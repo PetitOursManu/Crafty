@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "craft-host",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "env": { "PORT": "8787" },
+      "port": 8787
+    },
+    {
+      "name": "craft-host-sans-csp",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "env": { "PORT": "8788", "CSP": "off" },
+      "port": 8788
+    }
+  ]
+}

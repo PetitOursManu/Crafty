@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>craft-host · phase 0</title>
+  <link rel="stylesheet" href="/host.css">
+  <script type="module" src="/host.js"></script>
+</head>
+<body>
+  <div id="toast" role="alert" aria-live="assertive" hidden>
+    <div class="toast-body">
+      <strong>Attention : fichier non sauvegardé</strong>
+      <span id="toastDetail"></span>
+    </div>
+    <button id="toastRetry">Réessayer</button>
+    <button id="toastClose" aria-label="Masquer l'alerte">×</button>
+  </div>
+  <header>
+    <a href="/" class="back" title="Tableau de bord">←</a>
+    <strong id="title">craft-host</strong>
+    <span id="status" class="pill">chargement…</span>
+    <span id="dirty" class="pill">—</span>
+    <label class="btn">Ouvrir un fichier<input id="file" type="file" hidden></label>
+    <label><input id="asBlob" type="checkbox" disabled> envoyer en Blob (<code>file</code>)</label>
+    <label><input id="fail" type="checkbox"> stockage en échec</label>
+    <button id="reopen">Rouvrir la dernière sauvegarde</button>
+    <button id="download">Télécharger la dernière sauvegarde</button>
+    <span id="lastSave"></span>
+  </header>
+  <section id="control" hidden>
+    <button id="cmdList">commands()</button>
+    <input id="cmdId" placeholder="id de commande (ex. file.save)" size="28">
+    <button id="cmdRun">execute()</button>
+    <button id="docInspect">docInspect()</button>
+  </section>
+  <main>
+    <iframe id="app" title="application" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+    <aside><div class="logbar"><b>Journal des messages</b> <button id="clear">effacer</button></div><ol id="log"></ol></aside>
+  </main>
+</body>
+</html>

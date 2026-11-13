@@ -1,0 +1,42 @@
+{
+  "pdfcraft": {
+    "name": "PdfCraft",
+    "description": "Lire, annoter, organiser et signer des PDF.",
+    "extensions": [
+      "pdf"
+    ],
+    "version": "0.21.1",
+    "tag": "v0.21.1",
+    "zip": "pdfcraft-web-0.21.1.zip",
+    "zipSize": 34367297,
+    "sha256": "fe9708d46af191aebb56f70eb32cf8b112b0b9452d17ae6ba3a8c4a8665fe748",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "pdfcraft-web-0.21.1/",
+    "source": "https://github.com/storytold/pdfcraft/releases/tag/v0.21.1"
+  },
+  "wordcraft": {
+    "name": "WordCraft",
+    "description": "Traitement de texte compatible Word (docx, odt, rtf).",
+    "extensions": [
+      "docx",
+      "odt",
+      "rtf",
+      "md",
+      "txt"
+    ],
+    "version": "0.18.1",
+    "tag": "v0.18.1",
+    "zip": "wordcraft-web-0.18.1.zip",
+    "zipSize": 22536015,
+    "sha256": "3daa7c2d1f209a7eeb2527fcefa3fe31e875848fb1970d68f54edae55fe0bc9f",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "wordcraft-web-0.18.1/",
+    "source": "https://github.com/storytold/wordcraft/releases/tag/v0.18.1"
+  }
+}

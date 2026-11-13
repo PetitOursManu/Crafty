@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Craft · Applications</title>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script type="module" src="/dashboard.js"></script>
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div>
+        <h1>Applications</h1>
+        <p class="sub">Choisissez une application : elle s'ouvre dans le navigateur, vos fichiers restent sur le serveur.</p>
+      </div>
+      <details class="opts">
+        <summary>Options de test</summary>
+        <label><input type="checkbox" id="optControl"> pilotage (<code>?control</code>)</label>
+        <label><input type="checkbox" id="optWebgl"> forcer WebGL (<code>?webgl</code>)</label>
+      </details>
+    </header>
+
+    <section aria-labelledby="h-apps">
+      <h2 id="h-apps" class="visually-hidden">Applications disponibles</h2>
+      <ul id="apps" class="grid" aria-busy="true"></ul>
+      <p id="appsEmpty" class="empty" hidden>Aucune application installée. Lancez <code>npm run fetch pdfcraft</code>.</p>
+    </section>
+
+    <section aria-labelledby="h-files" class="files">
+      <div class="files-head">
+        <h2 id="h-files">Fichiers enregistrés</h2>
+        <button id="refresh" type="button">Actualiser</button>
+      </div>
+      <p class="sub">Prototype : stockage en mémoire du serveur, vidé à chaque redémarrage.</p>
+      <table id="files" hidden>
+        <thead><tr><th>Nom</th><th>Taille</th><th>Enregistré</th><th><span class="visually-hidden">Action</span></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="filesEmpty" class="empty">Aucun fichier pour l'instant.</p>
+    </section>
+  </main>
+</body>
+</html>
