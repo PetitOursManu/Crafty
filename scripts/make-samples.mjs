@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Génère les fichiers de test dans public/samples/ (ignoré par git) :
+// Génère les fichiers de test dans test/samples/ (ignoré par git) :
 //   test.pdf (3 pages), invalid.pdf (octets aléatoires), big.pdf (~100 Mo, flux binaires),
 //   test.docx (document Word minimal), big.docx (~40 Mo, image PNG non compressible embarquée).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const OUT = fileURLToPath(new URL('../public/samples/', import.meta.url));
+const OUT = fileURLToPath(new URL('../test/samples/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 
 function pdf(pages, extraBytesPerPage = 0) {

@@ -3,40 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>craft-host · phase 0</title>
+  <title>Craft</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/ui.css">
   <link rel="stylesheet" href="/host.css">
   <script type="module" src="/host.js"></script>
 </head>
 <body>
-  <div id="toast" role="alert" aria-live="assertive" hidden>
-    <div class="toast-body">
-      <strong>Attention : fichier non sauvegardé</strong>
-      <span id="toastDetail"></span>
+  <header class="hostbar">
+    <a class="btn icon ghost" id="back" href="/" title="Retour à mes fichiers" aria-label="Retour à mes fichiers"></a>
+    <span id="appTile"></span>
+    <div class="doc">
+      <div class="doc-name" id="docName">Chargement…</div>
+      <div class="doc-path" id="docPath"></div>
     </div>
-    <button id="toastRetry">Réessayer</button>
-    <button id="toastClose" aria-label="Masquer l'alerte">×</button>
-  </div>
-  <header>
-    <a href="/" class="back" title="Tableau de bord">←</a>
-    <strong id="title">craft-host</strong>
-    <span id="status" class="pill">chargement…</span>
-    <span id="dirty" class="pill">—</span>
-    <label class="btn">Ouvrir un fichier<input id="file" type="file" hidden></label>
-    <label><input id="asBlob" type="checkbox" disabled> envoyer en Blob (<code>file</code>)</label>
-    <label><input id="fail" type="checkbox"> stockage en échec</label>
-    <button id="reopen">Rouvrir la dernière sauvegarde</button>
-    <button id="download">Télécharger la dernière sauvegarde</button>
-    <span id="lastSave"></span>
+    <span id="status" class="status" role="status" aria-live="polite"><span class="dot"></span><span id="statusText"></span></span>
+    <div class="spacer"></div>
+    <label class="btn sm" id="localOpen" hidden><span>Ouvrir un fichier de l'ordinateur</span><input type="file" id="localFile" hidden></label>
+    <div id="account"></div>
   </header>
-  <section id="control" hidden>
-    <button id="cmdList">commands()</button>
-    <input id="cmdId" placeholder="id de commande (ex. file.save)" size="28">
-    <button id="cmdRun">execute()</button>
-    <button id="docInspect">docInspect()</button>
-  </section>
-  <main>
-    <iframe id="app" title="application" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
-    <aside><div class="logbar"><b>Journal des messages</b> <button id="clear">effacer</button></div><ol id="log"></ol></aside>
+  <main class="host-main">
+    <div class="frame-wrap">
+      <iframe id="app" title="Application" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+      <div id="loading" class="loading"><div class="spinner" aria-hidden="true"></div><span id="loadingText">Chargement de l'application…</span></div>
+    </div>
+    <aside id="debug" class="debug" hidden>
+      <div class="debug-bar"><strong>Journal (débogage)</strong>
+        <label class="check"><input type="checkbox" id="simFail"> simuler un échec</label>
+        <button class="btn sm" id="clearLog" type="button">effacer</button></div>
+      <ol id="log"></ol>
+    </aside>
   </main>
 </body>
 </html>

@@ -1,5 +1,4 @@
-// Outils Playwright pour les essais de la phase 0 (exploration et test e2e).
-// Utilise le Chromium déjà installé par Playwright (%LOCALAPPDATA%/ms-playwright) via playwright-core.
+// Outils Playwright pour les essais (exploration et test e2e) avec playwright-core et un Chrome déjà installé.
 import { chromium } from 'playwright-core';
 import { readFile } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
@@ -22,50 +21,46 @@ export function chromiumPath() {
   return undefined;
 }
 
-export async function launch({ base = 'http://localhost:8787', app = 'pdfcraft', flags = '', headless = true, args = [] } = {}) {
+// Navigateur + contexte ; `base` = URL du serveur. Les requêtes d'API de page.request portent l'en-tête Origin.
+export async function browserFor(base, { headless = true, args = [], colorScheme = 'light' } = {}) {
   const browser = await chromium.launch({ headless, args, executablePath: chromiumPath() });
-  const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, colorScheme, acceptDownloads: true });
   const page = await context.newPage();
-  const consoleMsgs = [];
+  const consoleMsgs = [], requests = [];
   page.on('console', (m) => consoleMsgs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => consoleMsgs.push(`[pageerror] ${e.message}`));
   page.on('response', (r) => { if (r.status() >= 400) consoleMsgs.push(`[http ${r.status()}] ${r.url()}`); });
-  page.on('requestfailed', (r) => consoleMsgs.push(`[failed] ${r.url()} ${r.failure()?.errorText}`));
-  const requests = [];
-  context.on('request', (r) => requests.push(r.url()));
-  context.on('serviceworker', () => {});
-  context.on('page', (p) => consoleMsgs.push(`[popup] ${p.url()}`));
   page.on('download', (d) => consoleMsgs.push(`[download] ${d.suggestedFilename()}`));
-  const t0 = Date.now();
-  await page.goto(`${base}/host.html?app=${app}${flags ? `&${flags}` : ''}`);
-  const h = {
-    browser, context, page, consoleMsgs, requests, t0,
-    frame: () => page.frame({ url: /\/apps\// }),
-    state: () => page.evaluate(() => JSON.parse(JSON.stringify(window.hostState))),
+  context.on('request', (r) => requests.push(r.url()));
+  const apiCall = async (method, path, { json, data, headers = {} } = {}) => {
+    const r = await page.request.fetch(`${base}${path}`, { method, headers: { origin: base, ...headers }, data: json !== undefined ? json : data });
+    const text = await r.text();
+    let body; try { body = JSON.parse(text); } catch { body = text; }
+    return { status: r.status(), body };
+  };
+  const b = {
+    browser, context, page, consoleMsgs, requests, base, api: apiCall,
+    async register(username, password) { return apiCall('POST', '/api/auth/register', { json: { username, password } }); },
+    async login(username, password) { return apiCall('POST', '/api/auth/login', { json: { username, password } }); },
+    async upload(path, { folder = 'root', name = path.split(/[\\/]/).pop() } = {}) {
+      const r = await apiCall('POST', `/api/files?folder=${folder}`, { data: await readFile(path), headers: { 'x-file-name': encodeURIComponent(name) } });
+      if (r.status >= 300) throw new Error(`upload ${r.status} ${JSON.stringify(r.body)}`);
+      return r.body;
+    },
+    // Ouvre la page hôte et attend `ready`.
+    async host(params, timeout = 120_000) {
+      await page.goto(`${base}/host.html?${new URLSearchParams(params).toString().replace(/=(&|$)/g, '$1')}`);
+      await page.waitForFunction(() => window.hostState?.ready || window.hostState?.failed.length, null, { timeout, polling: 100 });
+      return b.state();
+    },
+    state: () => page.evaluate(() => JSON.parse(JSON.stringify(window.hostState, (k, v) => (typeof v === 'function' ? undefined : v)))),
     log: () => page.evaluate(() => window.hostLog.map((l) => `${l.t.toFixed(2)} ${l.dir} ${l.text}`)),
-    async waitReady(timeout = 120_000) {
-      await page.waitForFunction(() => window.hostState.ready || window.hostState.failed.length, null, { timeout, polling: 100 });
-      return h.state();
-    },
-    async open(path, name = path.split(/[\\/]/).pop(), { asBlob = false } = {}) {
-      const bytes = await readFile(path);
-      // Le fichier passe par le serveur pour éviter de sérialiser 100 Mo dans evaluate().
-      const r = await page.request.post(`${base}/api/echo`, { data: bytes, headers: { 'x-file-name': encodeURIComponent(name), 'sec-fetch-site': 'same-origin' } });
-      const { id } = await r.json();
-      await page.evaluate(async ([id, asBlob]) => {
-        document.getElementById('asBlob').checked = asBlob;
-        await window.hostApi.openFromServer(id);
-      }, [id, asBlob]);
-    },
-    async waitFor(pred, timeout = 30_000) {
-      await page.waitForFunction(pred, null, { timeout, polling: 100 });
-    },
-    async clickApp(x, y) { // coordonnées relatives à l'iframe
-      const box = await page.locator('#app').boundingBox();
-      await page.mouse.click(box.x + x, box.y + y);
-    },
+    waitFor: (pred, timeout = 30_000, arg) => page.waitForFunction(pred, arg, { timeout, polling: 100 }),
+    // Exécute fn(window.<app>, arg) dans la page (l'application doit être chargée avec ?control).
+    inApp: (slug, fn, arg) => page.evaluate(([slug, src, arg]) => (0, eval)(src)(document.getElementById('app').contentWindow[slug], arg), [slug, fn.toString(), arg]),
+    async clickApp(x, y) { const box = await page.locator('#app').boundingBox(); await page.mouse.click(box.x + x, box.y + y); },
     shot: (path) => page.screenshot({ path }),
     close: () => browser.close(),
   };
-  return h;
+  return b;
 }

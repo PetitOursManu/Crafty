@@ -254,6 +254,15 @@ Compression du wasm, mesurée (taille / temps CPU sur cette machine) :
 - `vendor/` est **intact** après tous les essais : `scripts/verify-vendor.mjs` recalcule le SHA-256 de chaque
   fichier et le compare au manifeste écrit à la décompression (45 fichiers, 0 écart).
 
+## Thème des applications (constat du 14/11/2026)
+
+- **Vérifié** (Chrome, système en sombre, page en clair) : l'application dans l'iframe suit `prefers-color-scheme` du
+  **système** ; la propriété CSS `color-scheme` posée sur l'iframe par la page hôte n'a aucun effet.
+- Les deux applications ont une commande de thème : PdfCraft `view.theme.light` / `.dark` / `.system`, WordCraft
+  `view.interfaceTheme {value: "light"|"dark"|"system"}`. **Vérifié** : WordCraft applique le thème du compte via
+  `window.wordcraft` (toujours présent), mais refuse la commande tant qu'aucun document n'est ouvert (« Aucun document
+  n'est ouvert ») ; la page hôte réessaie. PdfCraft l'applique aussi, mais seulement avec `?control` (non activé par défaut).
+
 ## Non vérifié
 
 - Firefox et Safari.

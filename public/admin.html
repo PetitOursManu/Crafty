@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administration · Craft</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/ui.css">
+  <link rel="stylesheet" href="/admin.css">
+  <script type="module" src="/admin.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">C</span><span>Craft</span></a>
+    <span class="badge">Administration</span>
+    <div class="spacer"></div>
+    <a class="btn ghost" href="/">Mes fichiers</a>
+    <div id="account"></div>
+  </header>
+  <main class="admin">
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" id="tab-users" aria-controls="panel-users" aria-selected="true">Comptes</button>
+      <button role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Réglages</button>
+      <button role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="false" tabindex="-1">Journal</button>
+    </nav>
+
+    <section role="tabpanel" id="panel-users" aria-labelledby="tab-users">
+      <div class="panel-head">
+        <div><h2>Comptes</h2><p class="mut">Créez des comptes (mot de passe provisoire à changer) et choisissez leurs applications.</p></div>
+        <button class="btn primary" id="newUser" type="button">Nouveau compte</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Compte</th><th>Applications</th><th>Espace</th><th>Dernière connexion</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody id="users"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
+      <div class="panel-head"><div><h2>Réglages</h2><p class="mut">S'appliquent à tout le service.</p></div></div>
+      <form id="settings" class="settings"></form>
+    </section>
+
+    <section role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden>
+      <div class="panel-head">
+        <div><h2>Journal</h2><p class="mut">200 derniers événements : connexions, fichiers, administration.</p></div>
+        <button class="btn" id="refreshAudit" type="button">Actualiser</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table compact">
+          <thead><tr><th>Date</th><th>Compte</th><th>Action</th><th>Cible</th><th>Détail</th><th>IP</th></tr></thead>
+          <tbody id="audit"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

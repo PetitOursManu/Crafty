@@ -1,0 +1,11 @@
+.auth { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; gap: 16px; }
+.auth-card { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow-1); padding: 28px; display: flex; flex-direction: column; gap: 20px; }
+#view { display: flex; flex-direction: column; gap: 20px; }
+.auth-card h1 { font-size: 20px; }
+.auth-card .lead { margin: 4px 0 0; color: var(--mut); }
+.auth-card .btn.primary { width: 100%; justify-content: center; height: 38px; }
+.auth-alt { display: flex; flex-direction: column; gap: 8px; align-items: stretch; padding-top: 4px; border-top: 1px solid var(--line); }
+.auth-alt .btn { justify-content: center; }
+.linkish { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+.auth-foot { font-size: 12px; text-align: center; }

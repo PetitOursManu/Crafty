@@ -12,11 +12,17 @@ commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifi
 
 - `CLAUDE.md` (ce fichier) : décisions et règles.
 - `PLAN.md` : le plan détaillé (architecture, reprise de Mocky, API fichiers, sécurité, phases, risques, sources).
-- `PHASE0.md` : la mission du prototype. C'est la tâche en cours.
+- `PHASE0.md` : la mission du prototype (terminée).
 - `FINDINGS.md` : constats de la phase 0 (PdfCraft 0.21.1, WordCraft 0.18.1). Quand il contredit `PLAN.md` ou ce fichier, il a raison.
-- Code du prototype : `server.js`, `public/index.html` + `dashboard.*` (tableau de bord `/`), `public/host.*` (page hôte,
-  alerte rouge « fichier non sauvegardé » quand le stockage échoue), `scripts/fetch-app.mjs` (+ `unzip.mjs`, `verify-vendor.mjs`,
-  `make-samples.mjs`, `pw.mjs`), `test/` (`npm test`), `e2e/` (`npm run test:e2e`, Playwright + Chrome installé).
+- `README.md` : démarrage local.
+- Serveur : `server.js` (point d'entrée) et `src/` : `app.js` (assemblage, pages, accès aux applications), `auth.js` (comptes,
+  sessions, verrouillage), `files.js` (dossiers, fichiers, versions, quotas), `admin.js`, `static.js` (MIME, compression, CSP),
+  `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
+- Interface (`public/`) : `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
+  `host.*` (page hôte de production ; journal et outils seulement pour un admin avec `?debug`), `admin.*`, `ui.*` (composants
+  communs), `theme.js` (thème clair par défaut, avant le premier affichage).
+- Outils : `scripts/fetch-app.mjs` (+ `unzip.mjs`, `verify-vendor.mjs`), `make-samples.mjs`, `pw.mjs` (Playwright).
+  Tests : `test/` (`npm test`, serveur sur fausses applications), `e2e/` (`npm run test:e2e`, vraies applications dans Chrome).
 
 Distingue toujours « vérifié » (exécuté) de « lu dans la doc ». Ce que la phase 0 a vérifié est marqué comme tel ;
 le reste de `PLAN.md` vient de lectures.
@@ -101,6 +107,12 @@ boîte de dialogue ni perte de sélection (vérifié), mais un onglet masqué ne
   5. contrôle `Origin` / `Sec-Fetch-Site` sur toute requête qui modifie des données, jamais d'état modifié en `GET` ;
   6. une CSP, testée.
 - Données : SQLite (`better-sqlite3`) pour comptes, sessions, métadonnées.
+- Accès : le premier compte devient admin ; l'admin ouvre ou non l'inscription publique et le mode invité (sans stockage :
+  « Enregistrer » télécharge). Chaque compte a toutes les applications par défaut, ou une liste choisie par l'admin.
+  Une application non autorisée répond 404, comme un fichier d'autrui.
+- Fichiers : un enregistrement = une nouvelle version du même fichier (pas un nouveau fichier) ; « Enregistrer sous » et le premier
+  enregistrement d'un nouveau document demandent le nom ; un export d'un autre format va à côté, en demandant avant de remplacer.
+- Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.
 - Journal d'une ligne par événement de connexion (format compatible fail2ban) + journal d'audit.
@@ -111,12 +123,13 @@ boîte de dialogue ni perte de sélection (vérifié), mais un onglet masqué ne
 - Réponds-moi en français. Commits courts et cohérents.
 - Ne publie rien et n'expose aucun port en dehors de `localhost` sans me demander.
 
-## Feuille de route (phase 0 terminée le 13/11/2026 ; phase 1 en attente de mon accord)
+## Feuille de route (phases 0 à 3 faites le 14/11/2026 ; phase 4 à venir)
 
-0. Prototype jetable : PdfCraft puis WordCraft dans une page hôte, avec relevé des comportements réels (`PHASE0.md`, `FINDINGS.md`).
-1. Squelette serveur : comptes, sessions, verrouillage, limites, journaux.
-2. API fichiers : routes, quotas, versions, audit.
-3. Interface : connexion, « Mes documents », page hôte, avertissement avant de quitter.
+0. Prototype jetable : PdfCraft puis WordCraft dans une page hôte, avec relevé des comportements réels (`PHASE0.md`, `FINDINGS.md`). **Fait.**
+1. Squelette serveur : comptes, sessions, verrouillage, limites, journaux. **Fait** (inscription ouvrable par l'admin, mode invité).
+2. API fichiers : routes, quotas, versions, audit. **Fait** (dossiers, 10 versions par défaut, dernière application par fichier).
+3. Interface : connexion, explorateur de fichiers (accueil), page hôte, administration, thème clair/sombre. **Fait.**
+   Reste ouvert : sauvegarde automatique (`?control`), thème de PdfCraft (exige `?control`), `TRUST_PROXY` vérifié en vrai.
 4. Déploiement Coolify : Dockerfile, volume `/data`, domaine, sauvegarde, limites CPU/mémoire.
 5. Exploitation : script de mise à jour d'une application, fail2ban, comptes.
 6. Options : SSO avec Dashy, double authentification, partage.
