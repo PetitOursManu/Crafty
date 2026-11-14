@@ -283,6 +283,33 @@ Compression du wasm, mesurée (taille / temps CPU sur cette machine) :
   vidéo. Cause côté Opera non identifiée. Corrigé par prudence : plus de boucle de 10 min pour appliquer le thème quand
   WordCraft n'a pas de document, et plus aucun envoi d'un format que l'application ne lit pas.
 
+## Nouvelles applications (14/11/2026)
+
+**Vérifié** dans Chrome avec la page hôte réelle (zips contrôlés par `SHA256SUMS.txt` et l'API GitHub, `vendor/` intact) :
+
+| | GridCraft 0.19.1 | DeckCraft 0.18.1 | CadCraft 0.20.1 | FigCraft 0.18.1 |
+|---|---|---|---|---|
+| wasm brut / Brotli 9 / gzip 9 | 26,3 / 7,3 / 9,7 Mo | 33,2 / 8,7 / 11,9 Mo | 30,9 / 8,7 / 11,4 Mo | 25,5 / 8,4 / 10,5 Mo |
+| `ready` (premier chargement, compression à la volée) | 3,6 s | 8,1 s | 4,8 s | 5,7 s |
+| `ready` | `version:"1"`, `file:false` | idem | idem | idem |
+| Au démarrage en mode hôte | classeur vide | présentation vide | onglet Départ (sans dessin) | accueil (sans document) |
+| Boîte « Ouvrir » (`accept`) | xlsx xlsm xls xlsb ods csv tsv txt slk json | deckcraft pptx potx ppsx txt md | dxf dwg shx (multiple) | figcraft fig jam penpot sketch json svg png jpg jpeg webp gif tif tiff |
+| Nouveau document, Ctrl+S | `Book1.xlsx`, `saveAs:false` | `Presentation1.deckcraft`, `saveAs:true` | `Drawing1.dxf`, `saveAs:false` | `<nom>.figcraft`, `saveAs:true` |
+| Ctrl+S d'un document ouvert par la page | même nom, `saveAs:false` | idem | idem | idem |
+| `id` dans `save` | jamais | jamais | jamais | jamais |
+| Enregistrement piloté (sauvegarde auto) | `file.save` | `file.save` | `qsave {path: nom}` (sans path : « drawing has no file name yet ») | `ui.key {key:"S", ctrl:true}` (`file.save` : « no path yet », et « no file system » avec un path) |
+| Thème | `view.theme {mode}` | `view.dark {on}` (pas de « système ») | `ui.theme.<light/dark/system>` | `view.theme<Light/Dark/System>` |
+| Clés de réglages (`localStorage`) | `gridcraft.prefs`, `gridcraft.ui` | aucune (doc : rien n'est gardé) | `cadcraft.profile`, `cadcraft.prefs`, `cadcraft.panel-layout` | aucune relevée |
+| Ouverture de la boîte par | `file.open` | `app.openDialog` (`file.open` piloté : « use file.openBytes ») | `ui.open` | bouton « Ouvrir un fichier » |
+| CSP stricte | aucune violation | aucune | aucune | aucune |
+
+- Le test `e2e` de chacune passe : nouveau document, Enregistrer sous, nouvelle version, réouverture (contenu vérifié par
+  `docInspect`), sauvegarde automatique (une version « auto »), thème clair sur système sombre.
+- Licences : dépôts en Apache-2.0 (API GitHub) ; zips livrés avec LICENSE-MIT et LICENSE-APACHE ; FigCraft embarque des polices OFL.
+- **Non vérifié** : remise de fichiers par le sélecteur Crafty pour ces quatre (l'interception de la boîte, elle, est vérifiée) ;
+  synchronisation des réglages de GridCraft et CadCraft (même mécanisme que PdfCraft, testé sur PdfCraft) ; mémoire ; ouverture de
+  DWG, ODS, XLS, PPTX réels ; les formats d'`imports` (enregistrés ensuite sous quel nom ?).
+
 ## Non vérifié
 
 - Firefox et Safari.

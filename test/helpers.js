@@ -19,8 +19,8 @@ export async function startServer(opts = {}) {
     writeFileSync(join(v, '.htaccess'), 'secret');
   }
   writeFileSync(join(root, 'apps.json'), JSON.stringify({
-    demo: { name: 'Demo', version: '1.0.0', extensions: ['pdf'] },
-    other: { name: 'Other', version: '1.0.0', extensions: ['docx'] },
+    demo: { name: 'Demo', version: '1.0.0', extensions: ['pdf'], prefKeys: ['demo.ui', 'shared'] },
+    other: { name: 'Other', version: '1.0.0', extensions: ['docx'], prefKeys: ['other.ui', 'shared'] },
     absent: { name: 'Absent', version: '9.9.9' },
   }));
   mkdirSync(join(root, 'public'));

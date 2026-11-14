@@ -20,6 +20,24 @@
       "txt",
       "text"
     ],
+    "prefKeys": [
+      "pdfcraft",
+      "egui_memory_ron"
+    ],
+    "control": {
+      "save": "file.save",
+      "theme": {
+        "light": [
+          "view.theme.light"
+        ],
+        "dark": [
+          "view.theme.dark"
+        ],
+        "system": [
+          "view.theme.system"
+        ]
+      }
+    },
     "version": "0.21.1",
     "tag": "v0.21.1",
     "zip": "pdfcraft-web-0.21.1.zip",
@@ -58,6 +76,33 @@
       "json",
       "xml"
     ],
+    "prefKeys": [
+      "wordcraft.ui",
+      "egui_memory_ron"
+    ],
+    "control": {
+      "save": "file.save",
+      "theme": {
+        "light": [
+          "view.interfaceTheme",
+          {
+            "value": "light"
+          }
+        ],
+        "dark": [
+          "view.interfaceTheme",
+          {
+            "value": "dark"
+          }
+        ],
+        "system": [
+          "view.interfaceTheme",
+          {
+            "value": "system"
+          }
+        ]
+      }
+    },
     "version": "0.18.1",
     "tag": "v0.18.1",
     "zip": "wordcraft-web-0.18.1.zip",
@@ -69,5 +114,202 @@
     ],
     "stripPrefix": "wordcraft-web-0.18.1/",
     "source": "https://github.com/storytold/wordcraft/releases/tag/v0.18.1"
+  },
+  "gridcraft": {
+    "name": "GridCraft",
+    "description": "Tableur compatible Excel (xlsx, ods, csv).",
+    "extensions": [
+      "xlsx",
+      "xlsm",
+      "ods",
+      "csv",
+      "tsv"
+    ],
+    "imports": [
+      "xls",
+      "xlsb",
+      "slk",
+      "txt",
+      "json"
+    ],
+    "prefKeys": [
+      "gridcraft.prefs",
+      "gridcraft.ui"
+    ],
+    "control": {
+      "save": "file.save",
+      "theme": {
+        "light": [
+          "view.theme",
+          {
+            "mode": "light"
+          }
+        ],
+        "dark": [
+          "view.theme",
+          {
+            "mode": "dark"
+          }
+        ],
+        "system": [
+          "view.theme",
+          {
+            "mode": "system"
+          }
+        ]
+      }
+    },
+    "version": "0.19.1",
+    "tag": "v0.19.1",
+    "zip": "gridcraft-web-0.19.1.zip",
+    "zipSize": 9679862,
+    "sha256": "48c5d1b101befebb3c5ba3b7a14914f01c3207934813ed07dc4251b7ae116a78",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "gridcraft-web-0.19.1/",
+    "source": "https://github.com/storytold/gridcraft/releases/tag/v0.19.1"
+  },
+  "deckcraft": {
+    "name": "DeckCraft",
+    "description": "Présentations compatibles PowerPoint (pptx).",
+    "extensions": [
+      "pptx",
+      "deckcraft"
+    ],
+    "imports": [
+      "potx",
+      "ppsx",
+      "txt",
+      "md"
+    ],
+    "prefKeys": [],
+    "control": {
+      "save": "file.save",
+      "theme": {
+        "light": [
+          "view.dark",
+          {
+            "on": false
+          }
+        ],
+        "dark": [
+          "view.dark",
+          {
+            "on": true
+          }
+        ]
+      }
+    },
+    "version": "0.18.1",
+    "tag": "v0.18.1",
+    "zip": "deckcraft-web-0.18.1.zip",
+    "zipSize": 11910503,
+    "sha256": "3196e537fcfab538aaa2e88584bc74e29bb584459b916ab584ac22fbafe32db5",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "deckcraft-web-0.18.1/",
+    "source": "https://github.com/storytold/deckcraft/releases/tag/v0.18.1"
+  },
+  "cadcraft": {
+    "name": "CadCraft",
+    "description": "Dessin technique 2D (DXF, DWG).",
+    "extensions": [
+      "dxf",
+      "dwg"
+    ],
+    "imports": [],
+    "prefKeys": [
+      "cadcraft.profile",
+      "cadcraft.prefs",
+      "cadcraft.panel-layout"
+    ],
+    "control": {
+      "save": {
+        "command": "qsave",
+        "params": {
+          "path": "{name}"
+        }
+      },
+      "theme": {
+        "light": [
+          "ui.theme.light"
+        ],
+        "dark": [
+          "ui.theme.dark"
+        ],
+        "system": [
+          "ui.theme.system"
+        ]
+      }
+    },
+    "version": "0.20.1",
+    "tag": "v0.20.1",
+    "zip": "cadcraft-web-0.20.1.zip",
+    "zipSize": 11420690,
+    "sha256": "300e870c50b66d371055915ba95e3ddbfd4c45431466d5214743b5dcab95a0e1",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "cadcraft-web-0.20.1/",
+    "source": "https://github.com/storytold/cadcraft/releases/tag/v0.20.1"
+  },
+  "figcraft": {
+    "name": "FigCraft",
+    "description": "Design d'interfaces et maquettes (figcraft, import Figma, Sketch, SVG).",
+    "extensions": [
+      "figcraft"
+    ],
+    "imports": [
+      "fig",
+      "jam",
+      "penpot",
+      "sketch",
+      "svg",
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+      "gif",
+      "tif",
+      "tiff",
+      "json"
+    ],
+    "prefKeys": [],
+    "control": {
+      "save": {
+        "request": "ui.key",
+        "params": {
+          "key": "S",
+          "ctrl": true
+        }
+      },
+      "theme": {
+        "light": [
+          "view.themeLight"
+        ],
+        "dark": [
+          "view.themeDark"
+        ],
+        "system": [
+          "view.themeSystem"
+        ]
+      }
+    },
+    "version": "0.18.1",
+    "tag": "v0.18.1",
+    "zip": "figcraft-web-0.18.1.zip",
+    "zipSize": 10534024,
+    "sha256": "2fbeb93f5022b0a7cc9d8528f1ed7e2b54c94d213ef79e65128aa898c399f02b",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "figcraft-web-0.18.1/",
+    "source": "https://github.com/storytold/figcraft/releases/tag/v0.18.1"
   }
 }

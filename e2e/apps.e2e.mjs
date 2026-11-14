@@ -242,6 +242,112 @@ test('wordcraft : « Ouvrir » de l\'application → sélecteur Crafty (choisir,
   } finally { await b.close(); }
 });
 
+test('réglages des applications par compte : isolés sur un navigateur partagé, retrouvés ailleurs', { skip: missing('pdfcraft'), timeout: 180_000 }, async () => {
+  const shared = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = shared.page;
+  const lsPdf = () => p.evaluate(() => localStorage.getItem('pdfcraft'));
+  try {
+    // A (e2e0) change un réglage de PdfCraft.
+    await shared.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await shared.host({ app: 'pdfcraft' });
+    await shared.waitFor(() => window.hostState.control === true, 60_000);
+    await shared.inApp('pdfcraft', (a) => a.request('ui.set', { key: 'show_page_edge_shadows', value: 'false' }));
+    // eframe écrit ses réglages périodiquement (pas tout de suite) : on attend l'écriture.
+    await shared.waitFor(() => /"show_page_edge_shadows":false/.test(localStorage.getItem('pdfcraft') || ''), 60_000);
+    await p.evaluate(() => window.craftPrefsFlush());
+    const stored = (await shared.api('GET', '/api/prefs?keys=pdfcraft')).body.values.pdfcraft;
+    assert.match(stored, /"show_page_edge_shadows":false/);
+    assert.match(stored, /"author":"e2e0"/);
+
+    // B se connecte sur le même navigateur (sans déconnexion propre de A) : il ne voit pas les réglages de A.
+    await shared.api('POST', '/api/auth/logout');
+    const admin = await pw.browserFor(base);
+    await admin.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await admin.api('POST', '/api/admin/users', { json: { username: 'prefsb', password: 'provisoire1' } });
+    await admin.close();
+    await shared.api('POST', '/api/auth/login', { json: { username: 'prefsb', password: 'provisoire1' } });
+    await shared.api('POST', '/api/auth/password', { json: { current: 'provisoire1', password: 'motdepasse2' } });
+    await shared.host({ app: 'pdfcraft' });
+    await shared.waitFor(() => window.hostState.control === true, 60_000);
+    const bLocal = await lsPdf();
+    assert.ok(!bLocal || (!/"show_page_edge_shadows":false/.test(bLocal) && !/"author":"e2e0"/.test(bLocal)), 'réglages de A visibles pour B');
+
+    // A sur un autre navigateur : ses réglages reviennent.
+    const other = await pw.browserFor(base, { headless: !process.env.HEADED });
+    try {
+      await other.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await other.host({ app: 'pdfcraft' });
+      await other.waitFor(() => window.hostState.control === true, 60_000);
+      assert.match(await other.page.evaluate(() => localStorage.getItem('pdfcraft')), /"show_page_edge_shadows":false/);
+      const shadows = await other.inApp('pdfcraft', (a) => a.docInspect().then((d) => d.show_page_edge_shadows));
+      assert.equal(shadows, false, 'l\'application applique le réglage restauré');
+    } finally { await other.close(); }
+  } finally { await shared.close(); }
+});
+
+// Applications ajoutées le 14/11/2026 : nouveau document → modification → Ctrl+S (nom demandé) → Ctrl+S (nouvelle
+// version) → réouverture depuis Crafty (le contenu est là) → modification → sauvegarde automatique (version « auto »).
+const NEW_APPS = {
+  gridcraft: { modify: (a, n) => a.execute('cell.set', { cell: `A${n}`, input: String(40 + n) }),
+    check: async (a) => (await a.docInspect()).sheets[0].cells, expect: 2, name: 'Book1.xlsx' },
+  deckcraft: { modify: (a, n) => a.execute('shape.insert', { preset: 'rect', rect: [50 + n * 30, 50, 200, 100], text: `Essai ${n}` }),
+    // docInspect ne donne que le nombre de formes : 2 espaces réservés de la diapositive titre + 2 insertions.
+    check: async (a) => (await a.docInspect()).slides[0].shapes, expect: 4, name: 'Presentation1.deckcraft' },
+  cadcraft: { setup: (a) => a.execute('new', {}), modify: (a, n) => a.execute('line', { points: [[0, 0], [100 + n, 100]] }),
+    check: async (a) => (await a.docInspect()).entityCount, expect: 2, name: 'Drawing1.dxf' },
+  figcraft: { setup: (a) => a.execute('file.new', { name: 'Essai' }), modify: (a, n) => a.execute('node.create', { type: 'rectangle', x: 20 * n, y: 20, width: 100, height: 80 }),
+    check: async (a) => (await a.docInspect()).pages[0].children.length, expect: 2, name: 'Essai.figcraft' },
+};
+for (const [slug, c] of Object.entries(NEW_APPS)) {
+  test(`${slug} : nouveau document, enregistrer sous, version, réouverture, sauvegarde automatique, thème`, { skip: missing(slug), timeout: 180_000 }, async () => {
+    const b = await pw.browserFor(base, { headless: !process.env.HEADED, colorScheme: 'dark' });
+    const p = b.page;
+    const ctrlS = async () => { await b.clickApp(620, 420); await p.keyboard.press('Control+s'); };
+    try {
+      await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 3 } });
+      await b.api('PATCH', '/api/me', { json: { theme: 'light' } });
+      const folder = (await b.api('POST', '/api/folders', { json: { name: `Essais ${slug}` } })).body;
+      let st = await b.host({ app: slug, folder: folder.id });
+      assert.equal(st.ready.version, '1');
+      assert.equal(st.ready.appVersion, apps[slug].version);
+      await b.waitFor(() => window.hostState.control === true, 60_000);
+      await p.waitForTimeout(1500);
+      if (c.setup) await b.inApp(slug, c.setup);
+      await b.inApp(slug, c.modify, 1);
+      await p.waitForTimeout(500);
+      await ctrlS();
+      await p.waitForSelector('dialog[open] input');
+      assert.equal(await p.inputValue('dialog[open] input'), c.name);
+      await p.click('dialog[open] button[value=ok]');
+      await b.waitFor(() => window.hostState.saves[0]?.status === 'ok', 15_000);
+      await b.inApp(slug, c.modify, 2);
+      await p.waitForTimeout(500);
+      await ctrlS();
+      await b.waitFor(() => window.hostState.saves[1]?.status === 'ok', 15_000);
+      st = await b.state();
+      assert.deepEqual(st.saves.map((s) => s.target), ['post', 'put']);
+      const file = (await b.api('GET', `/api/fs?folder=${folder.id}`)).body.files.find((f) => f.name === c.name);
+      assert.equal(file.versions, 2);
+      assert.ok((await b.log()).some((l) => l.includes("thème de l'application : light")), 'thème du compte appliqué');
+
+      // Réouverture depuis Crafty : le contenu enregistré est là.
+      await b.host({ app: slug, file: file.id });
+      await b.waitFor(() => window.hostState.file && window.hostState.control === true, 60_000);
+      await p.waitForTimeout(2500);
+      assert.equal(await b.inApp(slug, c.check), c.expect);
+      await b.inApp(slug, c.modify, 3);
+      await b.waitFor(() => window.hostState.autosaves === 1, 30_000);
+      const vs = (await b.api('GET', `/api/files/${file.id}/versions`)).body;
+      assert.deepEqual(vs.map((v) => [v.n, v.auto]), [[3, true], [2, false], [1, false]]);
+      assert.deepEqual(b.consoleMsgs.filter((m) => /Content Security Policy|TrustedScript/.test(m)), [], 'violation de CSP');
+    } finally {
+      await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 30 } }).catch(() => {});
+      await b.close();
+    }
+  });
+}
+
 test('invité : application sans stockage, « Enregistrer » télécharge le fichier', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;

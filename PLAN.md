@@ -29,6 +29,9 @@ les corrections « (corrigé par la phase 0) ».
 - Dépôts publics `github.com/storytold/<slug>` pour : photocraft, vectorcraft, lightcraft, effectcraft, anicraft, designcraft,
   figcraft, texturecraft, materialcraft, soundcraft, wordcraft, deckcraft, cadcraft, gridcraft, craft-anything, filmcraft.
 - **Vérifiés en phase 0** : PdfCraft 0.21.1 et WordCraft 0.18.1 (zip, mode hôte, enregistrement, CSP, test e2e).
+- **Vérifiés le 14/11/2026** : GridCraft 0.19.1, DeckCraft 0.18.1, CadCraft 0.20.1, FigCraft 0.18.1 (`FINDINGS.md`). Seuls ces quatre
+  documentent `?host=parent` parmi les autres dépôts ; PhotoCraft, VectorCraft, LightCraft, EffectCraft, DesignCraft, TextureCraft,
+  MaterialCraft, SoundCraft ont un zip web mais pas de mode hôte documenté (lu, 14/11/2026).
   Différences entre les deux : voir `FINDINGS.md` § 10 (notamment `window.wordcraft` toujours exposé).
   PhotoCraft s'emballe autrement (lu) : wasm de 24 Mio avant compression, découpé en morceaux de 20 Mio au plus, Dockerfile
   et `nginx.conf` propres, mode hôte non mentionné dans le README. **Les 14 autres ne sont pas vérifiés.**

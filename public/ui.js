@@ -74,7 +74,7 @@ export function icon(name, cls = '') {
 }
 
 // Couleurs par application (pas de logo : les logos ArtCraft ne s'utilisent qu'inchangés, avec l'application).
-const APP_COLORS = { pdfcraft: '#d14532', wordcraft: '#2f6fed', photocraft: '#8a4bd8', deckcraft: '#e07b12', gridcraft: '#1d8a4e' };
+const APP_COLORS = { pdfcraft: '#d14532', wordcraft: '#2f6fed', photocraft: '#8a4bd8', deckcraft: '#e07b12', gridcraft: '#1d8a4e', cadcraft: '#0f7b8a', figcraft: '#c2338a' };
 export function appColor(slug) {
   if (APP_COLORS[slug]) return APP_COLORS[slug];
   let x = 0; for (const c of slug) x = (x * 31 + c.charCodeAt(0)) % 360;
@@ -87,7 +87,8 @@ export function appTile(app, cls = 'app-tile') {
 }
 // Couleur d'un type de fichier, pour l'icône.
 const EXT_COLORS = { pdf: '#d14532', docx: '#2f6fed', doc: '#2f6fed', odt: '#2f6fed', rtf: '#2f6fed', txt: '#6b6e78', md: '#6b6e78',
-  xlsx: '#1d8a4e', csv: '#1d8a4e', pptx: '#e07b12', png: '#8a4bd8', jpg: '#8a4bd8', jpeg: '#8a4bd8', svg: '#8a4bd8', zip: '#8a6d3b' };
+  xlsx: '#1d8a4e', xlsm: '#1d8a4e', ods: '#1d8a4e', csv: '#1d8a4e', tsv: '#1d8a4e', pptx: '#e07b12', deckcraft: '#e07b12',
+  dxf: '#0f7b8a', dwg: '#0f7b8a', figcraft: '#c2338a', fig: '#c2338a', png: '#8a4bd8', jpg: '#8a4bd8', jpeg: '#8a4bd8', svg: '#8a4bd8', zip: '#8a6d3b' };
 export const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '');
 export const extColor = (ext) => EXT_COLORS[ext] || '#7a7f8c';
 
@@ -261,7 +262,10 @@ export function changePasswordDialog() {
     } catch (err) { errEl.textContent = err.message; }
   });
 }
-export async function logout() {
+export async function logout(me) {
+  // Réglages en attente envoyés, puis ceux du compte retirés de ce navigateur (voir prefs-sync.js).
+  await window.craftPrefsFlush?.();
+  try { for (const k of [...new Set((me?.apps || []).flatMap((a) => a.prefKeys || [])), 'craft-prefs-sync']) localStorage.removeItem(k); } catch {}
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
   location.href = '/login.html';
 }
@@ -279,7 +283,7 @@ export function accountButton(me) {
       !me.guest && { label: 'Changer le mot de passe', icon: 'key', onClick: changePasswordDialog },
       !me.guest && me.user.role === 'admin' && { label: 'Administration', icon: 'shield', onClick: () => { location.href = '/admin.html'; } },
       { separator: true },
-      me.guest ? { label: 'Se connecter', icon: 'user', onClick: logout } : { label: 'Se déconnecter', icon: 'logout', onClick: logout },
+      me.guest ? { label: 'Se connecter', icon: 'user', onClick: () => logout(me) } : { label: 'Se déconnecter', icon: 'logout', onClick: () => logout(me) },
     ], menuAt(btn));
   });
   return btn;

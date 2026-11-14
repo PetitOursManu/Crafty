@@ -79,6 +79,13 @@ CREATE TABLE IF NOT EXISTS versions (
 );
 CREATE INDEX IF NOT EXISTS versions_file ON versions(file_id, n);
 CREATE INDEX IF NOT EXISTS versions_user ON versions(user_id);
+CREATE TABLE IF NOT EXISTS prefs (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY,
   at INTEGER NOT NULL,

@@ -5,6 +5,7 @@
 // enregistrée dès l'envoi, la page tient donc son propre état « non sauvegardé » et l'affiche (alerte rouge).
 import { api, h, icon, toast, dialog, confirmDialog, validName, appTile, extOf, accountButton, syncTheme } from '/ui.js';
 import { pickFiles } from '/picker.js';
+import { restorePrefs } from '/prefs-sync.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -15,7 +16,7 @@ const state = (window.hostState = { slug, ready: null, readyMs: null, dirty: fal
   folderId: q.get('folder') || null, saves: [], failed: [], control: undefined, guest: false, docs: {}, autosaves: 0,
   picks: 0, blocked: null, themeApplied: false });
 const hostLog = (window.hostLog = []);
-let me, app, debug = false, unsavedToast = null;
+let me, app, debug = false, unsavedToast = null, prefsSync = null;
 
 // ---------- Journal (visible seulement en débogage) ----------
 function describe(v) {
@@ -296,7 +297,7 @@ async function onSave(msg) {
     toast({ title: `Téléchargé : ${msg.name}`, detail: 'Mode invité : le fichier est dans vos téléchargements.' });
     return;
   }
-  // Un save qui arrive juste après notre execute('file.save') est la sauvegarde automatique.
+  // Un save qui arrive juste après notre commande d'enregistrement est la sauvegarde automatique.
   const auto = !!autoPending && Date.now() - autoPending < 15_000 && !msg.saveAs;
   autoPending = 0;
   const target = await resolveTarget(msg, { auto });
@@ -359,21 +360,25 @@ window.addEventListener('message', (event) => {
 // Elle suit le thème du système, pas celui de la page (color-scheme de l'iframe ignoré, vérifié). On lui applique le
 // choix du compte avec sa propre commande via window.<app> (?control, décision du 14/11/2026). WordCraft refuse
 // tant qu'aucun document n'est ouvert : quelques essais courts, puis on réessaie à l'ouverture d'un document ou à la
-// prochaine modification (pas de boucle de fond).
-const THEME_CMD = {
-  pdfcraft: (t) => [`view.theme.${t}`],
-  wordcraft: (t) => ['view.interfaceTheme', { value: t }],
-};
+// prochaine modification (pas de boucle de fond). Commandes par application dans apps.json (control.theme) ; une
+// application sans « system » (DeckCraft) reçoit clair ou sombre selon le système.
+function themeCommand() {
+  const t = app.control?.theme;
+  if (!t) return null;
+  const choice = window.craftTheme.get();
+  const resolved = choice === 'system' && !t.system ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : choice;
+  return t[resolved] || null;
+}
 let themeRun = 0;
 async function applyAppTheme() {
-  const cmd = THEME_CMD[slug];
+  const cmd = themeCommand();
   if (!cmd || !state.ready) return;
   const run = ++themeRun;
   for (let i = 0; i < 5 && run === themeRun; i++) {
     const a = iframe.contentWindow?.[slug];
     if (typeof a?.execute === 'function') {
       try {
-        await a.execute(...cmd(window.craftTheme.get()));
+        await a.execute(...cmd);
         state.themeApplied = true;
         log('info', `thème de l'application : ${window.craftTheme.get()}`, 'out');
         return;
@@ -385,14 +390,25 @@ async function applyAppTheme() {
 addEventListener('craft-theme-change', () => { state.themeApplied = false; applyAppTheme(); });
 
 // ---------- Sauvegarde automatique ----------
-// Sur dirty:true, après le délai réglé par l'admin (me.autosave, en secondes), execute('file.save') : l'application
+// Sur dirty:true, après le délai réglé par l'admin (me.autosave, en secondes), la commande d'enregistrement de
+// l'application (apps.json control.save : file.save, qsave pour CadCraft) : l'application
 // envoie un save sans boîte de dialogue (vérifié en phase 0). Seulement si un document de l'onglet est déjà stocké.
 // Un onglet masqué ne répond pas : on relance au retour au premier plan.
-let autosaveTimer = null, autoPending = 0;
+// control.save (apps.json) : un id de commande (execute), { command, params } ou { request, params } ; dans params,
+// « {name} » devient le nom du document actif dans l'application. Vérifié : FigCraft refuse file.save sur un document
+// ouvert par la page (ui.key Ctrl+S à la place) ; CadCraft refuse qsave sans path (qsave {path: nom}).
+function saveCall(a) {
+  const save = app.control?.save || 'file.save';
+  if (typeof save === 'string') return a.execute(save);
+  const name = Object.keys(state.docs).find((k) => state.docs[k].id === state.file?.id) || state.file?.name || '';
+  const params = JSON.parse(JSON.stringify(save.params || {}).replaceAll('{name}', name.replace(/["\\]/g, '')));
+  return save.request ? a.request(save.request, params) : a.execute(save.command, params);
+}
+let autosaveTimer = null, autoPending = 0, autoFailures = 0;
 function scheduleAutosave(delay = (me?.autosave ?? 0) * 1000) {
   clearTimeout(autosaveTimer);
   if (!delay || state.guest || !Object.keys(state.docs).length) return;
-  autosaveTimer = setTimeout(runAutosave, delay);
+  autosaveTimer = setTimeout(runAutosave, delay * 4 ** Math.min(autoFailures, 3)); // ralenti après un échec
 }
 async function runAutosave() {
   if (!state.dirty || state.saving || document.querySelector('dialog[open]')) return state.dirty && scheduleAutosave();
@@ -401,8 +417,15 @@ async function runAutosave() {
   if (typeof a?.execute !== 'function') return;
   autoPending = Date.now();
   log('info', 'sauvegarde automatique', 'out');
-  try { await a.execute('file.save'); }
-  catch (e) { autoPending = 0; log('info', `sauvegarde automatique : ${e?.message ?? e}`, 'err'); scheduleAutosave(); }
+  try {
+    await saveCall(a);
+    autoFailures = 0;
+  } catch (e) {
+    autoPending = 0;
+    autoFailures++;
+    log('info', `sauvegarde automatique : ${e?.message ?? e}`, 'err');
+    if (autoFailures <= 3) scheduleAutosave();
+  }
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.dirty) scheduleAutosave(3000); });
 
@@ -453,6 +476,9 @@ async function main() {
     $('back').href = pendingOpen.folderId ? `/?folder=${pendingOpen.folderId}` : '/';
   } else setDoc('Nouveau document');
   setStatus();
+  // Réglages de l'application du compte remis dans le navigateur avant son chargement (prefs-sync.js).
+  try { prefsSync = await restorePrefs(me, app); } catch (e) { log('info', `réglages non restaurés : ${e.message}`, 'err'); }
+  window.craftPrefsFlush = () => prefsSync?.flush();
   // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, ?control, drapeaux de rendu.
   const src = new URLSearchParams({ host: 'parent' });
   if (me.user) src.set('author', me.user.username);

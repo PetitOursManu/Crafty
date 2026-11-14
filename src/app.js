@@ -9,6 +9,7 @@ import { createAuth, checkCredentials, verifyPassword } from './auth.js';
 import { createStatic, notFound, safeFile } from './static.js';
 import { createFiles } from './files.js';
 import { adminRoutes } from './admin.js';
+import { prefsRoutes } from './prefs.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -55,7 +56,8 @@ export function createApp({
     return Object.keys(apps).filter((s) => mine.has(s));
   }
   const appJson = (slug) => ({ slug, name: apps[slug].name || slug, description: apps[slug].description || '',
-    version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [] });
+    version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [],
+    prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {} });
 
   // --- Connexion ---
   app.get('/api/auth/config', (req, res) => {
@@ -132,6 +134,7 @@ export function createApp({
   });
 
   files.routes(app, auth.requireUser, json);
+  prefsRoutes(app, { db, requireUser: auth.requireUser, allowedApps, apps });
   adminRoutes(app, { db, auth, files, log, apps, json });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));
 

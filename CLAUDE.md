@@ -129,6 +129,9 @@ charge pas l'application et propose celles qui le lisent.
 - Sauvegarde automatique : après `autosave_seconds` (réglage admin, 30 s par défaut, 0 = désactivée) suivant un `dirty:true`,
   documents déjà stockés seulement. Les sauvegardes automatiques successives remplacent une seule version « auto » ;
   seuls les enregistrements explicites ajoutent des versions.
+- Réglages des applications par compte : la page hôte remet dans le `localStorage` les `prefKeys` du compte (table `prefs`)
+  avant de charger l'application et renvoie les clés modifiées (10 s, arrière-plan, sortie) ; déconnexion = clés effacées ;
+  jamais les réglages d'un autre compte (marqueur `craft-prefs-sync`). Les applications écrivent leurs réglages ~30 s après.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.
@@ -152,9 +155,14 @@ charge pas l'application et propose celles qui le lisent.
 5. Exploitation : script de mise à jour d'une application, fail2ban, comptes.
 6. Options : SSO avec Dashy, double authentification, partage.
 
-Ajouter une application = lire son `packaging/web/README.md`, entrée dans `apps.json`, prototype
-(ouvrir, modifier, enregistrer, `saved`, recharger), mesurer le poids et la mémoire, puis activer.
-Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0). Toutes les autres : non vérifiées.
+Ajouter une application = `npm run fetch <slug>`, lire son `HOSTING.md`, sonder dans Chrome (`ready`, `accept` de sa boîte Ouvrir,
+`commands()`, clés `localStorage`, CSP), puis compléter son entrée dans `apps.json` : `name`, `description`, `extensions` (édités),
+`imports` (seulement ouverts), `prefKeys` (clés de réglages relevées), `control.save` (commande d'enregistrement : id, ou
+`{command|request, params}` avec `{name}` = nom du document) et `control.theme` (`light`/`dark`/`system` → commande). Ajouter son
+cas dans `e2e/apps.e2e.mjs` et faire passer `npm run test:e2e`.
+Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridCraft 0.19.1, DeckCraft 0.18.1, CadCraft 0.20.1 et
+FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`). Toutes les autres : non vérifiées (PhotoCraft, VectorCraft… n'ont pas de mode hôte
+documenté).
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
 PhotoCraft s'emballe autrement (wasm découpé en morceaux, Dockerfile et nginx.conf propres, mode hôte non documenté).
 FilmCraft n'a pas de version web.
