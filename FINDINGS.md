@@ -267,6 +267,22 @@ Compression du wasm, mesurée (taille / temps CPU sur cette machine) :
 - **Vérifié** : un second `open` envoyé à PdfCraft ouvre le document dans un onglet en arrière-plan ; l'onglet actif
   reste le premier, et `file.save` enregistre l'onglet actif.
 
+## Boîte « Ouvrir », formats et GPU (constats du 14/11/2026)
+
+- **Vérifié** (Chrome, `?control`) : `file.open` (les deux), `page.insert` (PdfCraft), `insert.picture` (WordCraft)
+  appellent `click()` sur un `<input type="file">` inséré par `rfd` (`#rfd-overlay`). `accept` relevé :
+  PdfCraft `.pdf .png .jpg .jpeg .tif .tiff .gif .bmp .jp2 .j2k .jpx .pcx .txt .text` (multiple pour l'insertion) ;
+  WordCraft `.docx .docm .dotx .dotm .doc .dot .odt .ott .fodt .rtf .txt .md .html .htm .mht .mhtml .tex .json .xml`.
+- **Vérifié** : remettre des fichiers à cet élément (`DataTransfer` + `change`) les fait ouvrir par l'application ;
+  après `cancel`, la boîte se rouvre normalement.
+- **Vérifié** : `rfd` insère un `<style>` constant (`sha256-9tSqG2Th9gNn6sbn1ZYMSqakJLznxnsamRDeigez2Mo=`), bloqué par la
+  CSP stricte jusqu'à son ajout.
+- Pic GPU signalé dans Opera après l'ouverture d'un PDF dans WordCraft : **non reproduit** dans Chrome (0,1 % de GPU sur
+  le même parcours, 2000×1040 à 150 %). **Mesuré** sur la machine : le processus GPU d'Opera restait à 59–66 % sur le
+  moteur « video codec » (décodage vidéo), sans onglet connecté à Crafty ; Crafty et les applications ne décodent pas de
+  vidéo. Cause côté Opera non identifiée. Corrigé par prudence : plus de boucle de 10 min pour appliquer le thème quand
+  WordCraft n'a pas de document, et plus aucun envoi d'un format que l'application ne lit pas.
+
 ## Non vérifié
 
 - Firefox et Safari.

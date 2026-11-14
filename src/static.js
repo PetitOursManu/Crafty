@@ -26,6 +26,10 @@ export const STRICT = (scripts = [], styles = []) => [
   "frame-ancestors 'self'",
 ].join('; ');
 const sha = (s) => `sha256-${createHash('sha256').update(s).digest('base64')}`;
+// Styles insérés à l'exécution par des bibliothèques communes aux applications (vérifié le 14/11/2026) :
+// rfd (boîte « Ouvrir ») ajoute un <style> constant pour #rfd-overlay. Si une version le change, le contrôle de
+// CSP de npm run test:e2e échoue : relever la nouvelle empreinte dans la console et la mettre ici.
+const RUNTIME_STYLES = ['sha256-9tSqG2Th9gNn6sbn1ZYMSqakJLznxnsamRDeigez2Mo='];
 export function inlineHashes(html) {
   const grab = (re) => [...html.matchAll(re)].map((m) => sha(m[1]));
   return { scripts: grab(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi), styles: grab(/<style[^>]*>([\s\S]*?)<\/style>/gi) };
@@ -48,8 +52,8 @@ export function safeFile(base, raw, index) {
 export function createStatic({ apps, vendorDir, csp }) {
   const appCsp = {};
   if (csp === 'auto') for (const [slug, a] of Object.entries(apps)) {
-    try { const h = inlineHashes(readFileSync(join(vendorDir, slug, a.version, 'index.html'), 'utf8')); appCsp[slug] = STRICT(h.scripts, h.styles); }
-    catch { appCsp[slug] = STRICT(); }
+    try { const h = inlineHashes(readFileSync(join(vendorDir, slug, a.version, 'index.html'), 'utf8')); appCsp[slug] = STRICT(h.scripts, [...h.styles, ...RUNTIME_STYLES]); }
+    catch { appCsp[slug] = STRICT([], RUNTIME_STYLES); }
   }
   const cache = new Map();
 

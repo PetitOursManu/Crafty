@@ -173,6 +173,75 @@ test('pdfcraft : sauvegarde automatique (une seule version auto), thème du comp
   } finally { await b.close(); }
 });
 
+test('format non pris en charge : message clair, application jamais chargée', { skip: missing('wordcraft'), timeout: 60_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  try {
+    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    const pdf = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Refus.pdf' });
+    await p.goto(`${base}/host.html?app=wordcraft&file=${pdf.id}`);
+    await p.waitForSelector('.blocked');
+    assert.match(await p.textContent('.blocked h2'), /WordCraft n'ouvre pas les fichiers \.pdf/);
+    assert.equal(await p.getAttribute('.blocked a.btn.primary', 'href'), `/host.html?app=pdfcraft&file=${pdf.id}`);
+    assert.equal(await p.locator('#app').getAttribute('src'), null, 'iframe jamais chargée');
+    assert.ok(!b.requests.some((u) => u.includes('/apps/wordcraft/')), 'aucun fichier de WordCraft demandé');
+    // L'explorateur ne propose pas WordCraft pour un PDF.
+    await p.goto(`${base}/`);
+    await p.click(`.item[data-key="f:${pdf.id}"]`, { button: 'right' });
+    await p.hover('.menu [role=menuitem]:has-text("Ouvrir avec")');
+    await p.waitForTimeout(300);
+    const labels = await p.locator('.menu').last().locator('[role=menuitem]').allTextContents();
+    assert.equal(labels.length, 1);
+    assert.ok(labels[0].endsWith('PdfCraft'), labels[0]);
+  } finally { await b.close(); }
+});
+
+test('wordcraft : « Ouvrir » de l\'application → sélecteur Crafty (choisir, importer, annuler)', { skip: missing('wordcraft'), timeout: 180_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  const openDialog = async () => {
+    await b.inApp('wordcraft', (a) => a.execute('file.open'));
+    await p.waitForSelector('dialog[open].picker-dlg');
+  };
+  try {
+    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    const first = await b.upload(join(SAMPLES, 'test.docx'), { name: 'Premier.docx' });
+    const second = await b.upload(join(SAMPLES, 'test.docx'), { name: 'Second.docx' });
+    await b.host({ app: 'wordcraft', file: first.id });
+    await b.waitFor(() => window.hostState.file && window.hostState.control === true, 60_000);
+    await p.waitForTimeout(1200);
+
+    // Annuler puis rouvrir : l'application n'est pas bloquée par la boîte annulée.
+    await openDialog();
+    const rows = await p.locator('dialog[open] .pk-row:not(.folder) .pk-name').allTextContents();
+    assert.ok(rows.includes('Second.docx') && !rows.some((r) => r.endsWith('.pdf')), `liste filtrée : ${rows}`);
+    await p.click('dialog[open] button[value=cancel]');
+    await openDialog();
+
+    // Choisir un fichier Crafty : WordCraft l'ouvre, et Ctrl+S l'enregistre dans CE fichier.
+    await p.click(`dialog[open] .pk-row:has-text("Second.docx")`);
+    await p.click('dialog[open] button[value=ok]');
+    await b.waitFor(() => window.hostState.file?.name === 'Second.docx', 15_000);
+    await p.waitForTimeout(1500);
+    await b.inApp('wordcraft', (a) => a.execute('text.insert', { text: 'Choisi ' }));
+    await b.waitFor(() => window.hostState.dirty === true);
+    await b.clickApp(600, 500);
+    await p.keyboard.press('Control+s');
+    await b.waitFor((n) => window.hostState.saves.length === n && window.hostState.saves.at(-1).status === 'ok', 15_000, 1);
+    assert.equal((await b.state()).saves[0].fileId, second.id);
+    assert.equal((await b.api('GET', `/api/files/${second.id}/versions`)).body.length, 2);
+    assert.equal((await b.api('GET', `/api/files/${first.id}/versions`)).body.length, 1, 'le premier document est intact');
+
+    // Importer depuis l'ordinateur : le fichier est rangé dans Crafty puis remis à l'application.
+    await openDialog();
+    await p.setInputFiles('dialog[open] input[type=file]', { name: 'Importé.docx', mimeType: 'application/octet-stream', buffer: readFileSync(join(SAMPLES, 'test.docx')) });
+    await b.waitFor(() => window.hostState.file?.name === 'Importé.docx', 15_000);
+    const fs = (await b.api('GET', '/api/fs')).body.files.map((f) => f.name);
+    assert.ok(fs.includes('Importé.docx'));
+    assert.deepEqual(b.consoleMsgs.filter((m) => /Content Security Policy|TrustedScript/.test(m)), [], 'violation de CSP');
+  } finally { await b.close(); }
+});
+
 test('invité : application sans stockage, « Enregistrer » télécharge le fichier', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;

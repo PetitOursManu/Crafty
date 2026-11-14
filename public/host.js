@@ -1,15 +1,19 @@
-// Page hôte : charge /apps/<slug>/?host=parent dans une iframe de même origine, ouvre le fichier demandé et
-// enregistre les `save` de l'application dans l'espace de fichiers du compte (nouvelle version à chaque fois).
+// Page hôte : charge /apps/<slug>/?host=parent&control dans une iframe de même origine, ouvre le fichier demandé,
+// remplace la boîte « Ouvrir » de l'application par le sélecteur Crafty, et enregistre chaque `save` dans le bon
+// fichier du compte (nouvelle version).
 // Constats de la phase 0 (FINDINGS.md) : pas d'`id` dans `save`, donc pas de `saved` ; l'application se croit
 // enregistrée dès l'envoi, la page tient donc son propre état « non sauvegardé » et l'affiche (alerte rouge).
-import { api, h, icon, toast, dialog, confirmDialog, validName, appTile, extOf, formatDateTime, accountButton, syncTheme } from '/ui.js';
+import { api, h, icon, toast, dialog, confirmDialog, validName, appTile, extOf, accountButton, syncTheme } from '/ui.js';
+import { pickFiles } from '/picker.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
 const slug = /^[a-z0-9-]+$/.test(q.get('app') || '') ? q.get('app') : null;
 const iframe = $('app');
+// docs : nom du document dans l'application → fichier Crafty où l'enregistrer (un par document ouvert).
 const state = (window.hostState = { slug, ready: null, readyMs: null, dirty: false, saving: false, unsaved: null, file: null,
-  folderId: q.get('folder') || null, saves: [], failed: [], control: undefined, guest: false, appName: null, autosaves: 0 });
+  folderId: q.get('folder') || null, saves: [], failed: [], control: undefined, guest: false, docs: {}, autosaves: 0,
+  picks: 0, blocked: null, themeApplied: false });
 const hostLog = (window.hostLog = []);
 let me, app, debug = false, unsavedToast = null;
 
@@ -33,11 +37,18 @@ function send(kind, fields, transfer = []) {
   iframe.contentWindow.postMessage(msg, location.origin, transfer);
 }
 
+// ---------- Formats ----------
+// extensions : formats que l'application édite et enregistre ; imports : formats qu'elle sait seulement ouvrir
+// (listes vérifiées dans l'attribut accept de leur boîte « Ouvrir »).
+const opens = (a, name) => [...(a.extensions || []), ...(a.imports || [])].includes(extOf(name));
+const edits = (a, name) => (a.extensions || []).includes(extOf(name));
+
 // ---------- En-tête et état ----------
 function setStatus() {
   const s = $('status');
   let cls, text;
-  if (state.unsaved) { cls = 'error'; text = 'Non sauvegardé'; }
+  if (state.blocked) { cls = ''; text = 'Format non pris en charge'; }
+  else if (state.unsaved) { cls = 'error'; text = 'Non sauvegardé'; }
   else if (state.saving) { cls = 'saving'; text = 'Enregistrement…'; }
   else if (state.dirty) { cls = 'dirty'; text = 'Modifications non enregistrées'; }
   else if (state.guest) { cls = ''; text = 'Mode invité : rien n\'est conservé'; }
@@ -53,16 +64,22 @@ function setDoc(name, path) {
   $('docPath').textContent = path ?? '';
   document.title = `${name} · ${app.name}`;
 }
+const pathText = (file) => ['Mes fichiers', ...(file.path || []).map((p) => p.name)].join(' › ');
+// Le document affiché dans l'en-tête devient `file` (dernier ouvert ou enregistré).
 async function showFile(file) {
+  if (!file.path) file = await api(`/api/files/${file.id}`);
   state.file = file;
   state.folderId = file.folderId;
-  const where = ['Mes fichiers', ...(file.path || []).map((p) => p.name)].join(' › ');
-  setDoc(file.name, where);
+  setDoc(file.name, pathText(file));
   $('back').href = file.folderId ? `/?folder=${file.folderId}` : '/';
   const u = new URL(location.href);
   u.searchParams.set('file', file.id); u.searchParams.delete('folder');
   history.replaceState(null, '', u);
   setStatus();
+}
+function track(appName, file) {
+  state.docs[appName] = file;
+  if (edits(app, file.name)) api(`/api/files/${file.id}`, { method: 'PATCH', body: { lastApp: slug } }).catch(() => {});
 }
 
 // ---------- Alerte « fichier non sauvegardé » ----------
@@ -76,26 +93,92 @@ function showUnsaved() {
   setStatus();
 }
 
+// ---------- Format non pris en charge : l'application n'est pas chargée ----------
+function showBlocked(file) {
+  state.blocked = { name: file.name, ext: extOf(file.name) };
+  setDoc(file.name, pathText(file));
+  $('back').href = file.folderId ? `/?folder=${file.folderId}` : '/';
+  const others = me.apps.filter((a) => a.slug !== slug && opens(a, file.name));
+  const ext = extOf(file.name);
+  $('loading').replaceChildren(h('div', { class: 'blocked', role: 'alert' },
+    h('h2', {}, `${app.name} n'ouvre pas les fichiers ${ext ? `.${ext}` : 'sans extension'}`),
+    h('p', { class: 'mut' }, `« ${file.name} » ne peut pas être ouvert dans ${app.name}.`,
+      others.length ? ' Il s\'ouvre avec :' : ' Aucune de vos applications ne lit ce format ; vous pouvez le télécharger.'),
+    h('div', { class: 'blocked-actions' },
+      ...others.map((a) => h('a', { class: 'btn primary', href: `/host.html?app=${a.slug}&file=${file.id}` }, appTile(a, 'app-tile mini'), `Ouvrir dans ${a.name}`)),
+      others.length ? null : h('a', { class: 'btn primary', href: `/api/files/${file.id}/content`, download: file.name }, icon('download'), 'Télécharger'),
+      h('a', { class: 'btn', href: $('back').href }, icon('back'), 'Retour à mes fichiers'))));
+  $('loading').hidden = false;
+  setStatus();
+}
+
 // ---------- Ouverture ----------
-async function openStoredFile(id) {
-  $('loadingText').textContent = 'Ouverture du document…';
+async function openStoredFile(file) {
   try {
-    const file = await api(`/api/files/${encodeURIComponent(id)}`);
-    const r = await api(`/api/files/${encodeURIComponent(id)}/content`, { raw: true });
+    const r = await api(`/api/files/${encodeURIComponent(file.id)}/content`, { raw: true });
     const bytes = await r.arrayBuffer();
     send('open', { name: file.name, bytes }, [bytes]);
-    state.appName = file.name;
+    track(file.name, file);
     await showFile(file);
-    api(`/api/files/${file.id}`, { method: 'PATCH', body: { lastApp: slug } }).catch(() => {});
+    applyAppTheme();
   } catch (e) {
     toast({ type: 'error', title: 'Impossible d\'ouvrir le document', detail: e.message });
     setDoc('Document introuvable');
   }
 }
 async function openLocal(f) {
+  if (!opens(app, f.name)) return toast({ type: 'error', title: 'Format non pris en charge', detail: `${app.name} n'ouvre pas les fichiers .${extOf(f.name) || '?'}` });
   const bytes = await f.arrayBuffer();
   send('open', { name: f.name, bytes }, [bytes]);
   setDoc(f.name, 'Fichier de l\'ordinateur');
+  applyAppTheme();
+}
+
+// ---------- « Ouvrir » de l'application → sélecteur Crafty ----------
+// Les deux applications ouvrent leur boîte de fichiers par click() sur un <input type="file"> (vérifié), avec la liste
+// des formats dans accept. Sur la fenêtre de l'iframe (même origine, fichiers de l'application intacts), on remplace
+// ce click() : le sélecteur Crafty s'ouvre, puis les fichiers choisis sont remis à l'élément comme si l'utilisateur
+// les avait pris sur son disque (DataTransfer + événement change). Annuler envoie l'événement cancel.
+function installPicker() {
+  const w = iframe.contentWindow;
+  if (state.guest || !w?.HTMLInputElement || w.__craftPicker) return;
+  w.__craftPicker = true;
+  const proto = w.HTMLInputElement.prototype;
+  const origClick = proto.click, origShow = proto.showPicker;
+  const intercept = function (orig) {
+    return function (...args) {
+      if (this.type !== 'file') return orig?.apply(this, args);
+      pickForInput(this);
+    };
+  };
+  proto.click = intercept(origClick);
+  if (origShow) proto.showPicker = intercept(origShow);
+}
+async function pickForInput(input) {
+  const w = iframe.contentWindow;
+  const exts = (input.accept || '').split(',').map((s) => s.trim().replace(/^\./, '').toLowerCase()).filter((s) => /^[a-z0-9]+$/.test(s));
+  state.picks++;
+  log('info', `boîte « Ouvrir » de l'application : accept=${input.accept} multiple=${input.multiple}`, 'out');
+  const files = await pickFiles({ title: input.multiple ? 'Choisir des fichiers' : 'Ouvrir', exts: [...new Set(exts)], multiple: input.multiple,
+    folderId: state.folderId, appName: app.name });
+  if (!files?.length) { input.dispatchEvent(new w.Event('cancel', { bubbles: true })); return; }
+  try {
+    const dt = new w.DataTransfer();
+    for (const f of files) {
+      const buf = await (await api(`/api/files/${f.id}/content`, { raw: true })).arrayBuffer();
+      dt.items.add(new w.File([buf], f.name, { lastModified: f.updatedAt }));
+      track(f.name, f);
+    }
+    input.files = dt.files;
+    input.dispatchEvent(new w.Event('input', { bubbles: true }));
+    input.dispatchEvent(new w.Event('change', { bubbles: true }));
+    // Un seul document d'un format que l'application édite : c'est le document ouvert.
+    if (files.length === 1 && edits(app, files[0].name) && !input.multiple) await showFile(files[0]);
+    applyAppTheme();
+  } catch (e) {
+    toast({ type: 'error', title: 'Impossible de transmettre le fichier', detail: e.message });
+    input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
+  }
 }
 
 // ---------- Enregistrement ----------
@@ -137,11 +220,6 @@ function saveAsDialog(suggested) {
     if (dot > 0) input.setSelectionRange(0, dot); else input.select();
   });
 }
-
-// Décide où vont les octets d'un `save` :
-// - Enregistrer sous, ou premier enregistrement d'un nouveau document → nom demandé, nouveau fichier ;
-// - même extension que le fichier ouvert → nouvelle version de ce fichier ;
-// - autre extension (export PDF/PNG de WordCraft) → fichier à part dans le même dossier (nouvelle version s'il existe).
 // Un export ne remplace pas en silence un fichier du même nom : on demande (Remplacer = nouvelle version).
 function conflictDialog(name) {
   return new Promise((resolve) => dialog({ title: 'Ce fichier existe déjà',
@@ -150,8 +228,15 @@ function conflictDialog(name) {
       h('button', { class: 'btn primary', value: 'replace', autofocus: true }, 'Remplacer')],
     onClose: (v) => resolve(v || 'cancel') }));
 }
-async function resolveTarget(msg) {
-  const exported = async (folderId) => {
+// Où vont les octets d'un `save` :
+// - format que l'application n'édite pas (PDF ou PNG depuis WordCraft) → export, à côté du document ;
+// - Enregistrer sous → nom demandé, nouveau fichier qui devient le document ;
+// - document connu (ouvert depuis Crafty, ou déjà enregistré) → nouvelle version de son fichier ;
+// - document inconnu (nouveau, ou ouvert depuis l'ordinateur) → nom demandé. Pendant une sauvegarde automatique, on
+//   ne surgit pas avec une boîte de dialogue : on le signale (« Enregistrer… »).
+async function resolveTarget(msg, { auto = false } = {}) {
+  if (!edits(app, msg.name)) {
+    const folderId = state.folderId;
     let replace = false;
     try {
       const d = await listFolder(folderId);
@@ -162,18 +247,10 @@ async function resolveTarget(msg) {
       }
     } catch {}
     return { kind: 'post', folderId, name: msg.name, replace, adopt: false, exported: true };
-  };
-  // Export d'un format que l'application n'édite pas (PDF depuis WordCraft…) : jamais adopté comme document courant.
-  if (!state.file && !app.extensions.includes(extOf(msg.name))) return exported(state.folderId);
-  if (msg.saveAs || !state.file) {
-    const r = await saveAsDialog(msg.name);
-    if (!r) return null;
-    return { kind: 'post', folderId: state.folderId, name: r.name, replace: r.replace, adopt: true };
   }
-  if (extOf(msg.name) !== extOf(state.file.name)) return exported(state.file.folderId);
-  if (msg.name === state.appName) return { kind: 'put', fileId: state.file.id, name: state.file.name };
-  // Même format mais autre nom : l'utilisateur a ouvert un autre document dans l'application elle-même.
-  // On ne l'écrit pas par-dessus le fichier ouvert : on demande où l'enregistrer.
+  const known = state.docs[msg.name];
+  if (known && !msg.saveAs) return { kind: 'put', fileId: known.id, name: known.name, doc: known, auto };
+  if (auto) return { defer: true };
   const r = await saveAsDialog(msg.name);
   return r ? { kind: 'post', folderId: state.folderId, name: r.name, replace: r.replace, adopt: true } : null;
 }
@@ -187,7 +264,7 @@ async function store(target, bytes) {
 }
 async function saveTo(target, bytes, msg) {
   state.saving = true; setStatus();
-  const entry = { name: msg.name, size: bytes.byteLength, id: msg.id, saveAs: msg.saveAs, target: target.kind };
+  const entry = { name: msg.name, size: bytes.byteLength, id: msg.id, saveAs: msg.saveAs, target: target.kind, auto: !!target.auto };
   state.saves.push(entry);
   try {
     const file = await store(target, bytes);
@@ -196,7 +273,8 @@ async function saveTo(target, bytes, msg) {
     state.unsaved = null;
     if (!target.exported) { state.lastSavedAt = Date.now(); state.lastSaveAuto = !!target.auto; }
     if (target.auto) state.autosaves++;
-    if (target.adopt) { state.appName = msg.name; await showFile(await api(`/api/files/${file.id}`)); }
+    if (target.adopt) track(msg.name, file);
+    if (!target.exported && file.id !== state.file?.id) await showFile(file);
     if (target.exported) toast({ title: `Exporté : ${file.name}`, detail: 'Enregistré à côté du document dans vos fichiers.' });
     if (msg.id !== undefined && msg.id !== null) send('saved', { id: msg.id });
   } catch (e) {
@@ -219,14 +297,15 @@ async function onSave(msg) {
     return;
   }
   // Un save qui arrive juste après notre execute('file.save') est la sauvegarde automatique.
-  const auto = autoPending && Date.now() - autoPending < 15_000 && !msg.saveAs;
+  const auto = !!autoPending && Date.now() - autoPending < 15_000 && !msg.saveAs;
   autoPending = 0;
-  const target = await resolveTarget(msg);
-  if (target && auto && target.kind === 'put') target.auto = true;
+  const target = await resolveTarget(msg, { auto });
   if (target?.cancel) return toast({ title: 'Export annulé', detail: msg.name });
-  if (!target) {
-    // Enregistrer sous annulé : l'application se croit enregistrée, on le signale.
-    state.unsaved = { name: msg.name, error: 'enregistrement annulé', retryLabel: 'Enregistrer…', retry: () => onSave(msg) };
+  if (!target || target.defer) {
+    // Nom refusé, ou document jamais enregistré pendant une sauvegarde automatique : l'application se croit
+    // enregistrée, on le signale et on propose d'enregistrer.
+    state.unsaved = { name: msg.name, error: target?.defer ? 'ce document n\'est pas encore dans vos fichiers' : 'enregistrement annulé',
+      retryLabel: 'Enregistrer…', retry: () => onSave({ ...msg, bytes: msg.bytes.slice(0) }) };
     showUnsaved();
     return;
   }
@@ -238,7 +317,7 @@ async function onHandoff(msg) {
   if (!bytes || state.guest) return toast({ type: 'error', title: 'Fichier transmis non pris en charge', detail: msg.name });
   try {
     const f = await store({ kind: 'post', folderId: state.folderId, name: msg.name, replace: false }, bytes);
-    const target = me.apps.find((a) => a.extensions.includes(extOf(f.name)));
+    const target = me.apps.find((a) => edits(a, f.name));
     toast({ title: `« ${f.name} » enregistré dans vos fichiers`, detail: target ? `Il s'ouvre avec ${target.name}.` : null, timeout: 10000,
       actions: target ? [{ label: `Ouvrir dans ${target.name}`, onClick: () => window.open(`/host.html?app=${target.slug}&file=${f.id}`, '_blank', 'noopener') }] : [] });
     if (target) send('handoff-done', { name: msg.name, app: target.slug });
@@ -246,6 +325,7 @@ async function onHandoff(msg) {
 }
 
 // ---------- Messages de l'application ----------
+let pendingOpen = null;
 window.addEventListener('message', (event) => {
   if (event.origin !== location.origin || event.source !== iframe.contentWindow) return;
   const msg = event.data;
@@ -257,12 +337,13 @@ window.addEventListener('message', (event) => {
     state.readyMs = Math.round(performance.now() - t0);
     $('loading').hidden = true;
     send('host', { version: '1', handoff: !state.guest });
-    if (q.get('file') && !state.guest) openStoredFile(q.get('file'));
+    installPicker();
+    if (pendingOpen) openStoredFile(pendingOpen);
     waitControl();
     applyAppTheme();
   } else if (kind === 'dirty') {
     state.dirty = !!msg.dirty; setStatus();
-    if (state.dirty) scheduleAutosave(); else clearTimeout(autosaveTimer);
+    if (state.dirty) { scheduleAutosave(); if (!state.themeApplied) applyAppTheme(); } else clearTimeout(autosaveTimer);
   } else if (kind === 'save') {
     onSave(msg);
   } else if (kind === 'failed') {
@@ -273,42 +354,48 @@ window.addEventListener('message', (event) => {
     onHandoff(msg);
   }
 });
-// Thème de l'application : elle suit le thème du système, pas celui de la page (color-scheme de l'iframe ignoré,
-// vérifié). On lui applique le choix du compte avec sa propre commande, via window.<app> (?control, décision du
-// 14/11/2026 : activé pour le thème et la sauvegarde automatique).
+
+// ---------- Thème de l'application ----------
+// Elle suit le thème du système, pas celui de la page (color-scheme de l'iframe ignoré, vérifié). On lui applique le
+// choix du compte avec sa propre commande via window.<app> (?control, décision du 14/11/2026). WordCraft refuse
+// tant qu'aucun document n'est ouvert : quelques essais courts, puis on réessaie à l'ouverture d'un document ou à la
+// prochaine modification (pas de boucle de fond).
 const THEME_CMD = {
   pdfcraft: (t) => [`view.theme.${t}`],
   wordcraft: (t) => ['view.interfaceTheme', { value: t }],
 };
+let themeRun = 0;
 async function applyAppTheme() {
   const cmd = THEME_CMD[slug];
-  if (!cmd) return;
-  // WordCraft refuse la commande tant qu'aucun document n'est ouvert : on réessaie (jusqu'à 10 min, sans bruit).
-  let lastErr;
-  for (let i = 0; i < 600; i++) {
-    const api = iframe.contentWindow?.[slug];
-    if (typeof api?.execute === 'function') {
-      try { await api.execute(...cmd(window.craftTheme.get())); log('info', `thème de l'application : ${window.craftTheme.get()}`, 'out'); return; }
-      catch (e) { lastErr = e?.message ?? String(e); }
-    } else if (i > 100) break; // pas d'API : l'application suit le système
+  if (!cmd || !state.ready) return;
+  const run = ++themeRun;
+  for (let i = 0; i < 5 && run === themeRun; i++) {
+    const a = iframe.contentWindow?.[slug];
+    if (typeof a?.execute === 'function') {
+      try {
+        await a.execute(...cmd(window.craftTheme.get()));
+        state.themeApplied = true;
+        log('info', `thème de l'application : ${window.craftTheme.get()}`, 'out');
+        return;
+      } catch (e) { log('info', `thème de l'application refusé : ${e?.message ?? e}`, 'err'); }
+    }
     await new Promise((r) => setTimeout(r, 1000));
   }
-  if (lastErr) log('info', `thème de l'application non appliqué : ${lastErr}`, 'err');
 }
-addEventListener('craft-theme-change', () => applyAppTheme());
+addEventListener('craft-theme-change', () => { state.themeApplied = false; applyAppTheme(); });
 
 // ---------- Sauvegarde automatique ----------
 // Sur dirty:true, après le délai réglé par l'admin (me.autosave, en secondes), execute('file.save') : l'application
-// envoie un save sans boîte de dialogue (vérifié en phase 0). Seulement pour un document déjà stocké. Un onglet
-// masqué ne répond pas : on relance au retour au premier plan.
+// envoie un save sans boîte de dialogue (vérifié en phase 0). Seulement si un document de l'onglet est déjà stocké.
+// Un onglet masqué ne répond pas : on relance au retour au premier plan.
 let autosaveTimer = null, autoPending = 0;
 function scheduleAutosave(delay = (me?.autosave ?? 0) * 1000) {
   clearTimeout(autosaveTimer);
-  if (!delay || state.guest || !state.file) return;
+  if (!delay || state.guest || !Object.keys(state.docs).length) return;
   autosaveTimer = setTimeout(runAutosave, delay);
 }
 async function runAutosave() {
-  if (!state.dirty || state.saving || !state.file || document.querySelector('dialog[open]')) return scheduleAutosave();
+  if (!state.dirty || state.saving || document.querySelector('dialog[open]')) return state.dirty && scheduleAutosave();
   if (document.visibilityState === 'hidden') return; // relancé par visibilitychange
   const a = iframe.contentWindow?.[slug];
   if (typeof a?.execute !== 'function') return;
@@ -349,19 +436,31 @@ async function main() {
   if (state.folderId) $('back').href = `/?folder=${encodeURIComponent(state.folderId)}`;
   if (state.guest) {
     $('localOpen').hidden = false;
-    $('localFile').accept = app.extensions.map((e) => `.${e}`).join(',');
+    $('localFile').accept = [...app.extensions, ...(app.imports || [])].map((e) => `.${e}`).join(',');
     $('localFile').onchange = (e) => { const f = e.target.files[0]; if (f) openLocal(f); e.target.value = ''; };
   }
-  setDoc(q.get('file') ? 'Ouverture…' : 'Nouveau document');
+  // Document demandé : vérifié avant de charger l'application (un format qu'elle ne lit pas n'est jamais envoyé).
+  if (q.get('file') && !state.guest) {
+    setDoc('Ouverture…');
+    try { pendingOpen = await api(`/api/files/${encodeURIComponent(q.get('file'))}`); }
+    catch (e) {
+      $('loading').replaceChildren(h('div', { class: 'blocked', role: 'alert' }, h('h2', {}, 'Document introuvable'),
+        h('p', { class: 'mut' }, e.message), h('div', { class: 'blocked-actions' }, h('a', { class: 'btn', href: '/' }, icon('back'), 'Retour à mes fichiers'))));
+      setDoc('Document introuvable'); return;
+    }
+    if (!opens(app, pendingOpen.name)) return showBlocked(pendingOpen);
+    setDoc(pendingOpen.name, pathText(pendingOpen));
+    $('back').href = pendingOpen.folderId ? `/?folder=${pendingOpen.folderId}` : '/';
+  } else setDoc('Nouveau document');
   setStatus();
-  // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, drapeaux de rendu transmis.
+  // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, ?control, drapeaux de rendu.
   const src = new URLSearchParams({ host: 'parent' });
   if (me.user) src.set('author', me.user.username);
   src.append('control', ''); // window.<app> : thème et sauvegarde automatique
   for (const f of ['webgl', 'cpu']) if (q.has(f)) src.append(f, '');
   t0 = performance.now();
   iframe.src = `/apps/${slug}/?${src.toString().replace(/=(&|$)/g, '$1')}`;
-  setTimeout(() => { if (!state.ready && !state.failed.length) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);
+  setTimeout(() => { if (!state.ready && !state.failed.length && !state.blocked) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);
 }
 main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: 'Chargement impossible', detail: e.message }); });
 window.hostApi = { send, openStoredFile, get api() { return iframe.contentWindow[slug]; } };

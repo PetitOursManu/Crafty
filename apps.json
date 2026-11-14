@@ -5,6 +5,21 @@
     "extensions": [
       "pdf"
     ],
+    "imports": [
+      "png",
+      "jpg",
+      "jpeg",
+      "tif",
+      "tiff",
+      "gif",
+      "bmp",
+      "jp2",
+      "j2k",
+      "jpx",
+      "pcx",
+      "txt",
+      "text"
+    ],
     "version": "0.21.1",
     "tag": "v0.21.1",
     "zip": "pdfcraft-web-0.21.1.zip",
@@ -22,10 +37,26 @@
     "description": "Traitement de texte compatible Word (docx, odt, rtf).",
     "extensions": [
       "docx",
+      "docm",
+      "dotx",
+      "dotm",
+      "doc",
+      "dot",
       "odt",
+      "ott",
+      "fodt",
       "rtf",
-      "md",
-      "txt"
+      "txt",
+      "md"
+    ],
+    "imports": [
+      "html",
+      "htm",
+      "mht",
+      "mhtml",
+      "tex",
+      "json",
+      "xml"
     ],
     "version": "0.18.1",
     "tag": "v0.18.1",

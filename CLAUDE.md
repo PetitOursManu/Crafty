@@ -80,6 +80,15 @@ onglet masqué ne répond qu'une fois visible. Thème : `view.theme.<light|dark|
 `view.interfaceTheme {value}` (WordCraft, refusé tant qu'aucun document n'est ouvert) ; l'iframe ignore `color-scheme`.
 PdfCraft ouvre un second document reçu par `open` dans un onglet en arrière-plan.
 
+**Boîte « Ouvrir » des applications (vérifié le 14/11/2026)** : les deux applications l'ouvrent par `click()` sur un
+`<input type="file">` (bibliothèque `rfd`), avec leurs formats dans `accept`. La page hôte remplace ce `click()` sur la
+fenêtre de l'iframe (même origine ; aucun fichier de `vendor/` modifié) : le sélecteur Crafty s'ouvre, et les fichiers
+choisis ou importés sont remis à l'élément (`DataTransfer` + `change` ; Annuler → `cancel`). Vaut aussi pour « Insérer des
+pages », « Images », etc. `rfd` insère un `<style>` constant : son empreinte est autorisée dans `src/static.js`
+(`RUNTIME_STYLES`). Formats dans `apps.json` : `extensions` (édités et enregistrés) et `imports` (seulement ouverts),
+relevés dans ces `accept`. Un fichier d'un format que l'application ne lit pas n'est jamais envoyé : la page hôte ne
+charge pas l'application et propose celles qui le lisent.
+
 ## Exigences serveur pour les fichiers statiques (README de chaque application)
 
 - `.wasm` en `application/wasm`, `.js` en `text/javascript`.

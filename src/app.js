@@ -55,7 +55,7 @@ export function createApp({
     return Object.keys(apps).filter((s) => mine.has(s));
   }
   const appJson = (slug) => ({ slug, name: apps[slug].name || slug, description: apps[slug].description || '',
-    version: apps[slug].version, extensions: apps[slug].extensions || [] });
+    version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [] });
 
   // --- Connexion ---
   app.get('/api/auth/config', (req, res) => {

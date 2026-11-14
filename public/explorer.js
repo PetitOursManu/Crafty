@@ -35,10 +35,14 @@ function folderIcon() {
 
 // ---------- Applications ----------
 const appBySlug = (s) => state.apps.find((a) => a.slug === s);
+// extensions : formats que l'application édite ; imports : formats qu'elle sait seulement ouvrir (conversion).
 const appsFor = (name) => state.apps.filter((a) => a.extensions.includes(extOf(name)));
+const importersFor = (name) => state.apps.filter((a) => (a.imports || []).includes(extOf(name)) && !a.extensions.includes(extOf(name)));
+// Ouvrir = la dernière application utilisée pour ce fichier si elle lit encore ce format, sinon celle qui l'édite.
 function defaultApp(file) {
   const last = appBySlug(file.lastApp);
-  return last || appsFor(file.name)[0] || null;
+  if (last && (appsFor(file.name).includes(last) || importersFor(file.name).includes(last))) return last;
+  return appsFor(file.name)[0] || null;
 }
 function hostUrl(slug, params) {
   const p = new URLSearchParams({ app: slug, ...params });
@@ -177,17 +181,19 @@ function showItemMenu(kind, x, at) {
   }
   const def = defaultApp(x);
   const compatible = appsFor(x.name);
-  const others = state.apps.filter((a) => !compatible.includes(a));
+  const importers = importersFor(x.name);
   const withApp = (a) => ({ label: a.name, icon: appTile(a, 'app-tile mini'), onClick: () => openFile(x, a.slug) });
+  const ext = extOf(x.name);
+  // Seules les applications qui lisent ce format sont proposées (les autres afficheraient une erreur).
   openMenu([
     def ? { label: `Ouvrir dans ${def.name}`, icon: 'open', hint: 'Entrée', onClick: () => openFile(x, def.slug) }
-      : { label: 'Aucune application pour ce format', icon: 'open', disabled: true },
-    { label: 'Ouvrir avec', icon: 'grid', disabled: !state.apps.length, submenu: [
+      : { label: `Aucune application n'ouvre les fichiers ${ext ? `.${ext}` : 'sans extension'}`, icon: 'open', disabled: true },
+    compatible.length + importers.length ? { label: 'Ouvrir avec', icon: 'grid', submenu: [
       ...compatible.map(withApp),
-      others.length && compatible.length ? { separator: true } : null,
-      others.length ? { heading: 'Format non prévu' } : null,
-      ...others.map(withApp),
-    ] },
+      importers.length && compatible.length ? { separator: true } : null,
+      importers.length ? { heading: 'Convertir avec' } : null,
+      ...importers.map(withApp),
+    ] } : null,
     { separator: true },
     { label: 'Télécharger', icon: 'download', onClick: () => downloadFile(x) },
     { label: 'Versions…', icon: 'history', hint: `${x.versions ?? 1}`, onClick: () => versionsDialog(x) },
