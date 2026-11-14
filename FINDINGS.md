@@ -353,7 +353,7 @@ FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **
 - Un Ctrl+O simulé n'est pris que si le canvas a le focus (attribut `tabindex` posé à l'exécution).
 - **Vérifié** : en mode pont, l'export Word de PdfCraft est capté et rangé à côté du document (plus de téléchargement).
 - **Instable, cause non établie** : DesignCraft n'a pas démarré (aucun signal en 60 puis 150 s) dans 2 batteries complètes
-  sur 5 ; il démarre à chaque essai isolé. Diagnostic automatique ajouté au test (capture + état).
+  sur 6 (les deux dernières, après relèvement des délais, sont entièrement vertes) ; il démarre à chaque essai isolé. Diagnostic automatique ajouté au test (capture + état).
 
 ## Non vérifié
 
