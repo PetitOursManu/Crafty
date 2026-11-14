@@ -3,8 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Craft</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Crafty</title>
+  <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/brand/favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1d1772">
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="/ui.css">
   <link rel="stylesheet" href="/host.css">
@@ -26,7 +30,7 @@
   <main class="host-main">
     <div class="frame-wrap">
       <iframe id="app" title="Application" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
-      <div id="loading" class="loading"><div class="spinner" aria-hidden="true"></div><span id="loadingText">Chargement de l'application…</span></div>
+      <div id="loading" class="loading"><img class="loading-logo" src="/brand/crafty-128.webp" alt="" width="64" height="64"><div class="spinner" aria-hidden="true"></div><span id="loadingText">Chargement de l'application…</span></div>
     </div>
     <aside id="debug" class="debug" hidden>
       <div class="debug-bar"><strong>Journal (débogage)</strong>

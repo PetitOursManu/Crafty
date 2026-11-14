@@ -12,10 +12,10 @@ const MIME = {
   '.wasm': 'application/wasm', '.json': 'application/json', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
   '.onnx': 'application/octet-stream', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
-  '.toml': 'text/plain; charset=utf-8',
+  '.toml': 'text/plain; charset=utf-8', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json',
 };
 // .onnx (modèles OCR) : gain de compression nul (mesuré), donc servis tels quels.
-const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.wasm', '.json', '.css', '.svg', '.txt', '.md', '.toml']);
+const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.wasm', '.json', '.css', '.svg', '.txt', '.md', '.toml', '.webmanifest']);
 // Noms produits par trunk : <nom>-<16 hex>[_bg|_loader].<ext>
 export const HASHED = /-[0-9a-f]{16}(_bg|_loader)?\.(wasm|js|ico|css)$/;
 // Politique la plus stricte vérifiée en phase 0 (FINDINGS.md § 7). Trusted Types casse l'OCR de PdfCraft.

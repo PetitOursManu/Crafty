@@ -74,7 +74,7 @@ async function load(folderId = state.folder?.id ?? null, { push = false } = {}) 
   const url = data.folder ? `/?folder=${data.folder.id}` : '/';
   if (push) history.pushState({ folder: data.folder?.id ?? null }, '', url);
   else history.replaceState({ folder: data.folder?.id ?? null }, '', url);
-  document.title = `${data.folder ? data.folder.name : 'Mes fichiers'} · Craft`;
+  document.title = `${data.folder ? data.folder.name : 'Mes fichiers'} · Crafty`;
 }
 const findItem = (key) => {
   const [kind, id] = key.split(':');

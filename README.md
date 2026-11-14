@@ -1,4 +1,4 @@
-# craft-host
+# Crafty (craft-host)
 
 Héberge les applications web Craft (PdfCraft, WordCraft…) derrière une connexion, avec un espace de fichiers
 par compte (dossiers, versions, quotas). Les applications tournent dans le navigateur ; le serveur authentifie,
