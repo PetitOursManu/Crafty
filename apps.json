@@ -335,6 +335,23 @@
   },
   "vectorcraft": {
     "enabled": false,
+    "mode": "intercept",
+    "name": "VectorCraft",
+    "extensions": [
+      "vectorcraft"
+    ],
+    "imports": [
+      "drawcraft",
+      "svg",
+      "svgz",
+      "pdf",
+      "ai",
+      "eps",
+      "dxf",
+      "emf",
+      "wmf",
+      "psd"
+    ],
     "version": "0.24.1",
     "tag": "v0.24.1",
     "zip": "vectorcraft-web-0.24.1.zip",
@@ -363,6 +380,12 @@
   },
   "effectcraft": {
     "enabled": false,
+    "mode": "intercept",
+    "name": "EffectCraft",
+    "extensions": [
+      "ecproj"
+    ],
+    "imports": [],
     "version": "0.24.1",
     "tag": "v0.24.1",
     "zip": "effectcraft-web-0.24.1.zip",
@@ -376,7 +399,20 @@
     "source": "https://github.com/storytold/effectcraft/releases/tag/v0.24.1"
   },
   "designcraft": {
-    "enabled": false,
+    "enabled": true,
+    "mode": "intercept",
+    "name": "DesignCraft",
+    "description": "Mise en page (designcraft, import InDesign IDML).",
+    "extensions": [
+      "designcraft"
+    ],
+    "imports": [
+      "idml",
+      "indd",
+      "indt"
+    ],
+    "prefKeys": [],
+    "control": {},
     "version": "0.20.1",
     "tag": "v0.20.1",
     "zip": "designcraft-web-0.20.1.zip",
@@ -391,6 +427,28 @@
   },
   "texturecraft": {
     "enabled": false,
+    "mode": "intercept",
+    "name": "TextureCraft",
+    "extensions": [
+      "tcraft"
+    ],
+    "imports": [
+      "glb",
+      "gltf",
+      "fbx",
+      "dae",
+      "usd",
+      "usda",
+      "usdc",
+      "usdz",
+      "abc",
+      "obj",
+      "ply",
+      "stl"
+    ],
+    "control": {
+      "open": "keys"
+    },
     "version": "0.6.1",
     "tag": "v0.6.1",
     "zip": "texturecraft-web-0.6.1.zip",
@@ -405,6 +463,17 @@
   },
   "materialcraft": {
     "enabled": false,
+    "mode": "intercept",
+    "name": "MaterialCraft",
+    "extensions": [
+      "zip",
+      "mcraft",
+      "sbs"
+    ],
+    "imports": [],
+    "control": {
+      "open": "keys"
+    },
     "version": "0.4.1",
     "tag": "v0.4.1",
     "zip": "materialcraft-web-0.4.1.zip",
@@ -418,7 +487,22 @@
     "source": "https://github.com/storytold/materialcraft/releases/tag/v0.4.1"
   },
   "soundcraft": {
-    "enabled": false,
+    "enabled": true,
+    "mode": "intercept",
+    "name": "SoundCraft",
+    "description": "Station audio : pistes, clips, mixage (scraftz).",
+    "extensions": [
+      "scraftz",
+      "scraft"
+    ],
+    "imports": [],
+    "prefKeys": [
+      "ui",
+      "ui.json",
+      "export_presets",
+      "egui_memory_ron"
+    ],
+    "control": {},
     "version": "0.20.1",
     "tag": "v0.20.1",
     "zip": "soundcraft-web-0.20.1.zip",
@@ -433,6 +517,12 @@
   },
   "craft-anything": {
     "enabled": false,
+    "mode": "intercept",
+    "name": "Craft Anything",
+    "extensions": [
+      "cany"
+    ],
+    "imports": [],
     "version": "0.6.1",
     "tag": "v0.6.1",
     "zip": "craft-anything-web-0.6.1.zip",

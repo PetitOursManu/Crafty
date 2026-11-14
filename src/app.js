@@ -58,7 +58,7 @@ export function createApp({
   }
   const appJson = (slug) => ({ slug, name: apps[slug].name || slug, description: apps[slug].description || '',
     version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [],
-    prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {} });
+    prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {}, mode: apps[slug].mode || 'bridge' });
 
   // --- Connexion ---
   app.get('/api/auth/config', (req, res) => {

@@ -74,7 +74,7 @@ export function icon(name, cls = '') {
 }
 
 // Couleurs par application (pas de logo : les logos ArtCraft ne s'utilisent qu'inchangés, avec l'application).
-const APP_COLORS = { pdfcraft: '#d14532', wordcraft: '#2f6fed', photocraft: '#8a4bd8', deckcraft: '#e07b12', gridcraft: '#1d8a4e', cadcraft: '#0f7b8a', figcraft: '#c2338a' };
+const APP_COLORS = { pdfcraft: '#d14532', wordcraft: '#2f6fed', photocraft: '#8a4bd8', deckcraft: '#e07b12', gridcraft: '#1d8a4e', cadcraft: '#0f7b8a', figcraft: '#c2338a', designcraft: '#b8860b', soundcraft: '#5b48d9' };
 export function appColor(slug) {
   if (APP_COLORS[slug]) return APP_COLORS[slug];
   let x = 0; for (const c of slug) x = (x * 31 + c.charCodeAt(0)) % 360;
@@ -88,7 +88,7 @@ export function appTile(app, cls = 'app-tile') {
 // Couleur d'un type de fichier, pour l'icône.
 const EXT_COLORS = { pdf: '#d14532', docx: '#2f6fed', doc: '#2f6fed', odt: '#2f6fed', rtf: '#2f6fed', txt: '#6b6e78', md: '#6b6e78',
   xlsx: '#1d8a4e', xlsm: '#1d8a4e', ods: '#1d8a4e', csv: '#1d8a4e', tsv: '#1d8a4e', pptx: '#e07b12', deckcraft: '#e07b12',
-  dxf: '#0f7b8a', dwg: '#0f7b8a', figcraft: '#c2338a', fig: '#c2338a', png: '#8a4bd8', jpg: '#8a4bd8', jpeg: '#8a4bd8', svg: '#8a4bd8', zip: '#8a6d3b' };
+  dxf: '#0f7b8a', dwg: '#0f7b8a', figcraft: '#c2338a', fig: '#c2338a', designcraft: '#b8860b', scraftz: '#5b48d9', scraft: '#5b48d9', png: '#8a4bd8', jpg: '#8a4bd8', jpeg: '#8a4bd8', svg: '#8a4bd8', zip: '#8a6d3b' };
 export const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '');
 export const extColor = (ext) => EXT_COLORS[ext] || '#7a7f8c';
 

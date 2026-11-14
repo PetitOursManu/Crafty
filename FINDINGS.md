@@ -334,6 +334,27 @@ FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **
 - Les applications sans pont pourraient être hébergées par interception (boîte Ouvrir → sélecteur Crafty, téléchargement →
   enregistrement), sans état « modifié », sans sauvegarde automatique ni thème : décision d'architecture à prendre (CLAUDE.md).
 
+## Mode interception (14/11/2026)
+
+**Vérifié** (Chrome, page hôte réelle) :
+
+| | Démarrage (signal `wasmBindings`) | Ouvrir (champ intercepté) | Enregistrer | Réouverture depuis Crafty |
+|---|---|---|---|---|
+| DesignCraft 0.20.1 | 12–14 s | `.designcraft .idml .indd .indt` | `<a download>` `Untitled-1.designcraft` | dépôt : **oui** (nom conservé) |
+| SoundCraft 0.20.1 | 4–5 s | `.scraftz .scraft` | sa boîte « Save Session As » puis `<a download>` (session de 66 Mo, audio compris) | dépôt : **oui** |
+| VectorCraft 0.24.1 | 13 s | `.vectorcraft` + ~90 formats | sa boîte « Enregistrer sous » puis téléchargement | dépôt et Ctrl+O simulé : fichier remis au champ mais **pas ouvert** ; API `openFile` à étudier |
+| TextureCraft 0.6.1 | 22–25 s | `.tcraft` + modèles 3D | `<a download>` `Material_Ball.tcraft` (parfois bloqué par son accueil) | **non** obtenue |
+| MaterialCraft 0.4.1 | 4 s | `.sbs .mcraft .zip` | sa boîte « Save package » → bouton Download (`*_sbs.zip`) | **non** obtenue |
+| EffectCraft 0.24.1 | API avant l'interface | (`.ecproj` vu avant) | rien de capté | — |
+| Craft Anything 0.6.1 | 3 s | rien | rien | — |
+
+- Les téléchargements révoquent souvent l'URL `blob:` juste après le clic : `URL.createObjectURL` est suivi pour garder le Blob.
+- Les octets venus de l'iframe sont d'un autre royaume JavaScript : `instanceof ArrayBuffer` échoue, copie nécessaire.
+- Un Ctrl+O simulé n'est pris que si le canvas a le focus (attribut `tabindex` posé à l'exécution).
+- **Vérifié** : en mode pont, l'export Word de PdfCraft est capté et rangé à côté du document (plus de téléchargement).
+- **Instable, cause non établie** : DesignCraft n'a pas démarré (aucun signal en 60 puis 150 s) dans 2 batteries complètes
+  sur 5 ; il démarre à chaque essai isolé. Diagnostic automatique ajouté au test (capture + état).
+
 ## Non vérifié
 
 - Firefox et Safari.

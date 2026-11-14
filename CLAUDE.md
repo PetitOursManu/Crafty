@@ -18,7 +18,8 @@ commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifi
 - Serveur : `server.js` (point d'entrée) et `src/` : `app.js` (assemblage, pages, accès aux applications), `auth.js` (comptes,
   sessions, verrouillage), `files.js` (dossiers, fichiers, versions, quotas), `admin.js`, `static.js` (MIME, compression, CSP),
   `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
-- Interface (`public/`) : `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
+- Logo : source `assets/crafty-logo-source.webp`, déclinaisons dans `public/brand/` (favicon, icônes, manifeste web).
+- Interface (`public/`) : `intercept.js` (interceptions dans l'iframe), `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
   `host.*` (page hôte de production ; journal et outils seulement pour un admin avec `?debug`), `admin.*`, `ui.*` (composants
   communs), `theme.js` (thème clair par défaut, avant le premier affichage).
 - Outils : `scripts/fetch-app.mjs` (+ `unzip.mjs`, `verify-vendor.mjs`), `make-samples.mjs`, `pw.mjs` (Playwright).
@@ -33,7 +34,7 @@ le reste de `PLAN.md` vient de lectures.
   (`storytold/<app>`, fichier `<app>-web-<version>.zip`), décompressé dans
   `vendor/<slug>/<version>/` et **jamais modifié**. Versions épinglées dans `apps.json`.
 - **Une seule origine.** Les applications sont servies sous `/apps/<slug>/` et chargées dans une
-  iframe de même origine avec `?host=parent`. Le pont n'écoute que la fenêtre parente de même
+  iframe de même origine avec `?host=parent` (ou, décision du 14/11/2026, en **mode interception** pour celles sans pont : voir plus bas). Le pont n'écoute que la fenêtre parente de même
   origine : pas de sous-domaine par application.
 - **Le serveur n'exécute aucune application.** Tout tourne dans le navigateur ; le serveur
   authentifie, stocke les fichiers et sert les fichiers statiques.
@@ -164,6 +165,15 @@ Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridC
 FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`). Toutes les autres : non vérifiées (PhotoCraft, VectorCraft… n'ont pas de mode hôte
 documenté).
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
+**Mode interception (décision du 14/11/2026)** pour les applications sans pont (`mode: "intercept"` dans `apps.json`) : pas de
+`?host=parent` ; prête quand `window.wasmBindings` (ou son API) existe ; Ouvrir = sélecteur Crafty remis à son champ fichier ;
+Enregistrer = téléchargement `<a download>` ou `showSaveFilePicker` capté (`public/intercept.js`) ; réouverture depuis Crafty par
+fichier déposé (`control.open: "drop"`, défaut) ou Ctrl+O simulé sur le canvas focalisé (`"keys"`). Pas d'état « modifié » : une
+frappe ou un clic depuis le dernier enregistrement compte comme modification possible (« Pensez à enregistrer »). Pas de
+sauvegarde automatique ni de thème. La capture des téléchargements vaut aussi en mode pont (exports PdfCraft rangés dans Crafty).
+Actives : DesignCraft, SoundCraft. Relevées mais pas encore actives : VectorCraft, TextureCraft, MaterialCraft (enregistrement capté,
+réouverture non obtenue), EffectCraft, Craft Anything (rien de capté) ; FilmCraft et LightCraft (pont, mais limites) ; PhotoCraft.
+
 Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Les dix autres du catalogue sont
 récupérées mais désactivées : voir `FINDINGS.md` (pont absent pour huit d'entre elles ; FilmCraft et LightCraft ont le pont mais
 des limites). PhotoCraft s'emballe autrement et ne démarre pas tel que servi.

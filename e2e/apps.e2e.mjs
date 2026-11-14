@@ -418,6 +418,96 @@ for (const slug of ['gridcraft', 'cadcraft']) {
   });
 }
 
+// Mode interception (applications sans pont) : Enregistrer = téléchargement capté ; Ouvrir = sélecteur Crafty remis au
+// champ ; réouverture depuis Crafty = fichier déposé sur l'application.
+const INTERCEPT_APPS = {
+  designcraft: { name: 'Untitled-1.designcraft', confirm: false },
+  soundcraft: { name: 'Midnight Groove.scraftz', confirm: true }, // sa propre boîte « Save Session As », validée par Entrée
+};
+for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
+  test(`${slug} (interception) : enregistrer, réouverture, Ouvrir de l'application, état « peut-être modifié »`, { skip: missing(slug), timeout: 420_000 }, async () => {
+    const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+    const p = b.page;
+    // Premier chargement : le serveur compresse le wasm à la volée (plusieurs secondes de CPU) ; DesignCraft démarre en 12 à 14 s.
+    const ready = async () => { await b.waitFor(() => window.hostState?.ready, 150_000); await p.waitForTimeout(8000); };
+    const save = async () => {
+      const n = (await b.state()).saves.length;
+      await b.clickApp(500, 400);
+      await p.keyboard.press('Control+s');
+      if (c.confirm) { await p.waitForTimeout(1500); await p.keyboard.press('Enter'); }
+      return n;
+    };
+    try {
+      await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await p.goto(`${base}/host.html?app=${slug}`);
+      await ready();
+      assert.doesNotMatch(await p.locator('#app').getAttribute('src'), /host=parent/);
+      assert.equal((await b.state()).ready.mode, 'intercept');
+      await save();
+      await p.waitForSelector('dialog[open] input', { timeout: 30_000 });
+      assert.equal(await p.inputValue('dialog[open] input'), c.name);
+      const ext = c.name.split('.').pop();
+      await p.fill('dialog[open] input', `Interception ${slug}.${ext}`);
+      await p.click('dialog[open] button[value=ok]');
+      await b.waitFor(() => window.hostState.saves[0]?.status === 'ok', 30_000);
+      const file = (await b.api('GET', '/api/fs')).body.files.find((f) => f.name === `Interception ${slug}.${ext}`);
+      assert.ok(file && file.size > 0);
+      assert.match(await p.textContent('#statusText'), /^Enregistré/);
+      await b.clickApp(500, 400);
+      await b.waitFor(() => window.hostState.maybeDirty === true, 5_000);
+      assert.equal(await p.textContent('#statusText'), 'Pensez à enregistrer (Ctrl+S)');
+
+      // Réouverture depuis Crafty (dépôt) : l'enregistrement suivant porte le nom du fichier, donc va dans ce fichier.
+      await p.goto(`${base}/host.html?app=${slug}&file=${file.id}`);
+      await ready();
+      let n = await save();
+      await b.waitFor((k) => window.hostState.saves.length > k && window.hostState.saves.at(-1).status, 30_000, n);
+      let last = (await b.state()).saves.at(-1);
+      assert.equal(last.target, 'put');
+      assert.equal(last.fileId, file.id);
+
+      // Ouvrir de l'application (vrai Ctrl+O) → sélecteur Crafty → fichier remis → Ctrl+S dans ce fichier.
+      await p.goto(`${base}/host.html?app=${slug}`);
+      await ready();
+      await b.clickApp(500, 400);
+      await p.keyboard.press('Control+o');
+      await p.waitForSelector('dialog[open].picker-dlg', { timeout: 15_000 });
+      await p.click(`dialog[open] .pk-row:has-text("Interception ${slug}")`);
+      await p.click('dialog[open] button[value=ok]');
+      await b.waitFor((nm) => window.hostState.file?.name === nm, 15_000, file.name);
+      await p.waitForTimeout(3000);
+      n = await save();
+      await b.waitFor((k) => window.hostState.saves.length > k && window.hostState.saves.at(-1).status, 30_000, n);
+      last = (await b.state()).saves.at(-1);
+      assert.equal(last.fileId, file.id, 'enregistré dans le fichier choisi');
+      assert.deepEqual(b.consoleMsgs.filter((m) => /Content Security Policy|TrustedScript/.test(m)), [], 'violation de CSP');
+    } catch (err) {
+      // Diagnostic en cas d'échec : capture et état de la page hôte dans le dossier temporaire.
+      const out = join(tmpdir(), `e2e-${slug}-echec`);
+      await p.screenshot({ path: `${out}.png` }).catch(() => {});
+      const info = await p.evaluate(() => ({ state: window.hostState, frame: (() => { const w = document.getElementById('app')?.contentWindow; return { wasm: !!w?.wasmBindings, url: w?.location?.href, title: w?.document?.title, canvas: !!w?.document?.querySelector('canvas') }; })() })).catch((x) => String(x));
+      console.log(`diagnostic ${slug} : ${out}.png`, JSON.stringify(info).slice(0, 1500), b.consoleMsgs.slice(-10).join(' || ').slice(0, 2000));
+      throw err;
+    } finally { await b.close(); }
+  });
+}
+
+test('pdfcraft : un export (Word) est capté et rangé à côté du document', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  try {
+    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    const file = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Export.pdf' });
+    await b.host({ app: 'pdfcraft', file: file.id });
+    await b.waitFor(() => window.hostState.file && window.hostState.control === true, 60_000);
+    await b.page.waitForTimeout(1500);
+    await b.inApp('pdfcraft', (a) => a.execute('export.docx'));
+    await b.waitFor(() => window.hostState.saves.some((s) => s.name === 'Export.docx' && s.status === 'ok'), 30_000);
+    const names = (await b.api('GET', '/api/fs')).body.files.map((f) => f.name);
+    assert.ok(names.includes('Export.docx'), names.join(', '));
+    assert.ok(!b.consoleMsgs.some((m) => m.startsWith('[download]')), 'aucun téléchargement du navigateur');
+  } finally { await b.close(); }
+});
+
 test('invité : application sans stockage, « Enregistrer » télécharge le fichier', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;

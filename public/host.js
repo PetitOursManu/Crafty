@@ -6,6 +6,7 @@
 import { api, h, icon, toast, dialog, confirmDialog, validName, appTile, extOf, accountButton, syncTheme } from '/ui.js';
 import { pickFiles } from '/picker.js';
 import { restorePrefs } from '/prefs-sync.js';
+import { installInterceptors, dropFile } from '/intercept.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -52,6 +53,7 @@ function setStatus() {
   else if (state.unsaved) { cls = 'error'; text = 'Non sauvegardé'; }
   else if (state.saving) { cls = 'saving'; text = 'Enregistrement…'; }
   else if (state.dirty) { cls = 'dirty'; text = 'Modifications non enregistrées'; }
+  else if (state.maybeDirty) { cls = 'dirty'; text = 'Pensez à enregistrer (Ctrl+S)'; }
   else if (state.guest) { cls = ''; text = 'Mode invité : rien n\'est conservé'; }
   else if (state.lastSavedAt) { cls = 'ok'; text = `${state.lastSaveAuto ? 'Enregistré automatiquement' : 'Enregistré'} · ${new Date(state.lastSavedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`; }
   else if (state.file) { cls = 'ok'; text = 'Enregistré'; }
@@ -142,28 +144,54 @@ async function openLocal(f) {
 // les avait pris sur son disque (DataTransfer + événement change). Annuler envoie l'événement cancel.
 function installPicker() {
   const w = iframe.contentWindow;
-  if (state.guest || !w?.HTMLInputElement || w.__craftPicker) return;
-  w.__craftPicker = true;
-  const proto = w.HTMLInputElement.prototype;
-  const origClick = proto.click, origShow = proto.showPicker;
-  const intercept = function (orig) {
-    return function (...args) {
-      if (this.type !== 'file') return orig?.apply(this, args);
-      pickForInput(this);
-    };
-  };
-  proto.click = intercept(origClick);
-  if (origShow) proto.showPicker = intercept(origShow);
+  if (state.guest || !w?.HTMLInputElement) return;
+  installInterceptors(w, {
+    pickInput: pickForInput,
+    pickHandles,
+    // Téléchargement capté (application sans pont, ou export de PdfCraft) : traité comme un save de l'application.
+    saveFile: async (name, blob) => { log('info', `téléchargement capté : ${name} (${blob.size} octets)`, 'out'); // Copie dans le royaume de la page : un ArrayBuffer de l'iframe échoue aux tests instanceof d'ici.
+      onSave({ name, bytes: new Uint8Array(await blob.arrayBuffer()).slice().buffer, saveAs: false, captured: true }); },
+    saveLost: (name) => toast({ type: 'error', title: 'Enregistrement non capté', detail: `${name} : le fichier n'a pas pu être récupéré.` }),
+  });
+}
+// showOpenFilePicker (FilmCraft…) : mêmes fichiers Crafty, rendus sous forme de « poignées ».
+async function pickHandles(opts = {}) {
+  const w = iframe.contentWindow;
+  const exts = [...new Set((opts.types || []).flatMap((t) => Object.values(t.accept || {}).flat())
+    .map((e) => String(e).replace(/^./, '').toLowerCase()).filter((e) => /^[a-z0-9]+$/.test(e)))];
+  state.picks++;
+  const files = await pickFiles({ title: 'Ouvrir', exts, multiple: !!opts.multiple, folderId: state.folderId, appName: app.name });
+  if (!files?.length) return null;
+  const out = [];
+  for (const f of files) {
+    const buf = await (await api(`/api/files/${f.id}/content`, { raw: true })).arrayBuffer();
+    out.push(new w.File([buf], f.name, { lastModified: f.updatedAt }));
+    track(f.name, f);
+  }
+  if (files.length === 1 && edits(app, files[0].name)) await showFile(files[0]);
+  return out;
 }
 // Boîte « Ouvrir » (son accept contient le format principal de l'application ; boîte multiple seulement si le registre
 // le dit : control.openMultiple, CadCraft) : le champ est annulé et chaque document part par le message `open` du pont,
 // comme depuis l'explorateur ; l'application le traite alors comme le fichier de la page (vérifié : DeckCraft considère
 // un fichier pris dans son champ comme un nouveau fichier, et Ctrl+S redemandait un nom). Autres boîtes (insérer une
 // image, des pages…) : les fichiers sont remis au champ.
+let autoPick = null; // fichier à remettre sans afficher le sélecteur (ouverture déclenchée par la page)
 async function pickForInput(input) {
   const w = iframe.contentWindow;
+  if (autoPick) {
+    const f = autoPick; autoPick = null;
+    const buf = await (await api(`/api/files/${f.id}/content`, { raw: true })).arrayBuffer();
+    const dt = new w.DataTransfer();
+    dt.items.add(new w.File([buf], f.name, { lastModified: f.updatedAt }));
+    input.files = dt.files;
+    input.dispatchEvent(new w.Event('input', { bubbles: true }));
+    input.dispatchEvent(new w.Event('change', { bubbles: true }));
+    return;
+  }
   const exts = (input.accept || '').split(',').map((s) => s.trim().replace(/^./, '').toLowerCase()).filter((s) => /^[a-z0-9]+$/.test(s));
-  const isOpen = exts.includes(app.extensions?.[0]) && (!input.multiple || !!app.control?.openMultiple);
+  // Sans pont (mode interception), pas de message open : le fichier est toujours remis au champ.
+  const isOpen = !intercept() && exts.includes(app.extensions?.[0]) && (!input.multiple || !!app.control?.openMultiple);
   state.picks++;
   log('info', `boîte « Ouvrir » de l'application : accept=${input.accept} multiple=${input.multiple} (${isOpen ? 'ouverture' : 'insertion'})`, 'out');
   const files = await pickFiles({ title: isOpen ? 'Ouvrir' : 'Choisir des fichiers', exts: [...new Set(exts)], multiple: input.multiple,
@@ -184,6 +212,7 @@ async function pickForInput(input) {
     input.files = dt.files;
     input.dispatchEvent(new w.Event('input', { bubbles: true }));
     input.dispatchEvent(new w.Event('change', { bubbles: true }));
+    if (intercept() && files.length === 1 && edits(app, files[0].name)) { state.maybeDirty = false; await showFile(files[0]); }
   } catch (e) {
     toast({ type: 'error', title: 'Impossible de transmettre le fichier', detail: e.message });
     if (!isOpen) input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
@@ -280,7 +309,7 @@ async function saveTo(target, bytes, msg) {
     entry.status = 'ok'; entry.fileId = file.id;
     log('info', `stocké : ${file.name} (${file.versions} version(s))`, 'out');
     state.unsaved = null;
-    if (!target.exported) { state.lastSavedAt = Date.now(); state.lastSaveAuto = !!target.auto; }
+    if (!target.exported) { state.lastSavedAt = Date.now(); state.lastSaveAuto = !!target.auto; state.maybeDirty = false; }
     if (target.auto) state.autosaves++;
     if (target.adopt) track(msg.name, file);
     if (!target.exported && file.id !== state.file?.id) await showFile(file);
@@ -343,13 +372,8 @@ window.addEventListener('message', (event) => {
   const kind = msg.type.slice(slug.length + 1);
   if (kind === 'ready') {
     state.ready = { ...msg };
-    state.readyMs = Math.round(performance.now() - t0);
-    $('loading').hidden = true;
     send('host', { version: '1', handoff: !state.guest });
-    installPicker();
-    if (pendingOpen) openStoredFile(pendingOpen);
-    waitControl();
-    applyAppTheme();
+    onAppReady();
   } else if (kind === 'dirty') {
     state.dirty = !!msg.dirty; setStatus();
     if (state.dirty) { scheduleAutosave(); if (!state.themeApplied) applyAppTheme(); } else clearTimeout(autosaveTimer);
@@ -363,6 +387,72 @@ window.addEventListener('message', (event) => {
     onHandoff(msg);
   }
 });
+
+// Démarrage commun : pont (message ready) ou interception (chargement de l'iframe, canvas présent).
+function onAppReady() {
+  state.readyMs = Math.round(performance.now() - t0);
+  $('loading').hidden = true;
+  installPicker();
+  if (pendingOpen) (intercept() ? openByDrop(pendingOpen) : openStoredFile(pendingOpen));
+  watchInput();
+  waitControl();
+  applyAppTheme();
+}
+// Mode interception : l'application n'a pas de pont. Prête quand son wasm est initialisé : window.wasmBindings (pages
+// générées par trunk, vérifié sur six) ou son API window.<app> (EffectCraft), puis un court délai pour la première
+// image. Au-delà de 25 s, prête dès que son canvas est là ; abandon après 3 min.
+const intercept = () => app?.mode === 'intercept';
+async function waitInterceptReady() {
+  for (let i = 0; i < 1800; i++) { // 3 min : premier chargement sur un réseau lent
+    const w = iframe.contentWindow, d = iframe.contentDocument;
+    const started = w && (w.wasmBindings || typeof w[slug]?.request === 'function');
+    if (started || (i > 250 && d?.querySelector('canvas'))) {
+      await new Promise((r) => setTimeout(r, 2000));
+      state.ready = { mode: 'intercept', signal: started ? 'wasm' : 'canvas' };
+      return onAppReady();
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  state.failed.push({ error: 'application non démarrée en 3 min' });
+  $('loadingText').textContent = `${app.name} ne démarre pas.`;
+}
+// Ouvrir un fichier stocké sans message open : glisser-déposer simulé sur l'application.
+async function openByDrop(file) {
+  try {
+    const w = iframe.contentWindow;
+    const buf = await (await api(`/api/files/${encodeURIComponent(file.id)}/content`, { raw: true })).arrayBuffer();
+    if (app.control?.open === 'keys') {
+      // Ctrl+O simulé : l'application ouvre sa boîte, pickForInput y remet ce fichier. L'application ne prend les
+      // touches qu'une fois son interface prête et son canvas focalisé (vérifié) : on réessaie toutes les 2 s, 30 s au plus.
+      autoPick = file;
+      for (let i = 0; i < 15 && autoPick === file; i++) {
+        const target = w.document.querySelector('canvas') || w.document.body;
+        if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '0');
+        target.focus?.();
+        for (const type of ['keydown', 'keyup']) {
+          target.dispatchEvent(new w.KeyboardEvent(type, { key: 'o', code: 'KeyO', keyCode: 79, which: 79, ctrlKey: true, bubbles: true, cancelable: true }));
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      if (autoPick === file) { autoPick = null; toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: `${app.name} n'a pas ouvert sa boîte Ouvrir.` }); return; }
+    } else dropFile(w, new w.File([buf], file.name, { lastModified: file.updatedAt }));
+    track(file.name, file);
+    state.maybeDirty = false;
+    await showFile(file);
+  } catch (e) { toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: e.message }); }
+}
+// Sans pont, l'état « modifié » est inconnu : une frappe ou un clic dans l'application depuis le dernier enregistrement
+// est compté comme une modification possible (avertissement avant de quitter).
+function watchInput() {
+  if (!intercept() || state.guest) return;
+  const d = iframe.contentDocument;
+  const mark = (e) => {
+    if (e.type === 'keydown' && (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta' || ((e.ctrlKey || e.metaKey) && /^[sS]$/.test(e.key)))) return;
+    if (!state.maybeDirty) { state.maybeDirty = true; setStatus(); }
+  };
+  d.addEventListener('keydown', mark, true);
+  d.addEventListener('pointerdown', mark, true);
+}
 
 // ---------- Thème de l'application ----------
 // Elle suit le thème du système, pas celui de la page (color-scheme de l'iframe ignoré, vérifié). On lui applique le
@@ -444,7 +534,7 @@ async function waitControl() {
   }
   state.control = false;
 }
-addEventListener('beforeunload', (e) => { if (state.dirty || state.unsaved) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('beforeunload', (e) => { if (state.dirty || state.unsaved || state.maybeDirty) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- Démarrage ----------
 let t0 = performance.now();
@@ -488,12 +578,14 @@ async function main() {
   try { prefsSync = await restorePrefs(me, app); } catch (e) { log('info', `réglages non restaurés : ${e.message}`, 'err'); }
   window.craftPrefsFlush = () => prefsSync?.flush();
   // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, ?control, drapeaux de rendu.
-  const src = new URLSearchParams({ host: 'parent' });
+  // Mode interception : pas de ?host=parent (l'application n'a pas de pont).
+  const src = new URLSearchParams(intercept() ? {} : { host: 'parent' });
   if (me.user) src.set('author', me.user.username);
   src.append('control', ''); // window.<app> : thème et sauvegarde automatique
   for (const f of ['webgl', 'cpu']) if (q.has(f)) src.append(f, '');
   t0 = performance.now();
   iframe.src = `/apps/${slug}/?${src.toString().replace(/=(&|$)/g, '$1')}`;
+  if (intercept()) waitInterceptReady();
   setTimeout(() => { if (!state.ready && !state.failed.length && !state.blocked) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);
 }
 main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: 'Chargement impossible', detail: e.message }); });
