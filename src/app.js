@@ -26,8 +26,9 @@ export function createApp({
   quiet = false,
 } = {}) {
   const registry = JSON.parse(readFileSync(appsFile, 'utf8'));
-  // Seules les applications réellement présentes dans vendor/ sont proposées.
-  const apps = Object.fromEntries(Object.entries(registry).filter(([slug, a]) => existsSync(join(vendorDir, slug, a.version, 'index.html'))));
+  // Seules les applications activées et réellement présentes dans vendor/ sont proposées.
+  // enabled: false (défaut de fetch-app pour une nouvelle application) tant qu'elle n'a pas passé les essais.
+  const apps = Object.fromEntries(Object.entries(registry).filter(([slug, a]) => a.enabled !== false && existsSync(join(vendorDir, slug, a.version, 'index.html'))));
   const db = openDb(dbFile);
   const log = createLogger({ authLogFile: dataDir === ':memory:' ? null : join(dataDir, 'logs', 'auth.log'), db, quiet });
   const auth = createAuth({ db, log, cookieSecure });

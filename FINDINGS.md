@@ -310,6 +310,30 @@ Compression du wasm, mesurée (taille / temps CPU sur cette machine) :
   synchronisation des réglages de GridCraft et CadCraft (même mécanisme que PdfCraft, testé sur PdfCraft) ; mémoire ; ouverture de
   DWG, ODS, XLS, PPTX réels ; les formats d'`imports` (enregistrés ensuite sous quel nom ?).
 
+## Applications restantes du catalogue (14/11/2026)
+
+Zips de PhotoCraft, VectorCraft, LightCraft, EffectCraft, DesignCraft, TextureCraft, MaterialCraft, SoundCraft, Craft Anything et
+FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **Aucune n'est activée** (`enabled: false` dans
+`apps.json`). Test dans la page hôte réelle (Chrome) : le pont envoie-t-il `ready` en 40 s ?
+
+| Application | Pont `?host=parent` | Constat (vérifié) |
+|---|---|---|
+| FilmCraft 0.20.1 | **oui** (`version:"1"`) | Nouveau projet → `Untitled.fcproj`, `saveAs:true`. Boîte Ouvrir par `showOpenFilePicker` (pas de champ fichier : non intercepté aujourd'hui). API différente (`inspect`, `files`, `importFiles`, pas de `docInspect`), pas de commande de thème. Projet enregistré : 1 500 octets, sans le média importé ; la réouverture du projet par la page n'a pas abouti en 2 min. |
+| LightCraft 0.21.1 | **oui**, ancienne forme (`version:"0.21.1"`) | Bibliothèque photo gardée dans le stockage du navigateur, `dirty:true` dès le démarrage, pas d'API de pilotage. Une même origine pour tous les comptes = bibliothèque partagée entre comptes d'un même navigateur. Fichiers déjà compressés (`.br`, `.gz`) livrés. |
+| VectorCraft 0.24.1 | non | Démarre ; `window.vectorcraft` présent ; Ctrl+O / Ctrl+S sans effet observé. |
+| EffectCraft 0.24.1 | non | API présente ; Ouvrir = champ fichier (`.ecproj`) ; `effectcraft-config.json` absent (404) ; base IndexedDB `effectcraft-handles`. |
+| DesignCraft 0.20.1 | non | Ouvrir = champ fichier (`.designcraft .idml .indd .indt`) ; Enregistrer = téléchargement `<a download>` (`Untitled-1.designcraft`). |
+| TextureCraft 0.6.1 | non | Ouvrir = champ fichier (`.tcraft .glb .gltf .fbx…`) ; Enregistrer = téléchargement (`Material_Ball.tcraft`). |
+| MaterialCraft 0.4.1 | non | Ouvrir = champ fichier (`.sbs .mcraft .zip`) ; Ctrl+S sans effet observé. |
+| SoundCraft 0.20.1 | non | Ouvrir = champ fichier (`.scraftz .scraft`) ; Ctrl+S sans effet observé. |
+| Craft Anything 0.6.1 | non | Démarre ; Ctrl+O / Ctrl+S sans effet observé. |
+| PhotoCraft 0.23.1 | — | Ne démarre pas tel que servi : demande `app/snippets/…/inline0.js` (404). Emballage différent (wasm en morceaux, nginx.conf propre). |
+
+- **Collision de réglages** : TextureCraft, MaterialCraft et SoundCraft (au moins) écrivent les clés génériques `ui`, `ui.json`,
+  `export_presets` dans le `localStorage` de l'origine commune : elles écrasent leurs réglages entre elles.
+- Les applications sans pont pourraient être hébergées par interception (boîte Ouvrir → sélecteur Crafty, téléchargement →
+  enregistrement), sans état « modifié », sans sauvegarde automatique ni thème : décision d'architecture à prendre (CLAUDE.md).
+
 ## Non vérifié
 
 - Firefox et Safari.

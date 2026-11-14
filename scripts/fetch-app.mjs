@@ -91,6 +91,7 @@ if (await stat(dest).catch(() => null)) {
 const appsPath = join(ROOT, 'apps.json');
 const apps = JSON.parse(await readFile(appsPath, 'utf8').catch(() => '{}'));
 apps[slug] = {
+  enabled: false, // à passer à true après les essais (CLAUDE.md, « Ajouter une application »)
   ...apps[slug],
   version,
   tag: release.tag_name,

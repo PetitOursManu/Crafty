@@ -1,5 +1,6 @@
 {
   "pdfcraft": {
+    "enabled": true,
     "name": "PdfCraft",
     "description": "Lire, annoter, organiser et signer des PDF.",
     "extensions": [
@@ -51,6 +52,7 @@
     "source": "https://github.com/storytold/pdfcraft/releases/tag/v0.21.1"
   },
   "wordcraft": {
+    "enabled": true,
     "name": "WordCraft",
     "description": "Traitement de texte compatible Word (docx, odt, rtf).",
     "extensions": [
@@ -116,6 +118,7 @@
     "source": "https://github.com/storytold/wordcraft/releases/tag/v0.18.1"
   },
   "gridcraft": {
+    "enabled": true,
     "name": "GridCraft",
     "description": "Tableur compatible Excel (xlsx, ods, csv).",
     "extensions": [
@@ -172,6 +175,7 @@
     "source": "https://github.com/storytold/gridcraft/releases/tag/v0.19.1"
   },
   "deckcraft": {
+    "enabled": true,
     "name": "DeckCraft",
     "description": "Présentations compatibles PowerPoint (pptx).",
     "extensions": [
@@ -215,6 +219,7 @@
     "source": "https://github.com/storytold/deckcraft/releases/tag/v0.18.1"
   },
   "cadcraft": {
+    "enabled": true,
     "name": "CadCraft",
     "description": "Dessin technique 2D (DXF, DWG).",
     "extensions": [
@@ -260,6 +265,7 @@
     "source": "https://github.com/storytold/cadcraft/releases/tag/v0.20.1"
   },
   "figcraft": {
+    "enabled": true,
     "name": "FigCraft",
     "description": "Design d'interfaces et maquettes (figcraft, import Figma, Sketch, SVG).",
     "extensions": [
@@ -312,5 +318,145 @@
     ],
     "stripPrefix": "figcraft-web-0.18.1/",
     "source": "https://github.com/storytold/figcraft/releases/tag/v0.18.1"
+  },
+  "photocraft": {
+    "enabled": false,
+    "version": "0.23.1",
+    "tag": "v0.23.1",
+    "zip": "photocraft-web-0.23.1.zip",
+    "zipSize": 16064050,
+    "sha256": "3a498eb517bca6cec89f9c6b1fc6448269a05428c8a3a4637c16817da157f03c",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "photocraft-web-0.23.1/",
+    "source": "https://github.com/storytold/photocraft/releases/tag/v0.23.1"
+  },
+  "vectorcraft": {
+    "enabled": false,
+    "version": "0.24.1",
+    "tag": "v0.24.1",
+    "zip": "vectorcraft-web-0.24.1.zip",
+    "zipSize": 38342892,
+    "sha256": "de31befd175476f252e3563b4b1fdc6c887d5842b33fb7d1f5fdf007dc7633aa",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "vectorcraft-web-0.24.1/",
+    "source": "https://github.com/storytold/vectorcraft/releases/tag/v0.24.1"
+  },
+  "lightcraft": {
+    "enabled": false,
+    "version": "0.21.1",
+    "tag": "v0.21.1",
+    "zip": "lightcraft-web-0.21.1.zip",
+    "zipSize": 74569049,
+    "sha256": "57147383a46eaab3b0cc036acf9443b221450c6a19f5dc303ae165bb9678b8cb",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "lightcraft-web-0.21.1/",
+    "source": "https://github.com/storytold/lightcraft/releases/tag/v0.21.1"
+  },
+  "effectcraft": {
+    "enabled": false,
+    "version": "0.24.1",
+    "tag": "v0.24.1",
+    "zip": "effectcraft-web-0.24.1.zip",
+    "zipSize": 22524556,
+    "sha256": "8adc985f345d73207abc69a27938905aba1729b63c6c9b332d0244a7567424f1",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "effectcraft-web-0.24.1/",
+    "source": "https://github.com/storytold/effectcraft/releases/tag/v0.24.1"
+  },
+  "designcraft": {
+    "enabled": false,
+    "version": "0.20.1",
+    "tag": "v0.20.1",
+    "zip": "designcraft-web-0.20.1.zip",
+    "zipSize": 27265672,
+    "sha256": "50fb2bebce1f48065318953393626b84b25cd1736c556e523275dadc46ae6906",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "designcraft-web-0.20.1/",
+    "source": "https://github.com/storytold/designcraft/releases/tag/v0.20.1"
+  },
+  "texturecraft": {
+    "enabled": false,
+    "version": "0.6.1",
+    "tag": "v0.6.1",
+    "zip": "texturecraft-web-0.6.1.zip",
+    "zipSize": 9488618,
+    "sha256": "6dea6a9f77a161cba3258ab4c6db591bdb4dd32b7385d16a7db997ab671a5f3b",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "texturecraft-web-0.6.1/",
+    "source": "https://github.com/storytold/texturecraft/releases/tag/v0.6.1"
+  },
+  "materialcraft": {
+    "enabled": false,
+    "version": "0.4.1",
+    "tag": "v0.4.1",
+    "zip": "materialcraft-web-0.4.1.zip",
+    "zipSize": 5245824,
+    "sha256": "73b8c319881fd7218737d30b5eeb033801a17427bcf3d31920da32a1fbb1ffec",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "materialcraft-web-0.4.1/",
+    "source": "https://github.com/storytold/materialcraft/releases/tag/v0.4.1"
+  },
+  "soundcraft": {
+    "enabled": false,
+    "version": "0.20.1",
+    "tag": "v0.20.1",
+    "zip": "soundcraft-web-0.20.1.zip",
+    "zipSize": 7179733,
+    "sha256": "ca7c03c53cf4b7ec9ae26ef2cbde5d86566d006127040fe694fb95f9773a34e4",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "soundcraft-web-0.20.1/",
+    "source": "https://github.com/storytold/soundcraft/releases/tag/v0.20.1"
+  },
+  "craft-anything": {
+    "enabled": false,
+    "version": "0.6.1",
+    "tag": "v0.6.1",
+    "zip": "craft-anything-web-0.6.1.zip",
+    "zipSize": 2667952,
+    "sha256": "e87273b5c0181785ce9059f5348353be44e18b4ba6485203babc26ef17f71d84",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "craft-anything-web-0.6.1/",
+    "source": "https://github.com/storytold/craft-anything/releases/tag/v0.6.1"
+  },
+  "filmcraft": {
+    "enabled": false,
+    "version": "0.20.1",
+    "tag": "v0.20.1",
+    "zip": "filmcraft-web-0.20.1.zip",
+    "zipSize": 15630847,
+    "sha256": "1cf3072e3f3b6535fcd024d6f6ab2a16cf7776345d868037dc630de0ad0dbbb8",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "filmcraft-web-0.20.1/",
+    "source": "https://github.com/storytold/filmcraft/releases/tag/v0.20.1"
   }
 }

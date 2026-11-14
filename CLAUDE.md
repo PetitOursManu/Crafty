@@ -164,5 +164,6 @@ Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridC
 FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`). Toutes les autres : non vérifiées (PhotoCraft, VectorCraft… n'ont pas de mode hôte
 documenté).
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
-PhotoCraft s'emballe autrement (wasm découpé en morceaux, Dockerfile et nginx.conf propres, mode hôte non documenté).
-FilmCraft n'a pas de version web.
+Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Les dix autres du catalogue sont
+récupérées mais désactivées : voir `FINDINGS.md` (pont absent pour huit d'entre elles ; FilmCraft et LightCraft ont le pont mais
+des limites). PhotoCraft s'emballe autrement et ne démarre pas tel que servi.
