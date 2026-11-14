@@ -17,7 +17,7 @@ const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'h
 export function createApp({
   root = ROOT,
   vendorDir = join(root, 'vendor'),
-  appsFile = join(root, 'apps.json'),
+  appsFile = process.env.APPS_FILE || join(root, 'apps.json'),
   dataDir = process.env.DATA_DIR || join(root, 'data'),
   dbFile = join(dataDir, 'craft.db'),
   csp = process.env.CSP ?? 'auto',

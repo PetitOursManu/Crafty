@@ -15,6 +15,9 @@ npm run fetch wordcraft
 npm start
 ```
 
+Les autres applications : `npm run fetch <slug>` (dépôts `storytold/<slug>`) ou `npm run fetch <propriétaire>/<slug>`
+(`tangency-labs/solidcraft`, `UCS-Care-Group/mailcraft`), puis `enabled: true` dans `apps.json` une fois vérifiée.
+
 Ouvrir http://localhost:8787/ : le premier compte créé devient administrateur. Le serveur n'écoute que sur
 `127.0.0.1` et `[::1]`.
 
@@ -28,6 +31,7 @@ Ouvrir http://localhost:8787/ : le premier compte créé devient administrateur.
 | `TRUST_PROXY` | désactivé | Nombre de mandataires de confiance (Cloudflare + Traefik : à régler et vérifier) |
 | `COOKIE_SECURE` | `0` | `1` derrière HTTPS terminé par le mandataire |
 | `SCRYPT_N` | `32768` | Coût du hachage des mots de passe (viser environ 100 ms sur le VPS) |
+| `APPS_FILE` | `./apps.json` | Registre des applications (essais : un registre qui en active d'autres) |
 | `CSP` | `auto` | `auto` (stricte, empreintes calculées), `off`, ou une politique fixe |
 
 ## Tests

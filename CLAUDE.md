@@ -156,24 +156,30 @@ charge pas l'application et propose celles qui le lisent.
 5. Exploitation : script de mise à jour d'une application, fail2ban, comptes.
 6. Options : SSO avec Dashy, double authentification, partage.
 
-Ajouter une application = `npm run fetch <slug>`, lire son `HOSTING.md`, sonder dans Chrome (`ready`, `accept` de sa boîte Ouvrir,
+Ajouter une application = `npm run fetch <slug>` (ou `<propriétaire>/<slug>` hors de `storytold` : MailCraft, SolidCraft), lire son `HOSTING.md`, sonder dans Chrome (`ready`, `accept` de sa boîte Ouvrir,
 `commands()`, clés `localStorage`, CSP), puis compléter son entrée dans `apps.json` : `name`, `description`, `extensions` (édités),
 `imports` (seulement ouverts), `prefKeys` (clés de réglages relevées), `control.save` (commande d'enregistrement : id, ou
 `{command|request, params}` avec `{name}` = nom du document) et `control.theme` (`light`/`dark`/`system` → commande). Ajouter son
 cas dans `e2e/apps.e2e.mjs` et faire passer `npm run test:e2e`.
 Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridCraft 0.19.1, DeckCraft 0.18.1, CadCraft 0.20.1 et
-FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`). Toutes les autres : non vérifiées (PhotoCraft, VectorCraft… n'ont pas de mode hôte
-documenté).
+FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`) ; en interception DesignCraft 0.20.1, SoundCraft 0.20.1, VectorCraft 0.24.1,
+TextureCraft 0.6.1, MaterialCraft 0.4.1, EffectCraft 0.24.1, Craft Anything 0.6.1, SolidCraft 0.41.0 (14/11/2026). Non vérifiées :
+PhotoCraft, FilmCraft, LightCraft (à voir plus tard), MailCraft 0.11.1 (partiellement, désactivée).
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
 **Mode interception (décision du 14/11/2026)** pour les applications sans pont (`mode: "intercept"` dans `apps.json`) : pas de
 `?host=parent` ; prête quand `window.wasmBindings` (ou son API) existe ; Ouvrir = sélecteur Crafty remis à son champ fichier ;
 Enregistrer = téléchargement `<a download>` ou `showSaveFilePicker` capté (`public/intercept.js`) ; réouverture depuis Crafty par
-fichier déposé (`control.open: "drop"`, défaut) ou Ctrl+O simulé sur le canvas focalisé (`"keys"`). Pas d'état « modifié » : une
-frappe ou un clic depuis le dernier enregistrement compte comme modification possible (« Pensez à enregistrer »). Pas de
-sauvegarde automatique ni de thème. La capture des téléchargements vaut aussi en mode pont (exports PdfCraft rangés dans Crafty).
-Actives : DesignCraft, SoundCraft. Relevées mais pas encore actives : VectorCraft, TextureCraft, MaterialCraft (enregistrement capté,
-réouverture non obtenue), EffectCraft, Craft Anything (rien de capté) ; FilmCraft et LightCraft (pont, mais limites) ; PhotoCraft.
+fichier déposé (`control.open: "drop"`, défaut), Ctrl+O simulé sur le canvas focalisé (`"keys"` : fichier remis au champ, à
+`showOpenFilePicker` ou à la fenêtre de repli de rfd), ou commande de l'API (`control.open: {command, params, fetch?}` avec `{name}`,
+`{base64}`, `{path}`). `control.saveData` (`{command, params, field | read, title?}`) : Crafty tient Ctrl+S et fait sérialiser le
+document par l'API (VectorCraft, EffectCraft). Les poignées et promesses rendues à l'iframe doivent être de son contexte (wasm-bindgen
+vérifie `instanceof`). Pas d'état « modifié » : une frappe ou un clic depuis le dernier enregistrement compte comme modification
+possible (« Pensez à enregistrer »). Pas de sauvegarde automatique ni de thème. `imports: ["*"]` = tout fichier (Craft Anything, lecture
+seule). La capture des téléchargements vaut aussi en mode pont (exports PdfCraft rangés dans Crafty).
+Actives : DesignCraft, SoundCraft, VectorCraft, TextureCraft, MaterialCraft, EffectCraft, Craft Anything, SolidCraft (14/11/2026).
+Désactivées : MailCraft (0.12.0 plante, boîte non enregistrable, données dans le navigateur), FilmCraft et LightCraft (pont, mais
+limites), PhotoCraft. **Point ouvert** : EffectCraft (session OPFS), SolidCraft (récents) et MailCraft gardent des données dans le
+stockage de l'origine, visibles d'un autre compte du même navigateur.
 
-Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Les dix autres du catalogue sont
-récupérées mais désactivées : voir `FINDINGS.md` (pont absent pour huit d'entre elles ; FilmCraft et LightCraft ont le pont mais
-des limites). PhotoCraft s'emballe autrement et ne démarre pas tel que servi.
+Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Voir `FINDINGS.md` pour chaque
+application ; PhotoCraft s'emballe autrement et ne démarre pas tel que servi.

@@ -19,40 +19,51 @@ export function installInterceptors(w, h) {
   if (ip.showPicker) ip.showPicker = wrapInput(ip.showPicker);
 
   // --- Ouvrir : API d'accès aux fichiers (Chromium) ---
-  const fileHandle = (file) => ({
-    kind: 'file', name: file.name,
-    getFile: async () => file,
-    createWritable: async () => writable(file.name),
-    queryPermission: async () => 'granted', requestPermission: async () => 'granted', isSameEntry: async (o) => o?.name === file.name,
+  // wasm-bindgen vérifie les types par `instanceof` dans le contexte de l'iframe (dyn_into, JsFuture) : un objet
+  // ordinaire ou une Promise créée par cette page-ci (autre contexte) est refusé, et l'application attend une réponse
+  // qui ne vient jamais (vérifié avec SolidCraft : « no answer from the file dialog »). D'où les prototypes de l'iframe
+  // (FileSystemFileHandle…) et des fonctions qui rendent des Promise et des tableaux de l'iframe.
+  const A = (fn) => (...a) => w.Promise.resolve().then(() => fn(...a));
+  const brand = (ctor, props) => {
+    const o = Object.create(w[ctor]?.prototype || w.Object.prototype);
+    for (const [k, v] of Object.entries(props)) Object.defineProperty(o, k, { value: v, enumerable: true });
+    return o;
+  };
+  const handle = (name, getFile) => brand('FileSystemFileHandle', {
+    kind: 'file', name,
+    getFile: A(getFile),
+    createWritable: A(() => writable(name)),
+    createSyncAccessHandle: A(() => { throw new w.DOMException('Not supported', 'NotSupportedError'); }),
+    queryPermission: A(() => 'granted'), requestPermission: A(() => 'granted'),
+    isSameEntry: A((o) => o?.name === name),
   });
-  w.showOpenFilePicker = async (opts = {}) => {
+  const fileHandle = (file) => handle(file.name, () => file);
+  w.showOpenFilePicker = A(async (opts = {}) => {
     const files = await h.pickHandles(opts);
     if (!files?.length) throw new w.DOMException('The user aborted a request.', 'AbortError');
-    return files.map(fileHandle);
-  };
+    return w.Array.from(files, fileHandle);
+  });
 
   // --- Enregistrer : showSaveFilePicker → écriture recueillie, stockée à la fermeture ---
   function writable(name) {
     let parts = [];
-    return {
-      write: async (d) => {
-        if (d && typeof d === 'object' && 'type' in d && !(d instanceof w.Blob) && !ArrayBuffer.isView(d) && !(d instanceof ArrayBuffer)) {
-          if (d.type === 'truncate') { parts = []; return; }
-          if (d.type !== 'write') return;
-          d = d.data;
-        }
-        parts.push(d instanceof w.Blob ? d : new w.Blob([d]));
-      },
-      seek: async () => {}, truncate: async () => { parts = []; },
-      close: async () => h.saveFile(name, new w.Blob(parts)),
-      abort: async () => { parts = []; },
-    };
+    const write = A((d) => {
+      if (d && typeof d === 'object' && 'type' in d && !(d instanceof w.Blob) && !ArrayBuffer.isView(d) && !(d instanceof w.ArrayBuffer)) {
+        if (d.type === 'truncate') { parts = []; return; }
+        if (d.type !== 'write') return;
+        d = d.data;
+      }
+      parts.push(d instanceof w.Blob ? d : new w.Blob([d]));
+    });
+    const close = A(() => { h.saveFile(name, new w.Blob(parts)); });
+    const abort = A(() => { parts = []; });
+    return brand('FileSystemWritableFileStream', {
+      write, close, abort,
+      seek: A(() => {}), truncate: A(() => { parts = []; }),
+      getWriter: () => brand('Object', { write, close, abort, releaseLock() {}, ready: w.Promise.resolve(), closed: w.Promise.resolve() }),
+    });
   }
-  w.showSaveFilePicker = async (opts = {}) => {
-    const name = opts.suggestedName || 'document';
-    return { kind: 'file', name, getFile: async () => new w.File([], name), createWritable: async () => writable(name),
-      queryPermission: async () => 'granted', requestPermission: async () => 'granted', isSameEntry: async () => false };
-  };
+  w.showSaveFilePicker = A((opts = {}) => handle(opts.suggestedName || 'document', () => new w.File([], opts.suggestedName || 'document')));
 
   // --- Enregistrer : téléchargement <a download> ---
   const blobs = new Map();

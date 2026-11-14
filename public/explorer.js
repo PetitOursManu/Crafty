@@ -37,7 +37,8 @@ function folderIcon() {
 const appBySlug = (s) => state.apps.find((a) => a.slug === s);
 // extensions : formats que l'application édite ; imports : formats qu'elle sait seulement ouvrir (conversion).
 const appsFor = (name) => state.apps.filter((a) => a.extensions.includes(extOf(name)));
-const importersFor = (name) => state.apps.filter((a) => (a.imports || []).includes(extOf(name)) && !a.extensions.includes(extOf(name)));
+// « * » dans imports : tout fichier (Craft Anything, qui analyse n'importe quel fichier).
+const importersFor = (name) => state.apps.filter((a) => ((a.imports || []).includes(extOf(name)) || (a.imports || []).includes('*')) && !a.extensions.includes(extOf(name)));
 // Ouvrir = la dernière application utilisée pour ce fichier si elle lit encore ce format, sinon celle qui l'édite.
 function defaultApp(file) {
   const last = appBySlug(file.lastApp);

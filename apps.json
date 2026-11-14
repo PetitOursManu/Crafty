@@ -334,7 +334,7 @@
     "source": "https://github.com/storytold/photocraft/releases/tag/v0.23.1"
   },
   "vectorcraft": {
-    "enabled": false,
+    "enabled": true,
     "mode": "intercept",
     "name": "VectorCraft",
     "extensions": [
@@ -362,7 +362,28 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "vectorcraft-web-0.24.1/",
-    "source": "https://github.com/storytold/vectorcraft/releases/tag/v0.24.1"
+    "source": "https://github.com/storytold/vectorcraft/releases/tag/v0.24.1",
+    "control": {
+      "open": {
+        "command": "document.open",
+        "params": {
+          "name": "{name}",
+          "dataBase64": "{base64}"
+        }
+      },
+      "saveData": {
+        "command": "document.serialize",
+        "params": {
+          "format": "vectorcraft"
+        },
+        "field": "dataBase64",
+        "title": {
+          "command": "document.inspect",
+          "field": "title"
+        }
+      }
+    },
+    "description": "Illustration vectorielle (vectorcraft, import SVG, PDF, AI…)"
   },
   "lightcraft": {
     "enabled": false,
@@ -379,7 +400,7 @@
     "source": "https://github.com/storytold/lightcraft/releases/tag/v0.21.1"
   },
   "effectcraft": {
-    "enabled": false,
+    "enabled": true,
     "mode": "intercept",
     "name": "EffectCraft",
     "extensions": [
@@ -396,7 +417,24 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "effectcraft-web-0.24.1/",
-    "source": "https://github.com/storytold/effectcraft/releases/tag/v0.24.1"
+    "source": "https://github.com/storytold/effectcraft/releases/tag/v0.24.1",
+    "control": {
+      "open": {
+        "fetch": "addFile",
+        "command": "file.open",
+        "params": {
+          "path": "{path}"
+        }
+      },
+      "saveData": {
+        "command": "file.saveAs",
+        "params": {
+          "path": "{path}"
+        },
+        "read": "readFile"
+      }
+    },
+    "description": "Animation et effets visuels (projets ecproj)"
   },
   "designcraft": {
     "enabled": true,
@@ -426,7 +464,7 @@
     "source": "https://github.com/storytold/designcraft/releases/tag/v0.20.1"
   },
   "texturecraft": {
-    "enabled": false,
+    "enabled": true,
     "mode": "intercept",
     "name": "TextureCraft",
     "extensions": [
@@ -459,10 +497,11 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "texturecraft-web-0.6.1/",
-    "source": "https://github.com/storytold/texturecraft/releases/tag/v0.6.1"
+    "source": "https://github.com/storytold/texturecraft/releases/tag/v0.6.1",
+    "description": "Peinture de textures sur modèles 3D (tcraft)"
   },
   "materialcraft": {
-    "enabled": false,
+    "enabled": true,
     "mode": "intercept",
     "name": "MaterialCraft",
     "extensions": [
@@ -484,7 +523,8 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "materialcraft-web-0.4.1/",
-    "source": "https://github.com/storytold/materialcraft/releases/tag/v0.4.1"
+    "source": "https://github.com/storytold/materialcraft/releases/tag/v0.4.1",
+    "description": "Matériaux procéduraux par nœuds (mcraft, sbs)"
   },
   "soundcraft": {
     "enabled": true,
@@ -516,13 +556,13 @@
     "source": "https://github.com/storytold/soundcraft/releases/tag/v0.20.1"
   },
   "craft-anything": {
-    "enabled": false,
+    "enabled": true,
     "mode": "intercept",
     "name": "Craft Anything",
-    "extensions": [
-      "cany"
+    "extensions": [],
+    "imports": [
+      "*"
     ],
-    "imports": [],
     "version": "0.6.1",
     "tag": "v0.6.1",
     "zip": "craft-anything-web-0.6.1.zip",
@@ -533,7 +573,8 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "craft-anything-web-0.6.1/",
-    "source": "https://github.com/storytold/craft-anything/releases/tag/v0.6.1"
+    "source": "https://github.com/storytold/craft-anything/releases/tag/v0.6.1",
+    "description": "Analyse de n'importe quel fichier (lecture seule)"
   },
   "filmcraft": {
     "enabled": false,
@@ -548,5 +589,82 @@
     ],
     "stripPrefix": "filmcraft-web-0.20.1/",
     "source": "https://github.com/storytold/filmcraft/releases/tag/v0.20.1"
+  },
+  "mailcraft": {
+    "enabled": false,
+    "version": "0.11.1",
+    "tag": "v0.11.1",
+    "zip": "mailcraft-web-0.11.1.zip",
+    "zipSize": 10797888,
+    "sha256": "9f06c0052ae5c3d4fa1ac218e2bbef8173bfe9d89ca86468ba6e5b531c428931",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "mailcraft-web-0.11.1/",
+    "repo": "ucs-care-group/mailcraft",
+    "source": "https://github.com/ucs-care-group/mailcraft/releases/tag/v0.11.1",
+    "name": "MailCraft",
+    "description": "Messagerie (lecture, import et export eml, mbox, ics, vcf)",
+    "mode": "intercept",
+    "extensions": [
+      "mailcraft"
+    ],
+    "imports": [
+      "eml",
+      "mbox",
+      "mbx",
+      "ics",
+      "ical",
+      "vcf",
+      "vcard",
+      "json"
+    ],
+    "prefKeys": [
+      "mailcraft.ui.v1"
+    ]
+  },
+  "solidcraft": {
+    "enabled": true,
+    "version": "0.41.0",
+    "tag": "v0.41.0",
+    "zip": "solidcraft-web-0.41.0.zip",
+    "zipSize": 56796909,
+    "sha256": "dba9a9389bc479c0c12412493b1bec61d4d4d8434cd4e4cca67ad2a38183fc04",
+    "sha256Source": [
+      "digest API GitHub",
+      "SHA256SUMS.txt"
+    ],
+    "stripPrefix": "solidcraft-web-0.41.0/",
+    "repo": "tangency-labs/solidcraft",
+    "source": "https://github.com/tangency-labs/solidcraft/releases/tag/v0.41.0",
+    "name": "SolidCraft",
+    "description": "CAO paramétrique 3D",
+    "mode": "intercept",
+    "extensions": [
+      "sc"
+    ],
+    "imports": [
+      "solidcraft",
+      "solvecraft",
+      "json",
+      "step",
+      "stp",
+      "3mf",
+      "stl",
+      "obj",
+      "glb",
+      "gltf",
+      "fcstd",
+      "3dm",
+      "dxf",
+      "svg"
+    ],
+    "prefKeys": [
+      "solidcraft.prefs"
+    ],
+    "control": {
+      "open": "keys"
+    }
   }
 }

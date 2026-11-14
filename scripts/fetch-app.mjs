@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage : node scripts/fetch-app.mjs <slug> [tag]
+// Usage : node scripts/fetch-app.mjs <slug | propriétaire/slug> [tag]   (défaut : storytold/<slug>)
 // Télécharge le zip web officiel de storytold/<slug>, vérifie son SHA-256 (SHA256SUMS.txt de la
 // release et empreinte de l'asset donnée par l'API GitHub), le décompresse dans
 // vendor/<slug>/<version>/ et met à jour apps.json. Écrit aussi vendor/<slug>/<version>.sha256
@@ -11,9 +11,10 @@ import { fileURLToPath } from 'node:url';
 import { listZip, readEntry, safeName } from './unzip.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const [slug, wantTag] = process.argv.slice(2);
-if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
-  console.error('usage : node scripts/fetch-app.mjs <slug> [tag]');
+const [arg, wantTag] = process.argv.slice(2);
+const [owner, slug] = String(arg || '').includes('/') ? String(arg).toLowerCase().split('/') : ['storytold', arg];
+if (!slug || !/^[a-z0-9-]+$/.test(slug) || !/^[a-z0-9][a-z0-9-]{0,38}$/i.test(owner)) {
+  console.error('usage : node scripts/fetch-app.mjs <slug | propriétaire/slug> [tag]');
   process.exit(2);
 }
 
@@ -27,7 +28,7 @@ async function get(url, binary = false) {
   return binary ? Buffer.from(await r.arrayBuffer()) : r.json();
 }
 
-const releases = await get(`https://api.github.com/repos/storytold/${slug}/releases?per_page=30`);
+const releases = await get(`https://api.github.com/repos/${owner}/${slug}/releases?per_page=30`);
 const zipRe = new RegExp(`^${slug}-web-(.+)\\.zip$`);
 let release, asset;
 for (const r of releases) {
@@ -36,7 +37,7 @@ for (const r of releases) {
   if (a) { release = r; asset = a; break; }
 }
 if (!asset) {
-  console.error(`Aucun zip web (${slug}-web-<version>.zip) dans les ${releases.length} dernières releases de storytold/${slug}${wantTag ? ` (tag ${wantTag})` : ''}. Arrêt.`);
+  console.error(`Aucun zip web (${slug}-web-<version>.zip) dans les ${releases.length} dernières releases de ${owner}/${slug}${wantTag ? ` (tag ${wantTag})` : ''}. Arrêt.`);
   process.exit(1);
 }
 const version = asset.name.match(zipRe)[1];
@@ -100,7 +101,8 @@ apps[slug] = {
   sha256: digest,
   sha256Source: checks,
   stripPrefix: strip || null,
-  source: `https://github.com/storytold/${slug}/releases/tag/${release.tag_name}`,
+  repo: `${owner}/${slug}`,
+  source: `https://github.com/${owner}/${slug}/releases/tag/${release.tag_name}`,
 };
 await writeFile(appsPath, JSON.stringify(apps, null, 2) + '\n');
 console.log(`apps.json : ${slug} → ${version}`);

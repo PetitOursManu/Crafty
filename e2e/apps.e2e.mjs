@@ -40,6 +40,13 @@ before(async () => {
 after(() => { srv?.close(); db?.close(); rmSync(dataDir, { recursive: true, force: true }); });
 
 let user = 0;
+// Compte e2e0 (créé par le premier test ; créé ici s'il manque, pour lancer un test seul avec --test-name-pattern).
+async function loginE2e0(b) {
+  const creds = { username: 'e2e0', password: 'motdepasse1' };
+  if ((await b.api('POST', '/api/auth/login', { json: creds })).status === 200) return;
+  await b.api('POST', '/api/auth/register', { json: creds });
+  if (user === 0) user = 1;
+}
 for (const [slug, c] of Object.entries(CASES)) {
   test(`${slug} : explorateur → ouvrir → modifier → Ctrl+S → version → recharger ; échec de stockage`, { skip: missing(slug), timeout: 180_000 }, async () => {
     const b = await pw.browserFor(base, { headless: !process.env.HEADED });
@@ -54,7 +61,7 @@ for (const [slug, c] of Object.entries(CASES)) {
         await p.fill('input[autocomplete=new-password] >> nth=1', 'motdepasse1');
         await p.click('button[type=submit]');
       } else {
-        await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+        await loginE2e0(b);
         await p.goto(`${base}/`);
       }
       await p.waitForSelector('#crumbs button');
@@ -122,7 +129,7 @@ test('pdfcraft : sauvegarde automatique (une seule version auto), thème du comp
   const b = await pw.browserFor(base, { headless: !process.env.HEADED, colorScheme: 'dark' });
   const p = b.page;
   try {
-    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await loginE2e0(b);
     await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 2 } });
     await b.api('PATCH', '/api/me', { json: { theme: 'light' } });
     const file = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Auto.pdf' });
@@ -177,7 +184,7 @@ test('format non pris en charge : message clair, application jamais chargée', {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;
   try {
-    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await loginE2e0(b);
     const pdf = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Refus.pdf' });
     await p.goto(`${base}/host.html?app=wordcraft&file=${pdf.id}`);
     await p.waitForSelector('.blocked');
@@ -191,8 +198,9 @@ test('format non pris en charge : message clair, application jamais chargée', {
     await p.hover('.menu [role=menuitem]:has-text("Ouvrir avec")');
     await p.waitForTimeout(300);
     const labels = await p.locator('.menu').last().locator('[role=menuitem]').allTextContents();
-    assert.equal(labels.length, 1);
-    assert.ok(labels[0].endsWith('PdfCraft'), labels[0]);
+    // PdfCraft (et d'autres qui importent le PDF : VectorCraft, Craft Anything), jamais WordCraft.
+    assert.ok(labels.some((l) => l.endsWith('PdfCraft')), labels.join(' | '));
+    assert.ok(!labels.some((l) => /WordCraft/.test(l)), labels.join(' | '));
   } finally { await b.close(); }
 });
 
@@ -204,7 +212,7 @@ test('wordcraft : « Ouvrir » de l\'application → sélecteur Crafty (choisir,
     await p.waitForSelector('dialog[open].picker-dlg');
   };
   try {
-    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await loginE2e0(b);
     const first = await b.upload(join(SAMPLES, 'test.docx'), { name: 'Premier.docx' });
     const second = await b.upload(join(SAMPLES, 'test.docx'), { name: 'Second.docx' });
     await b.host({ app: 'wordcraft', file: first.id });
@@ -248,7 +256,7 @@ test('réglages des applications par compte : isolés sur un navigateur partagé
   const lsPdf = () => p.evaluate(() => localStorage.getItem('pdfcraft'));
   try {
     // A (e2e0) change un réglage de PdfCraft.
-    await shared.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await loginE2e0(shared);
     await shared.host({ app: 'pdfcraft' });
     await shared.waitFor(() => window.hostState.control === true, 60_000);
     await shared.inApp('pdfcraft', (a) => a.request('ui.set', { key: 'show_page_edge_shadows', value: 'false' }));
@@ -304,7 +312,7 @@ for (const [slug, c] of Object.entries(NEW_APPS)) {
     const p = b.page;
     const ctrlS = async () => { await b.clickApp(620, 420); await p.keyboard.press('Control+s'); };
     try {
-      await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await loginE2e0(b);
       await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 3 } });
       await b.api('PATCH', '/api/me', { json: { theme: 'light' } });
       const folder = (await b.api('POST', '/api/folders', { json: { name: `Essais ${slug}` } })).body;
@@ -361,7 +369,7 @@ for (const [slug, c] of Object.entries(NEW_APPS)) {
     const b = await pw.browserFor(base, { headless: !process.env.HEADED });
     const p = b.page;
     try {
-      await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await loginE2e0(b);
       const folder = (await b.api('GET', '/api/fs')).body.folders.find((f) => f.name === `Essais ${slug}`);
       const file = (await b.api('GET', `/api/fs?folder=${folder.id}`)).body.files.find((f) => f.name === c.name);
       const before = file.versions;
@@ -418,48 +426,70 @@ for (const slug of ['gridcraft', 'cadcraft']) {
   });
 }
 
-// Mode interception (applications sans pont) : Enregistrer = téléchargement capté ; Ouvrir = sélecteur Crafty remis au
-// champ ; réouverture depuis Crafty = fichier déposé sur l'application.
+// Mode interception (applications sans pont) : Enregistrer = téléchargement ou showSaveFilePicker capté, ou Ctrl+S tenu par
+// Crafty par l'API de l'application ; Ouvrir = sélecteur Crafty ; réouverture = dépôt, Ctrl+O simulé ou commande de l'API.
+// prepare : crée le document de départ ; confirm(first) : la boîte propre de l'application ; keepName : l'application nomme
+// ses enregistrements d'après son projet (TextureCraft), le fichier garde donc ce nom ; ctrlO : vrai Ctrl+O testé.
+const api = (slug, fn, arg) => async (p) => p.frame({ url: /\/apps\// }).evaluate(fn, arg);
 const INTERCEPT_APPS = {
-  designcraft: { name: 'Untitled-1.designcraft', confirm: false },
-  soundcraft: { name: 'Midnight Groove.scraftz', confirm: true }, // sa propre boîte « Save Session As », validée par Entrée
+  designcraft: { name: 'Untitled-1.designcraft' },
+  soundcraft: { name: 'Midnight Groove.scraftz', confirm: async (p) => { await p.waitForTimeout(1500); await p.keyboard.press('Enter'); } },
+  solidcraft: { name: 'Cube.sc', focus: 'canvas', // un clic sur son écran d'accueil ouvrirait un exemple
+    prepare: api('solidcraft', async () => { await window.solidcraft.execute('file.new', { name: 'Cube' }); await window.solidcraft.execute('solid.box', { length: 20, width: 30, height: 40 }); }) },
+  vectorcraft: { name: 'Untitled-1.vectorcraft', focus: [300, 600],
+    prepare: api('vectorcraft', async () => { await window.vectorcraft.execute('file.newWithoutDialog', {}); await window.vectorcraft.execute('shape.rectangle', { x: 50, y: 50, width: 200, height: 120 }); }) },
+  texturecraft: { name: 'Material_Ball.tcraft', keepName: true, focus: [330, 750],
+    prepare: async (p) => { await p.mouse.click(581, 516); await p.waitForTimeout(1500); } }, // « Continuer avec le projet d'exemple »
+  materialcraft: { name: 'Untitled package.mcraft', focus: [500, 500],
+    prepare: async (p) => { await p.mouse.click(872, 255); await p.waitForTimeout(800); }, // ferme « Home »
+    // Sa boîte « Save package » au premier enregistrement : format .mcraft, puis Download.
+    confirm: async (p, first) => { if (!first) return; await p.waitForTimeout(1500); await p.mouse.click(32, 193); await p.waitForTimeout(500); await p.mouse.click(58, 222); } },
+  effectcraft: { name: 'document.ecproj', settle: 15_000, focus: [500, 700], ctrlO: false },
 };
 for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
   test(`${slug} (interception) : enregistrer, réouverture, Ouvrir de l'application, état « peut-être modifié »`, { skip: missing(slug), timeout: 420_000 }, async () => {
     const b = await pw.browserFor(base, { headless: !process.env.HEADED });
     const p = b.page;
     // Premier chargement : le serveur compresse le wasm à la volée (plusieurs secondes de CPU) ; DesignCraft démarre en 12 à 14 s.
-    const ready = async () => { await b.waitFor(() => window.hostState?.ready, 150_000); await p.waitForTimeout(8000); };
-    const save = async () => {
+    const ready = async () => { await b.waitFor(() => window.hostState?.ready, 150_000); await p.waitForTimeout(c.settle ?? 8000); };
+    const [fx, fy] = Array.isArray(c.focus) ? c.focus : [500, 400];
+    const focus = async () => (c.focus === 'canvas'
+      ? p.frame({ url: /\/apps\// }).evaluate(() => { const cv = document.querySelector('canvas'); cv.tabIndex = 0; cv.focus(); })
+      : b.clickApp(fx, fy));
+    const save = async (first = false) => {
       const n = (await b.state()).saves.length;
-      await b.clickApp(500, 400);
+      await focus();
       await p.keyboard.press('Control+s');
-      if (c.confirm) { await p.waitForTimeout(1500); await p.keyboard.press('Enter'); }
+      await c.confirm?.(p, first);
       return n;
     };
     try {
-      await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await loginE2e0(b);
       await p.goto(`${base}/host.html?app=${slug}`);
       await ready();
       assert.doesNotMatch(await p.locator('#app').getAttribute('src'), /host=parent/);
       assert.equal((await b.state()).ready.mode, 'intercept');
-      await save();
+      await c.prepare?.(p);
+      await save(true);
       await p.waitForSelector('dialog[open] input', { timeout: 30_000 });
       assert.equal(await p.inputValue('dialog[open] input'), c.name);
       const ext = c.name.split('.').pop();
-      await p.fill('dialog[open] input', `Interception ${slug}.${ext}`);
+      const fname = c.keepName ? c.name : `Interception ${slug}.${ext}`;
+      await p.fill('dialog[open] input', fname);
       await p.click('dialog[open] button[value=ok]');
       await b.waitFor(() => window.hostState.saves[0]?.status === 'ok', 30_000);
-      const file = (await b.api('GET', '/api/fs')).body.files.find((f) => f.name === `Interception ${slug}.${ext}`);
+      const file = (await b.api('GET', '/api/fs')).body.files.find((f) => f.name === fname);
       assert.ok(file && file.size > 0);
       assert.match(await p.textContent('#statusText'), /^Enregistré/);
-      await b.clickApp(500, 400);
+      await b.clickApp(fx, fy); // un vrai clic (le document est ouvert : plus d'écran d'accueil)
       await b.waitFor(() => window.hostState.maybeDirty === true, 5_000);
       assert.equal(await p.textContent('#statusText'), 'Pensez à enregistrer (Ctrl+S)');
 
-      // Réouverture depuis Crafty (dépôt) : l'enregistrement suivant porte le nom du fichier, donc va dans ce fichier.
+      // Réouverture depuis Crafty : l'enregistrement suivant porte le nom du fichier, donc va dans ce fichier.
       await p.goto(`${base}/host.html?app=${slug}&file=${file.id}`);
       await ready();
+      await b.waitFor(() => window.hostState.reopened, 150_000); // réouverture terminée (Ctrl+O simulé : l'application doit être disponible)
+      await p.waitForTimeout(3000);
       let n = await save();
       await b.waitFor((k) => window.hostState.saves.length > k && window.hostState.saves.at(-1).status, 30_000, n);
       let last = (await b.state()).saves.at(-1);
@@ -467,12 +497,13 @@ for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
       assert.equal(last.fileId, file.id);
 
       // Ouvrir de l'application (vrai Ctrl+O) → sélecteur Crafty → fichier remis → Ctrl+S dans ce fichier.
+      if (c.ctrlO === false) return;
       await p.goto(`${base}/host.html?app=${slug}`);
       await ready();
-      await b.clickApp(500, 400);
+      await focus();
       await p.keyboard.press('Control+o');
       await p.waitForSelector('dialog[open].picker-dlg', { timeout: 15_000 });
-      await p.click(`dialog[open] .pk-row:has-text("Interception ${slug}")`);
+      await p.click(`dialog[open] .pk-row:has-text("${fname.replace(/\.[^.]+$/, '')}")`);
       await p.click('dialog[open] button[value=ok]');
       await b.waitFor((nm) => window.hostState.file?.name === nm, 15_000, file.name);
       await p.waitForTimeout(3000);
@@ -492,10 +523,25 @@ for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
   });
 }
 
+test('craft-anything : n\'importe quel fichier de Crafty est analysé (lecture seule)', { skip: missing('craft-anything'), timeout: 150_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  try {
+    await loginE2e0(b);
+    const file = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Analyse.pdf' });
+    await b.host({ app: 'craft-anything', file: file.id });
+    await b.waitFor(() => window.hostState.reopened, 120_000);
+    // Interface dessinée dans un canvas : l'analyse affichée (type, taille, SHA-256) a été vérifiée à l'œil, pas ici.
+    assert.equal((await b.state()).reopened, file.id);
+    assert.equal(await b.page.locator('.toast').count(), 0, 'aucune erreur');
+    await b.clickApp(400, 300);
+    assert.equal((await b.state()).maybeDirty, false, 'rien à enregistrer');
+  } finally { await b.close(); }
+});
+
 test('pdfcraft : un export (Word) est capté et rangé à côté du document', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   try {
-    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await loginE2e0(b);
     const file = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Export.pdf' });
     await b.host({ app: 'pdfcraft', file: file.id });
     await b.waitFor(() => window.hostState.file && window.hostState.control === true, 60_000);

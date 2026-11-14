@@ -42,7 +42,8 @@ function send(kind, fields, transfer = []) {
 // ---------- Formats ----------
 // extensions : formats que l'application édite et enregistre ; imports : formats qu'elle sait seulement ouvrir
 // (listes vérifiées dans l'attribut accept de leur boîte « Ouvrir »).
-const opens = (a, name) => [...(a.extensions || []), ...(a.imports || [])].includes(extOf(name));
+// « * » dans imports : tout fichier (Craft Anything).
+const opens = (a, name) => [...(a.extensions || []), ...(a.imports || [])].some((e) => e === '*' || e === extOf(name));
 const edits = (a, name) => (a.extensions || []).includes(extOf(name));
 
 // ---------- En-tête et état ----------
@@ -149,7 +150,10 @@ function installPicker() {
     pickInput: pickForInput,
     pickHandles,
     // Téléchargement capté (application sans pont, ou export de PdfCraft) : traité comme un save de l'application.
-    saveFile: async (name, blob) => { log('info', `téléchargement capté : ${name} (${blob.size} octets)`, 'out'); // Copie dans le royaume de la page : un ArrayBuffer de l'iframe échoue aux tests instanceof d'ici.
+    saveFile: async (name, blob) => { log('info', `téléchargement capté : ${name} (${blob.size} octets)`, 'out');
+      // Pendant un enregistrement par l'API, l'application télécharge aussi le fichier (EffectCraft, vérifié) : déjà pris.
+      if (apiSaving) return log('info', 'téléchargement ignoré : enregistrement par l\'API en cours', 'out');
+      // Copie dans le royaume de la page : un ArrayBuffer de l'iframe échoue aux tests instanceof d'ici.
       onSave({ name, bytes: new Uint8Array(await blob.arrayBuffer()).slice().buffer, saveAs: false, captured: true }); },
     saveLost: (name) => toast({ type: 'error', title: 'Enregistrement non capté', detail: `${name} : le fichier n'a pas pu être récupéré.` }),
   });
@@ -157,6 +161,11 @@ function installPicker() {
 // showOpenFilePicker (FilmCraft…) : mêmes fichiers Crafty, rendus sous forme de « poignées ».
 async function pickHandles(opts = {}) {
   const w = iframe.contentWindow;
+  if (autoPick) { // réouverture par Ctrl+O simulé (SolidCraft : Ctrl+O passe par showOpenFilePicker, vérifié)
+    const f = autoPick; autoPick = null;
+    const buf = await (await api(`/api/files/${f.id}/content`, { raw: true })).arrayBuffer();
+    return [new w.File([buf], f.name, { lastModified: f.updatedAt })];
+  }
   const exts = [...new Set((opts.types || []).flatMap((t) => Object.values(t.accept || {}).flat())
     .map((e) => String(e).replace(/^./, '').toLowerCase()).filter((e) => /^[a-z0-9]+$/.test(e)))];
   state.picks++;
@@ -181,7 +190,11 @@ async function pickForInput(input) {
   const w = iframe.contentWindow;
   if (autoPick) {
     const f = autoPick; autoPick = null;
+    log('info', `réouverture : fichier remis au champ de l'application (${f.name})`, 'out');
     const buf = await (await api(`/api/files/${f.id}/content`, { raw: true })).arrayBuffer();
+    // Pas de remise immédiate : une application peut brancher son écouteur `change` juste après click()
+    // (SolidCraft ignorait un fichier remis sans délai).
+    await new Promise((r) => setTimeout(r, 300));
     const dt = new w.DataTransfer();
     dt.items.add(new w.File([buf], f.name, { lastModified: f.updatedAt }));
     input.files = dt.files;
@@ -400,13 +413,13 @@ function onAppReady() {
 }
 // Mode interception : l'application n'a pas de pont. Prête quand son wasm est initialisé : window.wasmBindings (pages
 // générées par trunk, vérifié sur six) ou son API window.<app> (EffectCraft), puis un court délai pour la première
-// image. Au-delà de 25 s, prête dès que son canvas est là ; abandon après 3 min.
+// image. Au-delà de 90 s (SolidCraft : wasm de 167 Mo, plus de 25 s au premier chargement), prête dès que son canvas est là ; abandon après 3 min.
 const intercept = () => app?.mode === 'intercept';
 async function waitInterceptReady() {
   for (let i = 0; i < 1800; i++) { // 3 min : premier chargement sur un réseau lent
     const w = iframe.contentWindow, d = iframe.contentDocument;
     const started = w && (w.wasmBindings || typeof w[slug]?.request === 'function');
-    if (started || (i > 250 && d?.querySelector('canvas'))) {
+    if (started || (i > 900 && d?.querySelector('canvas'))) {
       await new Promise((r) => setTimeout(r, 2000));
       state.ready = { mode: 'intercept', signal: started ? 'wasm' : 'canvas' };
       return onAppReady();
@@ -421,31 +434,110 @@ async function openByDrop(file) {
   try {
     const w = iframe.contentWindow;
     const buf = await (await api(`/api/files/${encodeURIComponent(file.id)}/content`, { raw: true })).arrayBuffer();
-    if (app.control?.open === 'keys') {
+    if (typeof app.control?.open === 'object') {
+      // Réouverture par l'API de l'application (VectorCraft : document.open {name, dataBase64}, vérifié).
+      const a = w[slug];
+      if (typeof a?.execute !== 'function') throw new Error("l'API de l'application n'est pas disponible");
+      // EffectCraft : son système de fichiers en mémoire reçoit le fichier par addFile(url, nom), puis file.open {path}.
+      const c = app.control.open, vars = { '{name}': file.name };
+      if (JSON.stringify(c.params || {}).includes('{base64}')) vars['{base64}'] = toB64(buf);
+      if (c.fetch) vars['{path}'] = await a[c.fetch](`/api/files/${encodeURIComponent(file.id)}/content`, file.name);
+      await apiCall(a, c, vars);
+      apiPath = vars['{path}'] || null;
+    } else if (app.control?.open === 'keys') {
       // Ctrl+O simulé : l'application ouvre sa boîte, pickForInput y remet ce fichier. L'application ne prend les
       // touches qu'une fois son interface prête et son canvas focalisé (vérifié) : on réessaie toutes les 2 s, 30 s au plus.
+      // Sans geste de l'utilisateur, la bibliothèque rfd n'appelle pas click() : elle affiche sa fenêtre HTML de repli
+      // (#rfd-overlay : champ fichier, Ok, Cancel ; vérifié avec TextureCraft). On y remet le fichier et on valide.
       autoPick = file;
-      for (let i = 0; i < 15 && autoPick === file; i++) {
+      const viaOverlay = async () => {
+        const ov = w.document.getElementById('rfd-overlay');
+        const input = ov?.querySelector('input[type=file]');
+        if (!input) return false;
+        autoPick = null;
+        const dt = new w.DataTransfer();
+        dt.items.add(new w.File([buf], file.name, { lastModified: file.updatedAt }));
+        input.files = dt.files;
+        input.dispatchEvent(new w.Event('change', { bubbles: true }));
+        log('info', `réouverture : fenêtre de repli de l'application remplie (${file.name})`, 'out');
+        [...ov.querySelectorAll('button')].find((b) => /^ok$/i.test(b.textContent.trim()))?.click();
+        return true;
+      };
+      // Une application occupée (TextureCraft calcule ses textures au démarrage) met les touches en attente et les traite
+      // toutes d'un coup (vérifié : six fenêtres empilées) : chaque essai attend que ses images s'enchaînent de nouveau.
+      const fluid = () => new Promise((r) => {
+        let n = 0; const t0 = performance.now();
+        const f = () => (++n >= 10 ? r(performance.now() - t0 < 1500) : w.requestAnimationFrame(f)); // ≥ 7 images/s
+        w.requestAnimationFrame(f);
+      });
+      const until = Date.now() + 120_000;
+      for (let i = 0; i < 6 && autoPick === file && Date.now() < until; i++) {
+        while (Date.now() < until && !(await fluid())) await new Promise((r) => setTimeout(r, 250));
+        if (await viaOverlay()) break;
+        log('info', `réouverture : Ctrl+O simulé (essai ${i + 1})`, 'out');
         const target = w.document.querySelector('canvas') || w.document.body;
         if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '0');
         target.focus?.();
         for (const type of ['keydown', 'keyup']) {
           target.dispatchEvent(new w.KeyboardEvent(type, { key: 'o', code: 'KeyO', keyCode: 79, which: 79, ctrlKey: true, bubbles: true, cancelable: true }));
         }
-        await new Promise((r) => setTimeout(r, 2000));
+        for (let t = 0; t < 50 && autoPick === file; t++) { // 5 s
+          if (await viaOverlay()) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
       }
       if (autoPick === file) { autoPick = null; toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: `${app.name} n'a pas ouvert sa boîte Ouvrir.` }); return; }
     } else dropFile(w, new w.File([buf], file.name, { lastModified: file.updatedAt }));
     track(file.name, file);
     state.maybeDirty = false;
+    state.reopened = file.id;
     await showFile(file);
   } catch (e) { toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: e.message }); }
+}
+// Ctrl+S tenu par Crafty (control.saveData, VectorCraft) : l'application sérialise le document par son API, sans sa boîte
+// « Enregistrer sous » (son document rouvert n'a pas de chemin dans un navigateur : chaque Ctrl+S la rouvrait, vérifié),
+// et l'enregistrement va au fichier Crafty ouvert. Ctrl+Maj+S reste à l'application (capté comme téléchargement).
+let apiSaving = false; // vrai pendant saveByApi (téléchargements de l'application ignorés)
+let apiPath = null; // chemin du document dans le système de fichiers en mémoire de l'application (EffectCraft)
+async function saveByApi() {
+  const c = app.control.saveData, a = iframe.contentWindow?.[slug];
+  if (typeof a?.execute !== 'function') return;
+  try {
+    let name = docName();
+    if (!name && c.title) name = (await apiCall(a, c.title, {}).catch(() => null))?.[c.title.field || 'title']; // nouveau document : son titre
+    name = String(name || 'document').replace(/[\\/:*?"<>|]/g, '_');
+    if (!/\.[a-z0-9]+$/i.test(name)) name = `${name}.${app.extensions?.[0]}`;
+    const path = apiPath || `/${name}`;
+    apiSaving = true;
+    const r = await apiCall(a, c, { '{name}': name, '{path}': path }).finally(() => setTimeout(() => { apiSaving = false; }, 1500));
+    let bytes;
+    if (c.read) { // l'application écrit dans son système de fichiers : on relit le fichier (copie dans ce contexte-ci)
+      apiPath = r?.path || path;
+      bytes = new Uint8Array(await a[c.read](apiPath)).buffer;
+    } else {
+      const b64 = r?.[c.field || 'dataBase64'];
+      if (typeof b64 !== 'string') throw new Error(r?.pending ? `l'application attend : ${r.pending}` : 'pas de contenu rendu');
+      bytes = fromB64(b64);
+    }
+    log('info', `enregistrement par l'API : ${name} (${bytes.byteLength} octets)`, 'out');
+    await onSave({ name, bytes, saveAs: false, captured: true });
+  } catch (e) { toast({ type: 'error', title: "Impossible d'enregistrer", detail: e?.message ?? String(e) }); }
 }
 // Sans pont, l'état « modifié » est inconnu : une frappe ou un clic dans l'application depuis le dernier enregistrement
 // est compté comme une modification possible (avertissement avant de quitter).
 function watchInput() {
-  if (!intercept() || state.guest) return;
+  if (!intercept() || state.guest || !app.extensions?.length) return; // sans format édité (Craft Anything) : rien à enregistrer
   const d = iframe.contentDocument;
+  if (app.control?.saveData) {
+    iframe.contentWindow.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || !/^[sS]$/.test(e.key)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.type === 'keydown' && !e.repeat) saveByApi();
+    }, true);
+    for (const t of ['keyup', 'keypress']) iframe.contentWindow.addEventListener(t, (e) => {
+      if ((e.ctrlKey || e.metaKey) && /^[sS]$/.test(e.key)) e.stopImmediatePropagation();
+    }, true);
+  }
   const mark = (e) => {
     if (e.type === 'keydown' && (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta' || ((e.ctrlKey || e.metaKey) && /^[sS]$/.test(e.key)))) return;
     if (!state.maybeDirty) { state.maybeDirty = true; setStatus(); }
@@ -495,6 +587,17 @@ addEventListener('craft-theme-change', () => { state.themeApplied = false; apply
 // control.save (apps.json) : un id de commande (execute), { command, params } ou { request, params } ; dans params,
 // « {name} » devient le nom du document actif dans l'application. Vérifié : FigCraft refuse file.save sur un document
 // ouvert par la page (ui.key Ctrl+S à la place) ; CadCraft refuse qsave sans path (qsave {path: nom}).
+// Paramètres de commande du registre : « {name} » (nom du document), « {base64} » (contenu du fichier).
+function ctlParams(params, vars) {
+  const walk = (v) => typeof v === 'string' ? (v in vars ? vars[v] : v.replaceAll('{name}', vars['{name}'] ?? ''))
+    : Array.isArray(v) ? v.map(walk) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)])) : v;
+  return walk(params || {});
+}
+const toB64 = (buf) => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const fromB64 = (b64) => { const s = atob(b64), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+const docName = () => Object.keys(state.docs).find((k) => state.docs[k].id === state.file?.id) || state.file?.name || '';
+const apiCall = (a, c, vars) => (c.request ? a.request(c.request, ctlParams(c.params, vars)) : a.execute(c.command, ctlParams(c.params, vars)));
+
 function saveCall(a) {
   const save = app.control?.save || 'file.save';
   if (typeof save === 'string') return a.execute(save);
@@ -557,7 +660,7 @@ async function main() {
   if (state.folderId) $('back').href = `/?folder=${encodeURIComponent(state.folderId)}`;
   if (state.guest) {
     $('localOpen').hidden = false;
-    $('localFile').accept = [...app.extensions, ...(app.imports || [])].map((e) => `.${e}`).join(',');
+    $('localFile').accept = (app.imports || []).includes('*') ? '' : [...app.extensions, ...(app.imports || [])].map((e) => `.${e}`).join(',');
     $('localFile').onchange = (e) => { const f = e.target.files[0]; if (f) openLocal(f); e.target.value = ''; };
   }
   // Document demandé : vérifié avant de charger l'application (un format qu'elle ne lit pas n'est jamais envoyé).

@@ -342,16 +342,49 @@ FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **
 |---|---|---|---|---|
 | DesignCraft 0.20.1 | 12–14 s | `.designcraft .idml .indd .indt` | `<a download>` `Untitled-1.designcraft` | dépôt : **oui** (nom conservé) |
 | SoundCraft 0.20.1 | 4–5 s | `.scraftz .scraft` | sa boîte « Save Session As » puis `<a download>` (session de 66 Mo, audio compris) | dépôt : **oui** |
-| VectorCraft 0.24.1 | 13 s | `.vectorcraft` + ~90 formats | sa boîte « Enregistrer sous » puis téléchargement | dépôt et Ctrl+O simulé : fichier remis au champ mais **pas ouvert** ; API `openFile` à étudier |
-| TextureCraft 0.6.1 | 22–25 s | `.tcraft` + modèles 3D | `<a download>` `Material_Ball.tcraft` (parfois bloqué par son accueil) | **non** obtenue |
-| MaterialCraft 0.4.1 | 4 s | `.sbs .mcraft .zip` | sa boîte « Save package » → bouton Download (`*_sbs.zip`) | **non** obtenue |
-| EffectCraft 0.24.1 | API avant l'interface | (`.ecproj` vu avant) | rien de capté | — |
-| Craft Anything 0.6.1 | 3 s | rien | rien | — |
+| VectorCraft 0.24.1 | 13 s | `.vectorcraft` + ~90 formats | **Ctrl+S tenu par Crafty** : `document.serialize` par l'API (sa boîte « Enregistrer sous » n'apparaît plus) | API `document.open {name, dataBase64}` : **oui** |
+| TextureCraft 0.6.1 | 5–25 s | `.tcraft` + modèles 3D | `<a download>` au nom du projet (`Material_Ball.tcraft`) | Ctrl+O simulé → fenêtre de repli de rfd remplie : **oui** (calque masqué retrouvé) ; sa boîte d'accueil reste ouverte |
+| MaterialCraft 0.4.1 | 4 s | `.sbs .mcraft .zip` | 1er : sa boîte « Save package » (format `.mcraft`, Download) ; ensuite téléchargement direct au nom du fichier | Ctrl+O simulé : **oui** (« Opened Mat.mcraft ») |
+| EffectCraft 0.24.1 | API avant l'interface (~15 s) | `.ecproj` | **Ctrl+S tenu par Crafty** : `file.saveAs {path}` dans son système de fichiers en mémoire puis `readFile` (son propre téléchargement est ignoré) | `addFile(url, nom)` + `file.open {path}` : **oui** |
+| Craft Anything 0.6.1 | 3 s | tout fichier (`accept` vide) | rien (lecture seule) | dépôt : **oui** (type, taille, SHA-256 affichés) |
+| SolidCraft 0.41.0 (tangency-labs) | 25 s, 2–3 s ensuite (service worker) | `.sc` + STEP, 3MF, STL, OBJ, glTF, DXF, SVG… | `showSaveFilePicker` capté | Ctrl+O simulé → `showOpenFilePicker` : **oui** (cube retrouvé, 2ᵉ version au Ctrl+S) |
+
+**Corrigé le 14/11/2026 (vérifié)** :
+
+- `showSaveFilePicker` / `showOpenFilePicker` interceptés : wasm-bindgen vérifie `instanceof` dans le contexte de l'iframe. Une poignée
+  ordinaire, ou une `Promise` créée par la page hôte (autre contexte), était refusée et l'application attendait une réponse qui ne
+  venait jamais (SolidCraft : « no answer from the file dialog »). Les objets rendus héritent maintenant des prototypes de l'iframe
+  (`FileSystemFileHandle`, `FileSystemWritableFileStream`) et les fonctions rendent des `Promise` de l'iframe.
+- Sans geste de l'utilisateur, rfd n'appelle pas `click()` : il affiche sa fenêtre HTML de repli (`#rfd-overlay`). La page hôte y remet
+  le fichier et clique « Ok ». Une application occupée (TextureCraft calcule ses textures) met les touches en attente puis les traite
+  d'un coup (six fenêtres empilées) : chaque essai attend que ses images s'enchaînent (≥ 7 images/s).
+- Fichier remis à un champ : 300 ms de délai (SolidCraft branche son écouteur juste après `click()`).
+
+**MailCraft** (`UCS-Care-Group/mailcraft`, **désactivé**) :
+
+- **0.12.0 panique au démarrage** (« time not implemented on this platform », `std::time` en WebAssembly), avec ou sans CSP,
+  2 s après le lancement : défaut de l'application. **0.11.1 épinglée**, démarre (boîte d'exemple).
+- Import `.eml .mbox .mbx .ics .ical .vcf .vcard` et ouverture `.mailcraft .json` : sélecteur Crafty, **vérifié**. Exports `.vcf`, `.ics`,
+  `.mbox` : captés et rangés, **vérifié**. « Enregistrer la boîte aux lettres sous » (`.mailcraft`) : **aucun téléchargement**, même
+  chargé directement hors de Crafty (vérifié) : la boîte ne peut donc pas être rangée dans Crafty.
+- La boîte vit dans le stockage du navigateur (texte affiché par l'application) : **commune à tous les comptes** d'un même navigateur.
+  JMAP (seul serveur possible dans le navigateur) demande `connect-src` vers le serveur de messagerie et du CORS chez lui.
+
+**SolidCraft** (`tangency-labs/solidcraft`, wasm de 167 Mo, 37 Mo compressé à la volée) : un **service worker** (`sw.js`, portée
+`/apps/solidcraft/`) garde la version et la relance hors ligne ; il vérifie `build.json` et suit un 404 (accès retiré). Ses
+« Récents » (`/disk/…`, `/upload/…`) et sa base `solidcraft-disk-handles` sont **communs aux comptes** d'un navigateur (les poignées
+interceptées ne s'y enregistrent pas : « could not be cloned »). API `window.solidcraft` (642 commandes, `document.inspect` donne un vrai
+`dirty`, `file.save`) : sauvegarde automatique possible, pas encore branchée.
+
+**Stockage commun à l'origine (non corrigé)** : EffectCraft rouvre sa dernière session depuis l'OPFS (`session.ecproj`) ; SolidCraft et
+MailCraft gardent des données dans le navigateur. Un autre compte du même navigateur les voit.
 
 - Les téléchargements révoquent souvent l'URL `blob:` juste après le clic : `URL.createObjectURL` est suivi pour garder le Blob.
 - Les octets venus de l'iframe sont d'un autre royaume JavaScript : `instanceof ArrayBuffer` échoue, copie nécessaire.
 - Un Ctrl+O simulé n'est pris que si le canvas a le focus (attribut `tabindex` posé à l'exécution).
 - **Vérifié** : en mode pont, l'export Word de PdfCraft est capté et rangé à côté du document (plus de téléchargement).
+- **Batterie e2e du 14/11/2026 soir** (26 tests, 6 nouvelles applications comprises) : une passe entièrement verte, puis une passe à
+  25/26 (DesignCraft non démarré, ci-dessous). Les tests d'interception se lancent aussi seuls (`--test-name-pattern`).
 - **Instable, cause non établie** : DesignCraft n'a pas démarré (aucun signal en 60 puis 150 s) dans 2 batteries complètes
   sur 6 (les deux dernières, après relèvement des délais, sont entièrement vertes) ; il démarre à chaque essai isolé. Diagnostic automatique ajouté au test (capture + état).
 
