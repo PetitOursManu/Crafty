@@ -348,6 +348,76 @@ for (const [slug, c] of Object.entries(NEW_APPS)) {
   });
 }
 
+// Sélecteur Crafty dans les applications ajoutées : leur propre bouton « Ouvrir » → choisir le fichier enregistré au test
+// précédent → l'application l'ouvre (contenu vérifié) → Ctrl+S l'enregistre dans ce fichier.
+const OPEN_DIALOG = {
+  gridcraft: (b) => b.inApp('gridcraft', (a) => a.execute('file.open')),
+  deckcraft: (b) => b.inApp('deckcraft', (a) => a.execute('app.openDialog')),
+  cadcraft: (b) => b.inApp('cadcraft', (a) => a.execute('ui.open')),
+  figcraft: (b) => b.clickApp(410, 218), // bouton « Ouvrir un fichier » de l'accueil de FigCraft
+};
+for (const [slug, c] of Object.entries(NEW_APPS)) {
+  test(`${slug} : « Ouvrir » de l'application → sélecteur Crafty → enregistrement dans ce fichier`, { skip: missing(slug), timeout: 120_000 }, async () => {
+    const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+    const p = b.page;
+    try {
+      await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      const folder = (await b.api('GET', '/api/fs')).body.folders.find((f) => f.name === `Essais ${slug}`);
+      const file = (await b.api('GET', `/api/fs?folder=${folder.id}`)).body.files.find((f) => f.name === c.name);
+      const before = file.versions;
+      // debug : mise en page avec le journal, celle où le bouton d'accueil de FigCraft a été repéré (410, 218).
+      await b.host({ app: slug, folder: folder.id, debug: '' });
+      await b.waitFor(() => window.hostState.control === true, 60_000);
+      await p.waitForTimeout(2000);
+      await OPEN_DIALOG[slug](b);
+      await p.waitForSelector('dialog[open].picker-dlg');
+      await p.click(`dialog[open] .pk-row:has-text("${c.name}")`);
+      await p.click('dialog[open] button[value=ok]');
+      await b.waitFor((n) => window.hostState.file?.name === n, 15_000, c.name);
+      await p.waitForTimeout(2500);
+      assert.equal(await b.inApp(slug, c.check), c.expect + 1, 'contenu du fichier choisi (3 modifications enregistrées)');
+      await b.inApp(slug, c.modify, 4);
+      await b.waitFor(() => window.hostState.dirty === true, 10_000);
+      await b.clickApp(620, 420);
+      await p.keyboard.press('Control+s');
+      await b.waitFor(() => window.hostState.saves.at(-1)?.status === 'ok', 15_000);
+      const st = await b.state();
+      assert.equal(st.saves.at(-1).fileId, file.id, 'enregistré dans le fichier choisi');
+      assert.equal(st.saves.at(-1).target, 'put');
+      assert.equal((await b.api('GET', `/api/files/${file.id}`)).body.versions, before + 1);
+      assert.deepEqual(b.consoleMsgs.filter((m) => /Content Security Policy|TrustedScript/.test(m)), [], 'violation de CSP');
+    } finally { await b.close(); }
+  });
+}
+
+// Réglages des applications qui en écrivent (GridCraft, CadCraft) : envoyés au serveur, retrouvés sur un autre navigateur.
+for (const slug of ['gridcraft', 'cadcraft']) {
+  test(`${slug} : réglages enregistrés dans le compte et retrouvés ailleurs`, { skip: missing(slug), timeout: 150_000 }, async () => {
+    const keys = apps[slug].prefKeys;
+    const one = await pw.browserFor(base, { headless: !process.env.HEADED });
+    try {
+      await one.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await one.host({ app: slug });
+      await one.waitFor(() => window.hostState.control === true, 60_000);
+      // Les applications écrivent leurs réglages périodiquement (environ 30 s).
+      await one.waitFor((k) => k.every((x) => localStorage.getItem(x) !== null), 60_000, keys);
+      await one.page.evaluate(() => window.craftPrefsFlush());
+      const local = await one.page.evaluate((k) => Object.fromEntries(k.map((x) => [x, localStorage.getItem(x)])), keys);
+      const server = (await one.api('GET', `/api/prefs?keys=${keys.join(',')}`)).body.values;
+      assert.deepEqual(server, local);
+    } finally { await one.close(); }
+    const two = await pw.browserFor(base, { headless: !process.env.HEADED });
+    try {
+      await two.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+      await two.page.goto(`${base}/`);
+      assert.equal(await two.page.evaluate((k) => k.filter((x) => localStorage.getItem(x) !== null).length, keys), 0, 'navigateur neuf');
+      await two.host({ app: slug });
+      const restored = await two.page.evaluate((k) => k.filter((x) => localStorage.getItem(x) !== null), keys);
+      assert.deepEqual(restored, keys, 'réglages remis avant le chargement');
+    } finally { await two.close(); }
+  });
+}
+
 test('invité : application sans stockage, « Enregistrer » télécharge le fichier', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;

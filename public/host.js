@@ -155,15 +155,26 @@ function installPicker() {
   proto.click = intercept(origClick);
   if (origShow) proto.showPicker = intercept(origShow);
 }
+// Boîte « Ouvrir » (son accept contient le format principal de l'application ; boîte multiple seulement si le registre
+// le dit : control.openMultiple, CadCraft) : le champ est annulé et chaque document part par le message `open` du pont,
+// comme depuis l'explorateur ; l'application le traite alors comme le fichier de la page (vérifié : DeckCraft considère
+// un fichier pris dans son champ comme un nouveau fichier, et Ctrl+S redemandait un nom). Autres boîtes (insérer une
+// image, des pages…) : les fichiers sont remis au champ.
 async function pickForInput(input) {
   const w = iframe.contentWindow;
-  const exts = (input.accept || '').split(',').map((s) => s.trim().replace(/^\./, '').toLowerCase()).filter((s) => /^[a-z0-9]+$/.test(s));
+  const exts = (input.accept || '').split(',').map((s) => s.trim().replace(/^./, '').toLowerCase()).filter((s) => /^[a-z0-9]+$/.test(s));
+  const isOpen = exts.includes(app.extensions?.[0]) && (!input.multiple || !!app.control?.openMultiple);
   state.picks++;
-  log('info', `boîte « Ouvrir » de l'application : accept=${input.accept} multiple=${input.multiple}`, 'out');
-  const files = await pickFiles({ title: input.multiple ? 'Choisir des fichiers' : 'Ouvrir', exts: [...new Set(exts)], multiple: input.multiple,
+  log('info', `boîte « Ouvrir » de l'application : accept=${input.accept} multiple=${input.multiple} (${isOpen ? 'ouverture' : 'insertion'})`, 'out');
+  const files = await pickFiles({ title: isOpen ? 'Ouvrir' : 'Choisir des fichiers', exts: [...new Set(exts)], multiple: input.multiple,
     folderId: state.folderId, appName: app.name });
-  if (!files?.length) { input.dispatchEvent(new w.Event('cancel', { bubbles: true })); return; }
+  if (!files?.length || isOpen) input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
+  if (!files?.length) return;
   try {
+    if (isOpen) {
+      for (const f of files) await openStoredFile(f);
+      return;
+    }
     const dt = new w.DataTransfer();
     for (const f of files) {
       const buf = await (await api(`/api/files/${f.id}/content`, { raw: true })).arrayBuffer();
@@ -173,12 +184,9 @@ async function pickForInput(input) {
     input.files = dt.files;
     input.dispatchEvent(new w.Event('input', { bubbles: true }));
     input.dispatchEvent(new w.Event('change', { bubbles: true }));
-    // Un seul document d'un format que l'application édite : c'est le document ouvert.
-    if (files.length === 1 && edits(app, files[0].name) && !input.multiple) await showFile(files[0]);
-    applyAppTheme();
   } catch (e) {
     toast({ type: 'error', title: 'Impossible de transmettre le fichier', detail: e.message });
-    input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
+    if (!isOpen) input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
   }
 }
 

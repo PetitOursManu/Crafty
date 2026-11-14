@@ -29,7 +29,10 @@ const sha = (s) => `sha256-${createHash('sha256').update(s).digest('base64')}`;
 // Styles insérés à l'exécution par des bibliothèques communes aux applications (vérifié le 14/11/2026) :
 // rfd (boîte « Ouvrir ») ajoute un <style> constant pour #rfd-overlay. Si une version le change, le contrôle de
 // CSP de npm run test:e2e échoue : relever la nouvelle empreinte dans la console et la mettre ici.
-const RUNTIME_STYLES = ['sha256-9tSqG2Th9gNn6sbn1ZYMSqakJLznxnsamRDeigez2Mo='];
+// CadCraft crée son champ fichier avec l'attribut style="display:none" : un attribut ne s'autorise par empreinte
+// qu'avec 'unsafe-hashes', limité ici à cette seule valeur.
+const RUNTIME_STYLES = ['unsafe-hashes', 'sha256-9tSqG2Th9gNn6sbn1ZYMSqakJLznxnsamRDeigez2Mo=',
+  'sha256-aqNNdDLnnrDOnTNdkJpYlAxKVJtLt9CtFLklmInuUAE=' /* display:none */];
 export function inlineHashes(html) {
   const grab = (re) => [...html.matchAll(re)].map((m) => sha(m[1]));
   return { scripts: grab(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi), styles: grab(/<style[^>]*>([\s\S]*?)<\/style>/gi) };
