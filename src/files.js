@@ -42,11 +42,12 @@ export function createFiles({ db, dataDir, log, settings }) {
     insertFolder: db.prepare('INSERT INTO folders (id, user_id, parent_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'),
     insertFile: db.prepare('INSERT INTO files (id, user_id, folder_id, name, size, last_app, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)'),
     maxN: db.prepare('SELECT IFNULL(MAX(n), 0) n FROM versions WHERE file_id = ?'),
-    insertVersion: db.prepare('INSERT INTO versions (id, file_id, user_id, n, size, sha256, app, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
+    insertVersion: db.prepare('INSERT INTO versions (id, file_id, user_id, n, size, sha256, app, created_at, auto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+    versionRow: db.prepare('SELECT * FROM versions WHERE id = ?'),
     setCurrent: db.prepare('UPDATE files SET size = ?, version_id = ?, updated_at = ?, last_app = IFNULL(?, last_app) WHERE id = ?'),
     old: db.prepare('SELECT id FROM versions WHERE file_id = ? ORDER BY n DESC LIMIT -1 OFFSET ?'),
     delVersion: db.prepare('DELETE FROM versions WHERE id = ?'),
-    versions: db.prepare('SELECT id, n, size, sha256, app, created_at FROM versions WHERE file_id = ? ORDER BY n DESC'),
+    versions: db.prepare('SELECT id, n, size, sha256, app, created_at, auto FROM versions WHERE file_id = ? ORDER BY n DESC'),
     version: db.prepare('SELECT * FROM versions WHERE id = ? AND file_id = ?'),
     // Toutes les versions sous un dossier (récursif), pour effacer les octets avant la suppression en cascade.
     blobsUnder: db.prepare(`WITH RECURSIVE t(id) AS (SELECT id FROM folders WHERE id = ? AND user_id = ?
@@ -123,17 +124,26 @@ export function createFiles({ db, dataDir, log, settings }) {
   }
 
   // Ajoute une version (renommage atomique du fichier temporaire), puis élague au-delà de max_versions.
-  async function addVersion(user, file, body, app) {
+  // Sauvegarde automatique (auto) : si la version courante est elle-même automatique, elle est remplacée
+  // (même numéro) au lieu d'en créer une nouvelle ; seuls les enregistrements explicites font l'historique.
+  async function addVersion(user, file, body, app, { auto = false } = {}) {
+    // Contenu identique à la version courante (enregistrement sans modification) : pas de nouvelle version.
+    const current = file.version_id ? q.versionRow.get(file.version_id) : null;
+    if (current && current.sha256 === body.sha256) { await unlink(body.tmp).catch(() => {}); return current.id; }
     const vid = randomUUID();
     mkdirSync(join(blobDir, vid.slice(0, 2)), { recursive: true });
     await rename(body.tmp, blobPath(vid));
     const now = Date.now();
     let pruned = [];
     db.transaction(() => {
-      q.insertVersion.run(vid, file.id, user.id, q.maxN.get(file.id).n + 1, body.size, body.sha256, app ?? null, now);
+      const cur = file.version_id ? q.versionRow.get(file.version_id) : null;
+      const merge = auto && cur?.auto;
+      q.insertVersion.run(vid, file.id, user.id, merge ? cur.n : q.maxN.get(file.id).n + 1, body.size, body.sha256, app ?? null, now, auto ? 1 : 0);
       q.setCurrent.run(body.size, vid, now, app ?? null, file.id);
-      pruned = q.old.all(file.id, Math.max(1, settings().max_versions)).map((r) => r.id);
-      for (const id of pruned) q.delVersion.run(id);
+      if (merge) { q.delVersion.run(cur.id); pruned.push(cur.id); }
+      const old = q.old.all(file.id, Math.max(1, settings().max_versions)).map((r) => r.id);
+      for (const id of old) q.delVersion.run(id);
+      pruned.push(...old);
     })();
     await Promise.all(pruned.map((id) => unlink(blobPath(id)).catch(() => {})));
     return vid;
@@ -234,8 +244,9 @@ export function createFiles({ db, dataDir, log, settings }) {
     app.put('/api/files/:id/content', requireUser, wrap(async (req, res) => {
       const f = fileOf(req.user, req.params.id);
       const body = await receive(req, req.user, f.name);
-      await addVersion(req.user, f, body, appHeader(req));
-      log.audit(req, 'file.save', f.id, { size: body.size, app: appHeader(req) });
+      const auto = req.headers['x-autosave'] === '1';
+      await addVersion(req.user, f, body, appHeader(req), { auto });
+      log.audit(req, auto ? 'file.autosave' : 'file.save', f.id, { size: body.size, app: appHeader(req) });
       res.json(fileJson(fileOf(req.user, f.id)));
     }));
     app.patch('/api/files/:id', requireUser, json, wrap((req, res) => {
@@ -264,7 +275,7 @@ export function createFiles({ db, dataDir, log, settings }) {
     app.get('/api/files/:id/versions', requireUser, wrap((req, res) => {
       const f = fileOf(req.user, req.params.id);
       res.set('Cache-Control', 'no-store').json(q.versions.all(f.id).map((v) => ({ id: v.id, n: v.n, size: v.size, sha256: v.sha256,
-        app: v.app, createdAt: v.created_at, current: v.id === f.version_id })));
+        app: v.app, createdAt: v.created_at, current: v.id === f.version_id, auto: !!v.auto })));
     }));
     // Restaurer = copier l'ancienne version en nouvelle version courante (l'historique est conservé).
     app.post('/api/files/:id/versions/:vid/restore', requireUser, wrap(async (req, res) => {

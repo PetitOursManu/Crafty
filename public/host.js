@@ -9,7 +9,7 @@ const q = new URLSearchParams(location.search);
 const slug = /^[a-z0-9-]+$/.test(q.get('app') || '') ? q.get('app') : null;
 const iframe = $('app');
 const state = (window.hostState = { slug, ready: null, readyMs: null, dirty: false, saving: false, unsaved: null, file: null,
-  folderId: q.get('folder') || null, saves: [], failed: [], control: undefined, guest: false });
+  folderId: q.get('folder') || null, saves: [], failed: [], control: undefined, guest: false, appName: null, autosaves: 0 });
 const hostLog = (window.hostLog = []);
 let me, app, debug = false, unsavedToast = null;
 
@@ -41,7 +41,7 @@ function setStatus() {
   else if (state.saving) { cls = 'saving'; text = 'Enregistrement…'; }
   else if (state.dirty) { cls = 'dirty'; text = 'Modifications non enregistrées'; }
   else if (state.guest) { cls = ''; text = 'Mode invité : rien n\'est conservé'; }
-  else if (state.lastSavedAt) { cls = 'ok'; text = `Enregistré · ${new Date(state.lastSavedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`; }
+  else if (state.lastSavedAt) { cls = 'ok'; text = `${state.lastSaveAuto ? 'Enregistré automatiquement' : 'Enregistré'} · ${new Date(state.lastSavedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`; }
   else if (state.file) { cls = 'ok'; text = 'Enregistré'; }
   else { cls = ''; text = 'Nouveau document, pas encore enregistré'; }
   s.className = `status ${cls}`;
@@ -84,6 +84,7 @@ async function openStoredFile(id) {
     const r = await api(`/api/files/${encodeURIComponent(id)}/content`, { raw: true });
     const bytes = await r.arrayBuffer();
     send('open', { name: file.name, bytes }, [bytes]);
+    state.appName = file.name;
     await showFile(file);
     api(`/api/files/${file.id}`, { method: 'PATCH', body: { lastApp: slug } }).catch(() => {});
   } catch (e) {
@@ -169,12 +170,17 @@ async function resolveTarget(msg) {
     if (!r) return null;
     return { kind: 'post', folderId: state.folderId, name: r.name, replace: r.replace, adopt: true };
   }
-  if (extOf(msg.name) === extOf(state.file.name)) return { kind: 'put', fileId: state.file.id, name: state.file.name };
-  return exported(state.file.folderId);
+  if (extOf(msg.name) !== extOf(state.file.name)) return exported(state.file.folderId);
+  if (msg.name === state.appName) return { kind: 'put', fileId: state.file.id, name: state.file.name };
+  // Même format mais autre nom : l'utilisateur a ouvert un autre document dans l'application elle-même.
+  // On ne l'écrit pas par-dessus le fichier ouvert : on demande où l'enregistrer.
+  const r = await saveAsDialog(msg.name);
+  return r ? { kind: 'post', folderId: state.folderId, name: r.name, replace: r.replace, adopt: true } : null;
 }
 async function store(target, bytes) {
   if (debug && $('simFail').checked) throw new Error('échec simulé (débogage)');
   const headers = { 'X-App': slug };
+  if (target.auto) headers['X-Autosave'] = '1';
   if (target.kind === 'put') return api(`/api/files/${target.fileId}/content`, { method: 'PUT', body: bytes, headers });
   headers['X-File-Name'] = encodeURIComponent(target.name);
   return api(`/api/files?folder=${encodeURIComponent(target.folderId || 'root')}${target.replace ? '&replace=1' : ''}`, { method: 'POST', body: bytes, headers });
@@ -188,8 +194,9 @@ async function saveTo(target, bytes, msg) {
     entry.status = 'ok'; entry.fileId = file.id;
     log('info', `stocké : ${file.name} (${file.versions} version(s))`, 'out');
     state.unsaved = null;
-    if (!target.exported) state.lastSavedAt = Date.now();
-    if (target.adopt) await showFile(await api(`/api/files/${file.id}`));
+    if (!target.exported) { state.lastSavedAt = Date.now(); state.lastSaveAuto = !!target.auto; }
+    if (target.auto) state.autosaves++;
+    if (target.adopt) { state.appName = msg.name; await showFile(await api(`/api/files/${file.id}`)); }
     if (target.exported) toast({ title: `Exporté : ${file.name}`, detail: 'Enregistré à côté du document dans vos fichiers.' });
     if (msg.id !== undefined && msg.id !== null) send('saved', { id: msg.id });
   } catch (e) {
@@ -211,7 +218,11 @@ async function onSave(msg) {
     toast({ title: `Téléchargé : ${msg.name}`, detail: 'Mode invité : le fichier est dans vos téléchargements.' });
     return;
   }
+  // Un save qui arrive juste après notre execute('file.save') est la sauvegarde automatique.
+  const auto = autoPending && Date.now() - autoPending < 15_000 && !msg.saveAs;
+  autoPending = 0;
   const target = await resolveTarget(msg);
+  if (target && auto && target.kind === 'put') target.auto = true;
   if (target?.cancel) return toast({ title: 'Export annulé', detail: msg.name });
   if (!target) {
     // Enregistrer sous annulé : l'application se croit enregistrée, on le signale.
@@ -247,10 +258,11 @@ window.addEventListener('message', (event) => {
     $('loading').hidden = true;
     send('host', { version: '1', handoff: !state.guest });
     if (q.get('file') && !state.guest) openStoredFile(q.get('file'));
-    if (q.has('control')) waitControl();
+    waitControl();
     applyAppTheme();
   } else if (kind === 'dirty') {
     state.dirty = !!msg.dirty; setStatus();
+    if (state.dirty) scheduleAutosave(); else clearTimeout(autosaveTimer);
   } else if (kind === 'save') {
     onSave(msg);
   } else if (kind === 'failed') {
@@ -262,8 +274,8 @@ window.addEventListener('message', (event) => {
   }
 });
 // Thème de l'application : elle suit le thème du système, pas celui de la page (color-scheme de l'iframe ignoré,
-// vérifié). Quand window.<app> est disponible (WordCraft toujours, PdfCraft avec ?control), on lui applique le
-// choix du compte avec sa propre commande.
+// vérifié). On lui applique le choix du compte avec sa propre commande, via window.<app> (?control, décision du
+// 14/11/2026 : activé pour le thème et la sauvegarde automatique).
 const THEME_CMD = {
   pdfcraft: (t) => [`view.theme.${t}`],
   wordcraft: (t) => ['view.interfaceTheme', { value: t }],
@@ -278,11 +290,35 @@ async function applyAppTheme() {
     if (typeof api?.execute === 'function') {
       try { await api.execute(...cmd(window.craftTheme.get())); log('info', `thème de l'application : ${window.craftTheme.get()}`, 'out'); return; }
       catch (e) { lastErr = e?.message ?? String(e); }
-    } else if (i > 100) break; // pas d'API (PdfCraft sans ?control) : l'application suit le système
+    } else if (i > 100) break; // pas d'API : l'application suit le système
     await new Promise((r) => setTimeout(r, 1000));
   }
   if (lastErr) log('info', `thème de l'application non appliqué : ${lastErr}`, 'err');
 }
+addEventListener('craft-theme-change', () => applyAppTheme());
+
+// ---------- Sauvegarde automatique ----------
+// Sur dirty:true, après le délai réglé par l'admin (me.autosave, en secondes), execute('file.save') : l'application
+// envoie un save sans boîte de dialogue (vérifié en phase 0). Seulement pour un document déjà stocké. Un onglet
+// masqué ne répond pas : on relance au retour au premier plan.
+let autosaveTimer = null, autoPending = 0;
+function scheduleAutosave(delay = (me?.autosave ?? 0) * 1000) {
+  clearTimeout(autosaveTimer);
+  if (!delay || state.guest || !state.file) return;
+  autosaveTimer = setTimeout(runAutosave, delay);
+}
+async function runAutosave() {
+  if (!state.dirty || state.saving || !state.file || document.querySelector('dialog[open]')) return scheduleAutosave();
+  if (document.visibilityState === 'hidden') return; // relancé par visibilitychange
+  const a = iframe.contentWindow?.[slug];
+  if (typeof a?.execute !== 'function') return;
+  autoPending = Date.now();
+  log('info', 'sauvegarde automatique', 'out');
+  try { await a.execute('file.save'); }
+  catch (e) { autoPending = 0; log('info', `sauvegarde automatique : ${e?.message ?? e}`, 'err'); scheduleAutosave(); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.dirty) scheduleAutosave(3000); });
+
 async function waitControl() {
   for (let i = 0; i < 200; i++) {
     if (typeof iframe.contentWindow[slug]?.request === 'function') { state.control = true; return; }
@@ -321,9 +357,8 @@ async function main() {
   // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, drapeaux de rendu transmis.
   const src = new URLSearchParams({ host: 'parent' });
   if (me.user) src.set('author', me.user.username);
-  for (const f of ['webgl', 'cpu', 'control']) if (q.has(f)) src.append(f, '');
-  // Le thème de la page est transmis à l'iframe (prefers-color-scheme suit color-scheme de l'iframe).
-  iframe.style.colorScheme = document.documentElement.dataset.theme;
+  src.append('control', ''); // window.<app> : thème et sauvegarde automatique
+  for (const f of ['webgl', 'cpu']) if (q.has(f)) src.append(f, '');
   t0 = performance.now();
   iframe.src = `/apps/${slug}/?${src.toString().replace(/=(&|$)/g, '$1')}`;
   setTimeout(() => { if (!state.ready && !state.failed.length) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);

@@ -262,6 +262,10 @@ Compression du wasm, mesurée (taille / temps CPU sur cette machine) :
   `view.interfaceTheme {value: "light"|"dark"|"system"}`. **Vérifié** : WordCraft applique le thème du compte via
   `window.wordcraft` (toujours présent), mais refuse la commande tant qu'aucun document n'est ouvert (« Aucun document
   n'est ouvert ») ; la page hôte réessaie. PdfCraft l'applique aussi, mais seulement avec `?control` (non activé par défaut).
+- **Décision du 14/11/2026** : la page hôte charge toujours les applications avec `?control`. **Vérifié** : thème du compte
+  appliqué à PdfCraft et WordCraft ; sauvegarde automatique par `execute("file.save")` dans les deux (Chrome).
+- **Vérifié** : un second `open` envoyé à PdfCraft ouvre le document dans un onglet en arrière-plan ; l'onglet actif
+  reste le premier, et `file.save` enregistre l'onglet actif.
 
 ## Non vérifié
 

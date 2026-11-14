@@ -9,7 +9,8 @@ export const DEFAULT_SETTINGS = {
   guest_apps: null,              // null = toutes les applications ; sinon liste de slugs
   max_versions: 10,              // versions conservées par fichier (courante comprise)
   default_quota: 1024 ** 3,      // 1 Gio par compte, anciennes versions comprises
-  max_file_size: 512 * 1024 ** 2 // limite d'ouverture des applications (512 Mio)
+  max_file_size: 512 * 1024 ** 2, // limite d'ouverture des applications (512 Mio)
+  autosave_seconds: 30,          // délai de la sauvegarde automatique après une modification (0 = désactivée)
 };
 
 const SCHEMA = `
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS versions (
   size INTEGER NOT NULL,
   sha256 TEXT NOT NULL,
   app TEXT,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  auto INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS versions_file ON versions(file_id, n);
 CREATE INDEX IF NOT EXISTS versions_user ON versions(user_id);
@@ -96,6 +98,8 @@ export function openDb(file) {
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
   db.exec(SCHEMA);
+  // Migration : colonne auto (sauvegarde automatique) ajoutée après la première version du schéma.
+  if (!db.prepare('PRAGMA table_info(versions)').all().some((c) => c.name === 'auto')) db.exec('ALTER TABLE versions ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
 
   const getRow = db.prepare('SELECT value FROM settings WHERE key = ?');
   const setRow = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');

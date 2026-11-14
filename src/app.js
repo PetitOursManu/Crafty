@@ -123,7 +123,7 @@ export function createApp({
     if (!req.user) return res.status(401).json({ error: 'Connexion requise.' });
     const { id, username, role, mustChange, theme } = req.user;
     res.json({ user: { id, username, role, mustChange, theme }, apps: mustChange ? [] : allowedApps(req).map(appJson),
-      usage: files.usage(req.user) });
+      usage: files.usage(req.user), autosave: db.settings().autosave_seconds });
   });
   app.patch('/api/me', auth.requireUser, json, (req, res) => {
     if (!['light', 'dark', 'system'].includes(req.body?.theme)) return res.status(400).json({ error: 'Thème invalide.' });

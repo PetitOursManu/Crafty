@@ -264,7 +264,8 @@ async function versionsDialog(file) {
   const fill = async () => {
     const vs = await api(`/api/files/${file.id}/versions`);
     list.replaceChildren(...vs.map((v) => h('li', {},
-      h('div', { class: 'v-main' }, h('strong', {}, `Version ${v.n}`, v.current ? h('span', { class: 'badge accent' }, 'actuelle') : null),
+      h('div', { class: 'v-main' }, h('strong', {}, `Version ${v.n} `, v.current ? h('span', { class: 'badge accent' }, 'actuelle') : null, ' ',
+          v.auto ? h('span', { class: 'badge', title: 'Sauvegarde automatique, mise à jour jusqu\'au prochain « Enregistrer »' }, 'auto') : null),
         h('span', { class: 'v-meta' }, `${formatDateTime(v.createdAt)} · ${formatSize(v.size)}${v.app ? ` · ${appBySlug(v.app)?.name || v.app}` : ''}`)),
       h('button', { class: 'btn sm', type: 'button', onclick: () => downloadFile(file, v.id) }, icon('download'), 'Télécharger'),
       v.current ? null : h('button', { class: 'btn sm', type: 'button', onclick: async () => {

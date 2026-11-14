@@ -180,6 +180,7 @@ function renderSettings() {
   const versions = h('input', { type: 'number', min: 1, max: 100, step: 1, value: String(s.max_versions), required: true });
   const quota = h('input', { type: 'number', min: 0, step: 0.5, value: String(+(s.default_quota / GIB).toFixed(2)), required: true });
   const maxSize = h('input', { type: 'number', min: 1, max: 512, step: 1, value: String(Math.round(s.max_file_size / MIB)), required: true });
+  const autosave = h('input', { type: 'number', min: 0, max: 3600, step: 5, value: String(s.autosave_seconds), required: true });
   const errEl = h('div', { class: 'error-text', role: 'alert' });
   const form = $('settings');
   form.replaceChildren(
@@ -188,7 +189,10 @@ function renderSettings() {
       h('div', { class: 'row' },
         h('label', { class: 'field' }, 'Versions conservées par fichier', versions, h('span', { class: 'hint' }, 'Les plus anciennes sont effacées au prochain enregistrement.')),
         h('label', { class: 'field' }, 'Quota par défaut (Gio)', quota, h('span', { class: 'hint' }, 'Par compte, versions comprises.')),
-        h('label', { class: 'field' }, 'Taille max. d\'un fichier (Mio)', maxSize, h('span', { class: 'hint' }, '512 au plus (limite des applications).')))),
+        h('label', { class: 'field' }, 'Taille max. d\'un fichier (Mio)', maxSize, h('span', { class: 'hint' }, '512 au plus (limite des applications).'))),
+      h('div', { class: 'row' },
+        h('label', { class: 'field' }, 'Sauvegarde automatique (secondes)', autosave, h('span', { class: 'hint' },
+          'Délai après une modification ; 0 = désactivée. Les sauvegardes automatiques successives mettent à jour une seule version ; seuls les « Enregistrer » ajoutent des versions.')))),
     errEl, h('div', {}, h('button', { class: 'btn primary', type: 'submit' }, 'Enregistrer les réglages')));
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -196,7 +200,7 @@ function renderSettings() {
     try {
       settings = await api('/api/admin/settings', { method: 'PATCH', body: {
         signup_open: signup.input.checked, guest_enabled: guest.input.checked, guest_apps: g.allApps ? null : g.apps,
-        max_versions: Number(versions.value), default_quota: Math.round(Number(quota.value) * GIB), max_file_size: Math.round(Number(maxSize.value) * MIB) } });
+        max_versions: Number(versions.value), default_quota: Math.round(Number(quota.value) * GIB), max_file_size: Math.round(Number(maxSize.value) * MIB), autosave_seconds: Number(autosave.value) } });
       errEl.textContent = '';
       toast({ title: 'Réglages enregistrés.' });
       await loadUsers();
@@ -206,7 +210,7 @@ function renderSettings() {
 
 // ---------- Journal ----------
 const ACTIONS = { 'auth.login': 'Connexion', 'auth.logout': 'Déconnexion', 'auth.setup': 'Création du compte admin', 'auth.register': 'Inscription',
-  'auth.password': 'Mot de passe changé', 'file.upload': 'Import', 'file.save': 'Enregistrement', 'file.update': 'Fichier modifié',
+  'auth.password': 'Mot de passe changé', 'file.upload': 'Import', 'file.save': 'Enregistrement', 'file.autosave': 'Sauvegarde automatique', 'file.update': 'Fichier modifié',
   'file.delete': 'Fichier supprimé', 'file.restore': 'Version restaurée', 'folder.create': 'Dossier créé', 'folder.update': 'Dossier modifié',
   'folder.delete': 'Dossier supprimé', 'admin.user.create': 'Compte créé', 'admin.user.update': 'Compte modifié',
   'admin.user.delete': 'Compte supprimé', 'admin.settings': 'Réglages modifiés' };

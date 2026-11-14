@@ -118,6 +118,61 @@ for (const [slug, c] of Object.entries(CASES)) {
   });
 }
 
+test('pdfcraft : sauvegarde automatique (une seule version auto), thème du compte, garde contre un autre document', { skip: missing('pdfcraft'), timeout: 180_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED, colorScheme: 'dark' });
+  const p = b.page;
+  try {
+    await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'motdepasse1' } });
+    await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 2 } });
+    await b.api('PATCH', '/api/me', { json: { theme: 'light' } });
+    const file = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Auto.pdf' });
+    // Pas de &control dans l'URL : la page hôte l'ajoute toujours.
+    await b.host({ app: 'pdfcraft', file: file.id });
+    assert.match(await p.locator('#app').getAttribute('src'), /[?&]control(&|$)/);
+    await b.waitFor(() => window.hostState.file && window.hostState.control === true, 60_000);
+    // Thème du compte (clair) appliqué à PdfCraft alors que le système est en sombre.
+    await b.waitFor(() => window.hostLog.some((l) => l.text === "thème de l'application : light"), 30_000);
+    await p.waitForTimeout(1000);
+
+    await b.inApp('pdfcraft', (a) => a.execute('page.insert_blank'));
+    await b.waitFor(() => window.hostState.autosaves === 1, 20_000); // aucune touche pressée
+    await b.waitFor(() => !window.hostState.dirty, 10_000);
+    assert.match(await p.textContent('#statusText'), /^Enregistré automatiquement/);
+    let vs = (await b.api('GET', `/api/files/${file.id}/versions`)).body;
+    assert.deepEqual(vs.map((v) => [v.n, v.auto]), [[2, true], [1, false]]);
+    await b.inApp('pdfcraft', (a) => a.execute('page.insert_blank'));
+    await b.waitFor(() => window.hostState.autosaves === 2, 20_000);
+    vs = (await b.api('GET', `/api/files/${file.id}/versions`)).body;
+    assert.deepEqual(vs.map((v) => [v.n, v.auto]), [[2, true], [1, false]], 'la seconde auto remplace la première');
+    assert.equal((await b.inApp('pdfcraft', (a) => a.docInspect())).documents[0].pages, 5);
+    // Ctrl+S explicite : nouvelle version, non automatique.
+    await b.inApp('pdfcraft', (a) => a.execute('page.insert_blank'));
+    await b.waitFor(() => window.hostState.dirty === true);
+    await b.clickApp(600, 500);
+    await p.keyboard.press('Control+s');
+    await b.waitFor(() => window.hostState.saves.length === 3 && window.hostState.saves[2].status === 'ok', 15_000);
+    vs = (await b.api('GET', `/api/files/${file.id}/versions`)).body;
+    assert.deepEqual(vs.map((v) => [v.n, v.auto]), [[3, false], [2, true], [1, false]]);
+
+    // Un autre document ouvert dans l'application elle-même ne doit pas écraser le fichier stocké.
+    await p.evaluate(async () => {
+      const bytes = await (await fetch(`/api/files/${window.hostState.file.id}/content`)).arrayBuffer();
+      window.hostApi.send('open', { name: 'autre.pdf', bytes }, [bytes]);
+    });
+    await p.waitForTimeout(1500);
+    // PdfCraft l'ouvre dans un onglet en arrière-plan (vérifié) : on passe dessus, puis Enregistrer.
+    await b.inApp('pdfcraft', (a) => a.execute('view.next_tab'));
+    await b.inApp('pdfcraft', (a) => a.execute('file.save'));
+    await p.waitForSelector('dialog[open] input');
+    assert.equal(await p.inputValue('dialog[open] input'), 'autre.pdf');
+    await p.click('dialog[open] button[value=cancel]');
+    vs = (await b.api('GET', `/api/files/${file.id}/versions`)).body;
+    assert.equal(vs.length, 3, 'fichier stocké intact');
+    assert.deepEqual(b.consoleMsgs.filter((m) => /Content Security Policy|TrustedScript/.test(m)), [], 'violation de CSP');
+    await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 30 } });
+  } finally { await b.close(); }
+});
+
 test('invité : application sans stockage, « Enregistrer » télécharge le fichier', { skip: missing('pdfcraft'), timeout: 120_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;

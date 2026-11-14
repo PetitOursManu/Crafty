@@ -13,6 +13,10 @@
   if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (read() === 'system') apply('system'); });
   window.craftTheme = {
     get: read,
-    set: function (choice) { try { localStorage.setItem(KEY, choice); } catch (e) {} apply(choice); },
+    set: function (choice) {
+      try { localStorage.setItem(KEY, choice); } catch (e) {}
+      apply(choice);
+      window.dispatchEvent(new CustomEvent('craft-theme-change', { detail: choice }));
+    },
   };
 })();

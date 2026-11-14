@@ -73,9 +73,12 @@ comme `"1"`. Limite d'ouverture côté application : 512 Mio, nom coupé à 255 
 - Exports PdfCraft (Word, texte, image…) = téléchargements du navigateur, hors de l'hôte. Exports WordCraft = `save`.
 
 `?control` ajoute `window.<app>` (crate `craft-web-api`) : tout script de la même origine peut piloter
-l'application. À n'activer que pour la sauvegarde automatique, jamais par défaut. **Exception vérifiée :
-WordCraft expose `window.wordcraft` toujours, avec ou sans `?control`.** `execute("file.save")` enregistre sans
-boîte de dialogue ni perte de sélection (vérifié), mais un onglet masqué ne répond qu'une fois visible.
+l'application. **Décision du 14/11/2026 : la page hôte l'active toujours**, pour la sauvegarde automatique et le thème
+du compte (risque accepté : les applications partagent déjà l'origine du site). WordCraft expose `window.wordcraft`
+de toute façon. `execute("file.save")` enregistre sans boîte de dialogue ni perte de sélection (vérifié), mais un
+onglet masqué ne répond qu'une fois visible. Thème : `view.theme.<light|dark|system>` (PdfCraft),
+`view.interfaceTheme {value}` (WordCraft, refusé tant qu'aucun document n'est ouvert) ; l'iframe ignore `color-scheme`.
+PdfCraft ouvre un second document reçu par `open` dans un onglet en arrière-plan.
 
 ## Exigences serveur pour les fichiers statiques (README de chaque application)
 
@@ -110,8 +113,13 @@ boîte de dialogue ni perte de sélection (vérifié), mais un onglet masqué ne
 - Accès : le premier compte devient admin ; l'admin ouvre ou non l'inscription publique et le mode invité (sans stockage :
   « Enregistrer » télécharge). Chaque compte a toutes les applications par défaut, ou une liste choisie par l'admin.
   Une application non autorisée répond 404, comme un fichier d'autrui.
-- Fichiers : un enregistrement = une nouvelle version du même fichier (pas un nouveau fichier) ; « Enregistrer sous » et le premier
-  enregistrement d'un nouveau document demandent le nom ; un export d'un autre format va à côté, en demandant avant de remplacer.
+- Fichiers : un enregistrement = une nouvelle version du même fichier (pas un nouveau fichier) ; un contenu identique à la
+  version courante n'en crée pas ; « Enregistrer sous » et le premier enregistrement d'un nouveau document demandent le nom ;
+  un export d'un autre format va à côté, en demandant avant de remplacer. Un `save` dont le nom diffère du document ouvert
+  (autre document ouvert dans l'application elle-même) n'écrase jamais le fichier : « Enregistrer sous ».
+- Sauvegarde automatique : après `autosave_seconds` (réglage admin, 30 s par défaut, 0 = désactivée) suivant un `dirty:true`,
+  documents déjà stockés seulement. Les sauvegardes automatiques successives remplacent une seule version « auto » ;
+  seuls les enregistrements explicites ajoutent des versions.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.
@@ -129,7 +137,8 @@ boîte de dialogue ni perte de sélection (vérifié), mais un onglet masqué ne
 1. Squelette serveur : comptes, sessions, verrouillage, limites, journaux. **Fait** (inscription ouvrable par l'admin, mode invité).
 2. API fichiers : routes, quotas, versions, audit. **Fait** (dossiers, 10 versions par défaut, dernière application par fichier).
 3. Interface : connexion, explorateur de fichiers (accueil), page hôte, administration, thème clair/sombre. **Fait.**
-   Reste ouvert : sauvegarde automatique (`?control`), thème de PdfCraft (exige `?control`), `TRUST_PROXY` vérifié en vrai.
+   Sauvegarde automatique et thème des deux applications : **faits** (`?control` toujours actif). Reste ouvert :
+   `TRUST_PROXY` vérifié en vrai (phase 4).
 4. Déploiement Coolify : Dockerfile, volume `/data`, domaine, sauvegarde, limites CPU/mémoire.
 5. Exploitation : script de mise à jour d'une application, fail2ban, comptes.
 6. Options : SSO avec Dashy, double authentification, partage.

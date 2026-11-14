@@ -79,6 +79,35 @@ test('versions : chaque enregistrement en crée une, élagage au-delà de max_ve
   await a.patch('/api/admin/settings', { max_versions: 10 });
 });
 
+test('sauvegarde automatique : les autos successives mettent à jour une seule version, « Enregistrer » en ajoute', async () => {
+  const up = (await a.upload('Auto.pdf', PDF('v1'))).data;
+  const put = (body, auto) => a.req('PUT', `/api/files/${up.id}/content`, { body, headers: auto ? { 'x-autosave': '1' } : {} });
+  assert.equal((await put(PDF('v2'), false)).status, 200);
+  assert.equal((await put(PDF('a1'), true)).status, 200);
+  const n = blobCount();
+  assert.equal((await put(PDF('a2'), true)).status, 200);
+  assert.equal((await put(PDF('a3'), true)).status, 200);
+  assert.equal(blobCount(), n, 'les octets de l\'auto remplacée sont effacés');
+  let vs = (await a.get(`/api/files/${up.id}/versions`)).data;
+  assert.deepEqual(vs.map((v) => [v.n, v.auto]), [[3, true], [2, false], [1, false]]);
+  assert.deepEqual((await a.get(`/api/files/${up.id}/content`)).buf, PDF('a3'));
+  assert.equal((await put(PDF('v4'), false)).status, 200);
+  assert.equal((await put(PDF('v4'), false)).data.versions, 4, 'contenu identique : pas de nouvelle version');
+  assert.equal((await put(PDF('a4'), true)).status, 200);
+  vs = (await a.get(`/api/files/${up.id}/versions`)).data;
+  assert.deepEqual(vs.map((v) => [v.n, v.auto]), [[5, true], [4, false], [3, true], [2, false], [1, false]]);
+  const audit = s.db.prepare("SELECT action FROM audit WHERE target = ? AND action LIKE 'file.%save'").all(up.id).map((r) => r.action);
+  assert.ok(audit.includes('file.autosave') && audit.includes('file.save'));
+});
+
+test('délai de sauvegarde automatique : réglage admin borné, transmis par /api/me', async () => {
+  assert.equal((await a.get('/api/me')).data.autosave, 30);
+  assert.equal((await a.patch('/api/admin/settings', { autosave_seconds: -1 })).status, 400);
+  assert.equal((await a.patch('/api/admin/settings', { autosave_seconds: 0 })).status, 200);
+  assert.equal((await b.get('/api/me')).data.autosave, 0);
+  await a.patch('/api/admin/settings', { autosave_seconds: 30 });
+});
+
 test('?replace=1 : même nom dans le dossier → nouvelle version au lieu d\'un nouveau fichier', async () => {
   const up = await a.upload('Export.pdf', PDF('1'));
   const again = await a.upload('Export.pdf', PDF('2'), 'root', '&replace=1');
