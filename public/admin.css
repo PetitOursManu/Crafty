@@ -34,3 +34,21 @@
 .app-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; padding: 8px 0 0 26px; }
 .temp-pass { display: flex; gap: 8px; }
 .temp-pass input { font-family: ui-monospace, monospace; }
+
+/* Assistant IA */
+.ai-provider summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.ai-provider summary::-webkit-details-marker { display: none; }
+.ai-provider summary::before { content: "›"; color: var(--mut); transition: transform .15s; }
+.ai-provider[open] summary::before { transform: rotate(90deg); }
+.ai-provider[open] summary { margin-bottom: 12px; }
+.ai-provider { display: flex; flex-direction: column; gap: 12px; }
+.badge.ok { background: color-mix(in srgb, #2f9e5f 18%, transparent); color: #2f9e5f; }
+.ai-test-row { align-items: center; }
+.ai-test { font-size: 13px; }
+.ai-providers-title { margin: 8px 0 -4px; }
+.card.warn { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; border-color: color-mix(in srgb, #d97706 50%, transparent); background: color-mix(in srgb, #d97706 8%, transparent); }
+.card.warn svg { width: 18px; height: 18px; color: #d97706; flex: none; margin-top: 2px; }
+.field-set { display: flex; flex-direction: column; gap: 6px; }
+.radio { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 24px; }
+.chip-check { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 13px; }

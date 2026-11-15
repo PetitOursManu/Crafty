@@ -139,6 +139,17 @@ charge pas l'application et propose celles qui le lisent.
   le quota, 512 Mio au plus), remis avant le chargement, renvoyé toutes les 30 s / en arrière-plan / après chaque enregistrement
   s'il a changé ; données d'un autre compte effacées avant tout chargement (marqueur `craft-data-sync`) ; déconnexion = dernier envoi
   puis effacement (gardées si l'envoi échoue). Relevé par application dans `FINDINGS.md`.
+- Assistant IA (décision du 15/11/2026, `src/ai.js`, `public/agent.js`) : bouton « Assistant » sur l'accueil et dans la barre de chaque
+  application. Le serveur relaie vers un fournisseur au dialecte OpenAI (/chat/completions avec outils) : OpenRouter, OpenAI,
+  Anthropic, Gemini, Mistral, DeepSeek, xAI, Groq, Ollama, compatible (presets repris de Mocky) ; par fournisseur : adresse, clé
+  (chiffrée si `CRAFTY_SECRET`, jamais renvoyée au navigateur), modèle, effort (auto/off/low/medium/high, traduit comme dans Mocky).
+  L'admin active l'assistant, choisit les comptes (admins toujours), le fournisseur par défaut, les limites (échanges/heure, étapes) ;
+  l'utilisateur choisit parmi les fournisseurs prêts. Les outils s'exécutent dans la page (accueil : `explorer-agent.js` ; application :
+  `host-agent.js`, commandes de `window.<app>`) ; message système composé par le serveur ; suppressions confirmées par un clic ;
+  applications sans API : agent limité (enregistrer, renommer, répondre). Conversations non stockées ; consommation par compte
+  (table `ai_usage`).
+- Outils de la barre du haut par application : `tools` dans `apps.json` (`calculator` : SolidCraft).
+- Couleurs des applications : fond de leur icône officielle (getartcraft.com), mesuré ; jamais inventées.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.

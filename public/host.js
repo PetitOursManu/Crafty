@@ -7,6 +7,9 @@ import { api, h, icon, toast, dialog, confirmDialog, validName, appTile, extOf, 
 import { pickFiles } from '/picker.js';
 import { restorePrefs } from '/prefs-sync.js';
 import { restoreData } from '/appdata-sync.js';
+import { mountAgent } from '/agent.js';
+import { hostTools } from '/host-agent.js';
+import { mountCalculator } from '/calculator.js';
 import { installInterceptors, dropFile } from '/intercept.js';
 
 const $ = (id) => document.getElementById(id);
@@ -496,6 +499,27 @@ async function openByDrop(file) {
     await showFile(file);
   } catch (e) { toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: e.message }); }
 }
+// ---------- Assistant IA : pilotage et enregistrement ----------
+const agentApi = () => { const a = iframe.contentWindow?.[slug]; return !!state.ready && typeof a?.commands === 'function' && typeof a?.execute === 'function'; };
+// Enregistrer pour l'assistant : commande de l'application (pont), API (control.saveData), sinon Ctrl+S simulé.
+// Attend l'issue jusqu'à 20 s ; un nouveau document attend son nom dans la boîte « Enregistrer sous ».
+async function agentSave() {
+  if (state.guest) throw new Error("mode invité : rien n'est conservé");
+  if (!state.ready) throw new Error("l'application n'est pas encore prête");
+  const n = state.saves.length, a = iframe.contentWindow?.[slug];
+  if (intercept() && app.control?.saveData) saveByApi();
+  else if (!intercept() && typeof a?.execute === 'function') await saveCall(a);
+  else {
+    const w = iframe.contentWindow, target = w.document.querySelector('canvas') || w.document.body;
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '0');
+    target.focus?.();
+    for (const type of ['keydown', 'keyup']) target.dispatchEvent(new w.KeyboardEvent(type, { key: 's', code: 'KeyS', keyCode: 83, which: 83, ctrlKey: true, bubbles: true, cancelable: true }));
+  }
+  for (let i = 0; i < 100 && !(state.saves.length > n && state.saves.at(-1).status); i++) await new Promise((r) => setTimeout(r, 200));
+  if (state.saves.length === n) return { pending: true, note: document.querySelector('dialog[open]') ? "l'utilisateur doit choisir un nom dans la boîte « Enregistrer sous »" : 'enregistrement demandé, pas encore reçu' };
+  const last = state.saves.at(-1);
+  return { status: last.status, name: state.file?.name || last.name, error: last.error };
+}
 // Ctrl+S tenu par Crafty (control.saveData, VectorCraft) : l'application sérialise le document par son API, sans sa boîte
 // « Enregistrer sous » (son document rouvert n'a pas de chemin dans un navigateur : chaque Ctrl+S la rouvrait, vérifié),
 // et l'enregistrement va au fichier Crafty ouvert. Ctrl+Maj+S reste à l'application (capté comme téléchargement).
@@ -695,6 +719,13 @@ async function main() {
   t0 = performance.now();
   iframe.src = `/apps/${slug}/?${src.toString().replace(/=(&|$)/g, '$1')}`;
   if (intercept()) waitInterceptReady();
+  if ((app.tools || []).includes('calculator')) mountCalculator($('calcBtn'));
+  if (!state.guest) mountAgent({ button: $('agentBtn'), context: () => ({ page: 'app', app: slug, appName: app.name, document: state.file?.name || null, hasApi: agentApi() }), tools: hostTools({
+    slug, appName: app.name, api: () => iframe.contentWindow?.[slug], hasApi: agentApi, docName: () => state.file?.name || '', file: () => state.file,
+    status: () => $('statusText').textContent, save: agentSave,
+    touched: () => { if (intercept() && !state.maybeDirty) { state.maybeDirty = true; setStatus(); } },
+    renamed: async () => { const f = await api(`/api/files/${state.file.id}`); for (const k of Object.keys(state.docs)) if (state.docs[k].id === f.id) state.docs[k] = f; state.docs[f.name] = f; await showFile(f); },
+  }) }).catch(() => {});
   setTimeout(() => { if (!state.ready && !state.failed.length && !state.blocked) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);
 }
 main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: 'Chargement impossible', detail: e.message }); });

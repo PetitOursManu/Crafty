@@ -26,6 +26,7 @@
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" id="tab-users" aria-controls="panel-users" aria-selected="true">Comptes</button>
       <button role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Réglages</button>
+      <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false" tabindex="-1">Assistant IA</button>
       <button role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="false" tabindex="-1">Journal</button>
     </nav>
 
@@ -45,6 +46,11 @@
     <section role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
       <div class="panel-head"><div><h2>Réglages</h2><p class="mut">S'appliquent à tout le service.</p></div></div>
       <form id="settings" class="settings"></form>
+    </section>
+
+    <section role="tabpanel" id="panel-ai" aria-labelledby="tab-ai" hidden>
+      <div class="panel-head"><div><h2>Assistant IA</h2><p class="mut">Fournisseurs, modèles et comptes autorisés. Les conversations ne sont pas conservées.</p></div></div>
+      <div id="ai"></div>
     </section>
 
     <section role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden>

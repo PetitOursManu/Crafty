@@ -1,4 +1,5 @@
 // Administration : comptes, applications par compte, réglages (inscription, invités, versions, quotas), journal.
+import { renderAi } from '/admin-ai.js';
 import { api, h, icon, toast, dialog, confirmDialog, openMenu, menuAt, appTile, formatSize, formatDateTime, accountButton, syncTheme } from '/ui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -13,7 +14,7 @@ function tempPassword() {
 const fail = (title) => (e) => toast({ type: 'error', title, detail: e.message });
 
 // ---------- Onglets ----------
-const TABS = ['users', 'settings', 'audit'];
+const TABS = ['users', 'settings', 'ai', 'audit'];
 function selectTab(name) {
   for (const t of TABS) {
     const on = t === name;
@@ -23,6 +24,7 @@ function selectTab(name) {
   }
   history.replaceState(null, '', `#${name}`);
   if (name === 'audit') loadAudit();
+  if (name === 'ai') renderAi($('ai'), users);
 }
 for (const t of TABS) {
   $(`tab-${t}`).onclick = () => selectTab(t);
@@ -213,7 +215,7 @@ const ACTIONS = { 'auth.login': 'Connexion', 'auth.logout': 'Déconnexion', 'aut
   'auth.password': 'Mot de passe changé', 'file.upload': 'Import', 'file.save': 'Enregistrement', 'file.autosave': 'Sauvegarde automatique', 'file.update': 'Fichier modifié',
   'file.delete': 'Fichier supprimé', 'file.restore': 'Version restaurée', 'folder.create': 'Dossier créé', 'folder.update': 'Dossier modifié',
   'folder.delete': 'Dossier supprimé', 'admin.user.create': 'Compte créé', 'admin.user.update': 'Compte modifié',
-  'admin.user.delete': 'Compte supprimé', 'admin.settings': 'Réglages modifiés' };
+  'admin.user.delete': 'Compte supprimé', 'admin.settings': 'Réglages modifiés', 'admin.ai': 'Assistant IA modifié', 'ai.error': "Erreur de l'assistant" };
 async function loadAudit() {
   try {
     const rows = await api('/api/admin/audit?limit=200');

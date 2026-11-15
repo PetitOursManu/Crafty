@@ -31,6 +31,7 @@ Ouvrir http://localhost:8787/ : le premier compte créé devient administrateur.
 | `TRUST_PROXY` | désactivé | Nombre de mandataires de confiance (Cloudflare + Traefik : à régler et vérifier) |
 | `COOKIE_SECURE` | `0` | `1` derrière HTTPS terminé par le mandataire |
 | `SCRYPT_N` | `32768` | Coût du hachage des mots de passe (viser environ 100 ms sur le VPS) |
+| `CRAFTY_SECRET` | aucun | Chiffre les clés des fournisseurs d'IA (AES-256-GCM). Sans lui, elles sont gardées en clair dans la base. |
 | `APPS_FILE` | `./apps.json` | Registre des applications (essais : un registre qui en active d'autres) |
 | `CSP` | `auto` | `auto` (stricte, empreintes calculées), `off`, ou une politique fixe |
 

@@ -645,6 +645,103 @@ test('accueil : Entrée crée le dossier ; sélection multiple (case, Ctrl, Maj,
   } finally { await b.close(); }
 });
 
+// Assistant IA avec un faux fournisseur local (dialecte OpenAI) qui joue un scénario d'appels d'outils : la boucle, les
+// outils de l'accueil et d'une application, la confirmation des suppressions. Aucun vrai modèle n'est appelé.
+async function fakeModel(script) {
+  const { createServer } = await import('node:http');
+  const seen = [];
+  const srv = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      const b = JSON.parse(body);
+      seen.push(b);
+      const tools = b.messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
+      const out = script(b.messages, tools, b);
+      const message = out.tool ? { role: 'assistant', content: out.say ?? null, tool_calls: [{ id: `c${seen.length}`, type: 'function', function: { name: out.tool, arguments: JSON.stringify(out.args || {}) } }] }
+        : { role: 'assistant', content: out.say };
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ choices: [{ message, finish_reason: out.tool ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5 } }));
+    });
+  });
+  srv.listen(0, '127.0.0.1');
+  await new Promise((r) => srv.once('listening', r));
+  return { url: `http://127.0.0.1:${srv.address().port}/v1`, seen, close: () => srv.close() };
+}
+
+test('assistant IA : ranger des fichiers sur l\'accueil (suppression confirmée), piloter PdfCraft', { skip: missing('pdfcraft'), timeout: 240_000 }, async () => {
+  const model = await fakeModel((messages, tools) => {
+    const user = messages.filter((m) => m.role === 'user').at(-1).content;
+    const n = tools.length - messages.slice(0, messages.lastIndexOf(messages.filter((m) => m.role === 'user').at(-1))).filter((m) => m.role === 'tool').length;
+    const last = tools.at(-1);
+    if (/range/i.test(user)) {
+      if (n === 0) return { tool: 'search_files', args: { extension: 'pdf' } };
+      if (n === 1) return { tool: 'create_folder', args: { name: 'Factures' } };
+      const pdfs = tools.find((t) => t.results)?.results || [], folder = tools.find((t) => t.type === 'folder' && t.name === 'Factures');
+      if (n === 2) return { tool: 'move_items', args: { items: pdfs.map((p) => ({ type: 'file', id: p.id })), target_folder_id: folder.id } };
+      if (n === 3) return { tool: 'search_files', args: { query: 'Brouillon' } };
+      if (n === 4) return { tool: 'delete_items', args: { items: last.results.map((p) => ({ type: 'file', id: p.id })) } };
+      return { say: `C'est rangé : **${pdfs.length} PDF** dans Factures.` };
+    }
+    if (/page/i.test(user)) {
+      if (n === 0) return { tool: 'list_commands', args: { query: 'insert blank' } };
+      if (n === 1) return { tool: 'run_command', args: { id: last.commands[0].id } };
+      if (n === 2) return { tool: 'save_document' };
+      return { say: 'Page ajoutée et document enregistré.' };
+    }
+    return { say: 'Bonjour.' };
+  });
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  try {
+    await loginE2e0(b);
+    const r = await b.api('PUT', '/api/admin/ai', { json: { enabled: true, everyone: true, defaultProvider: 'custom', providers: { custom: { enabled: true, baseUrl: model.url, model: 'faux-modele' } } } });
+    assert.equal(r.status, 200);
+    const old = (await b.api('GET', '/api/fs')).body;
+    for (const f of old.files) await b.api('DELETE', `/api/files/${f.id}`);
+    for (const d of old.folders) await b.api('DELETE', `/api/folders/${d.id}`);
+    await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Facture-1.pdf' });
+    await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Facture-2.pdf' });
+    await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Brouillon.pdf' });
+
+    // Accueil : le bouton apparaît ; le scénario range, puis la suppression attend la confirmation.
+    await p.goto(`${base}/`);
+    await p.waitForSelector('#agentBtn:not([hidden])');
+    await p.click('#agentBtn');
+    await p.fill('.agent-input', 'Range mes PDF dans un dossier Factures et supprime le brouillon');
+    await p.keyboard.press('Enter');
+    await p.waitForSelector('.agent-confirm button:has-text("Confirmer")', { timeout: 30_000 });
+    assert.match(await p.textContent('.agent-confirm'), /Brouillon\.pdf/);
+    await p.click('.agent-confirm button:has-text("Confirmer")');
+    await p.waitForSelector('.agent-msg.assistant:has-text("C\'est rangé")', { timeout: 30_000 });
+    const root = (await b.api('GET', '/api/fs')).body;
+    assert.deepEqual(root.folders.map((d) => d.name), ['Factures']);
+    assert.deepEqual(root.files.map((f) => f.name), [], 'PDF rangés, brouillon supprimé');
+    const inside = (await b.api('GET', `/api/fs?folder=${root.folders[0].id}`)).body.files.map((f) => f.name).sort();
+    assert.deepEqual(inside, ['Facture-1.pdf', 'Facture-2.pdf'], 'PDF rangés dans Factures, brouillon supprimé');
+    // Le message système vient du serveur ; les outils de l'accueil ont été proposés.
+    assert.match(model.seen[0].messages[0].content, /accueil/);
+    assert.ok(model.seen[0].tools.some((t) => t.function.name === 'delete_items'));
+
+    // PdfCraft : la commande trouvée est exécutée, puis le document enregistré (nouvelle version).
+    const pdf = (await b.api('GET', `/api/fs?folder=${root.folders[0].id}`)).body.files.find((f) => f.name === 'Facture-1.pdf');
+    await b.host({ app: 'pdfcraft', file: pdf.id });
+    await b.waitFor(() => window.hostState.file && window.hostState.control === true, 60_000);
+    await p.waitForSelector('#agentBtn:not([hidden])');
+    await p.click('#agentBtn');
+    await p.fill('.agent-input', 'Ajoute une page blanche et enregistre');
+    await p.keyboard.press('Enter');
+    await p.waitForSelector('.agent-msg.assistant:has-text("Page ajoutée")', { timeout: 60_000 });
+    assert.equal(await b.inApp('pdfcraft', async (a) => (await a.docInspect()).documents[0].pages), 4);
+    const meta = (await b.api('GET', `/api/files/${pdf.id}`)).body;
+    assert.equal(meta.versions, 2, 'enregistré par l\'assistant');
+    assert.match(model.seen.at(-1).messages[0].content, /PdfCraft/);
+  } finally {
+    await b.api('PUT', '/api/admin/ai', { json: { enabled: false } }).catch(() => {});
+    await b.close(); model.close();
+  }
+});
+
 test('craft-anything : n\'importe quel fichier de Crafty est analysé (lecture seule)', { skip: missing('craft-anything'), timeout: 150_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   try {

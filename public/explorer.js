@@ -3,6 +3,8 @@ import {
   api, h, icon, toast, openMenu, menuAt, closeMenus, dialog, confirmDialog, promptDialog, validName,
   appTile, extOf, extColor, formatSize, formatDate, formatDateTime, accountButton, syncTheme,
 } from '/ui.js';
+import { mountAgent } from '/agent.js';
+import { explorerTools } from '/explorer-agent.js';
 
 const $ = (id) => document.getElementById(id);
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -565,5 +567,19 @@ async function main() {
     if (e.key === 'Backspace' && state.path.length) { e.preventDefault(); load(state.path[state.path.length - 2]?.id ?? null, { push: true }); }
   });
   await load(new URLSearchParams(location.search).get('folder'));
+  // Assistant IA (si l'admin l'a ouvert à ce compte) : outils de l'explorateur.
+  mountAgent({
+    button: $('agentBtn'),
+    context: () => ({ page: 'home', folder: ['Mes fichiers', ...state.path.map((p) => p.name)].join(' / ') }),
+    tools: explorerTools({
+      reload: () => load(),
+      show: async (id) => { await load(id, { push: true }); return state.folder?.name || 'Mes fichiers'; },
+      filter: (t) => { $('search').value = state.filter = t; render(); return $('items').children.length; },
+      select: (keys) => { state.sel = new Set(keys.filter((k) => findItem(k))); state.checkMode = true; paintSelection(); return state.sel.size; },
+      unselect: (k) => state.sel.delete(k),
+      open: (f, slug) => openFile(f, slug),
+      apps: () => state.apps,
+    }),
+  }).catch(() => {});
 }
 main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: 'Chargement impossible', detail: e.message }); });

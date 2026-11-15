@@ -62,6 +62,10 @@ const ICONS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  sparkles: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+  calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18h.01M12 18h4"/>',
+  send: '<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
   save: '<path d="M5 4h11l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>',
   home: '<path d="M4 11l8-7 8 7v8.5a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19.5z"/>',
 };
@@ -75,7 +79,12 @@ export function icon(name, cls = '') {
 }
 
 // Couleurs par application (pas de logo : les logos ArtCraft ne s'utilisent qu'inchangés, avec l'application).
-const APP_COLORS = { pdfcraft: '#d14532', wordcraft: '#2f6fed', photocraft: '#8a4bd8', deckcraft: '#e07b12', gridcraft: '#1d8a4e', cadcraft: '#0f7b8a', figcraft: '#c2338a', designcraft: '#b8860b', soundcraft: '#5b48d9' };
+// Couleurs des applications : fond de leur icône officielle (getartcraft.com/images/apps/<slug>/icon.webp, mesuré le
+// 15/11/2026 : teinte dominante des pixels colorés) ; MailCraft et SolidCraft : icône de leur zip.
+const APP_COLORS = { pdfcraft: '#b4052a', wordcraft: '#3b5ad9', gridcraft: '#1e9a53', deckcraft: '#f16b1f', cadcraft: '#15a3c5',
+  figcraft: '#07d493', vectorcraft: '#df563e', effectcraft: '#d9368c', designcraft: '#78b21b', texturecraft: '#be682e',
+  materialcraft: '#18889a', soundcraft: '#15a7c2', 'craft-anything': '#4e79f3', photocraft: '#3077e8', filmcraft: '#895cf1',
+  lightcraft: '#efa720', mailcraft: '#4b9bf1', solidcraft: '#2676db' };
 export function appColor(slug) {
   if (APP_COLORS[slug]) return APP_COLORS[slug];
   let x = 0; for (const c of slug) x = (x * 31 + c.charCodeAt(0)) % 360;
@@ -87,9 +96,15 @@ export function appTile(app, cls = 'app-tile') {
   return t;
 }
 // Couleur d'un type de fichier, pour l'icône.
-const EXT_COLORS = { pdf: '#d14532', docx: '#2f6fed', doc: '#2f6fed', odt: '#2f6fed', rtf: '#2f6fed', txt: '#6b6e78', md: '#6b6e78',
-  xlsx: '#1d8a4e', xlsm: '#1d8a4e', ods: '#1d8a4e', csv: '#1d8a4e', tsv: '#1d8a4e', pptx: '#e07b12', deckcraft: '#e07b12',
-  dxf: '#0f7b8a', dwg: '#0f7b8a', figcraft: '#c2338a', fig: '#c2338a', designcraft: '#b8860b', scraftz: '#5b48d9', scraft: '#5b48d9', png: '#8a4bd8', jpg: '#8a4bd8', jpeg: '#8a4bd8', svg: '#8a4bd8', zip: '#8a6d3b' };
+const C = APP_COLORS;
+const EXT_COLORS = { pdf: C.pdfcraft, docx: C.wordcraft, doc: C.wordcraft, odt: C.wordcraft, rtf: C.wordcraft, txt: '#6b6e78', md: '#6b6e78',
+  xlsx: C.gridcraft, xlsm: C.gridcraft, ods: C.gridcraft, csv: C.gridcraft, tsv: C.gridcraft, pptx: C.deckcraft, deckcraft: C.deckcraft,
+  dxf: C.cadcraft, dwg: C.cadcraft, figcraft: C.figcraft, fig: C.figcraft, designcraft: C.designcraft, idml: C.designcraft,
+  scraftz: C.soundcraft, scraft: C.soundcraft, vectorcraft: C.vectorcraft, ai: C.vectorcraft, svg: C.vectorcraft, eps: C.vectorcraft,
+  ecproj: C.effectcraft, tcraft: C.texturecraft, mcraft: C.materialcraft, sbs: C.materialcraft, sc: C.solidcraft, step: C.solidcraft,
+  stp: C.solidcraft, stl: C.solidcraft, '3mf': C.solidcraft, obj: C.solidcraft, glb: C.solidcraft, gltf: C.solidcraft,
+  mailcraft: C.mailcraft, eml: C.mailcraft, mbox: C.mailcraft, ics: C.mailcraft, vcf: C.mailcraft,
+  png: C.photocraft, jpg: C.photocraft, jpeg: C.photocraft, webp: C.photocraft, zip: '#8a6d3b' };
 export const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '');
 export const extColor = (ext) => EXT_COLORS[ext] || '#7a7f8c';
 

@@ -11,6 +11,7 @@ import { createFiles } from './files.js';
 import { adminRoutes } from './admin.js';
 import { prefsRoutes } from './prefs.js';
 import { createAppData } from './appdata.js';
+import { createAi } from './ai.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -25,6 +26,7 @@ export function createApp({
   trustProxy = process.env.TRUST_PROXY ?? false,
   cookieSecure = process.env.COOKIE_SECURE === '1',
   quiet = false,
+  aiOptions = null, // essais : fetchImpl, secret (sinon CRAFTY_SECRET)
 } = {}) {
   const registry = JSON.parse(readFileSync(appsFile, 'utf8'));
   // Seules les applications activées et réellement présentes dans vendor/ sont proposées.
@@ -35,6 +37,7 @@ export function createApp({
   const auth = createAuth({ db, log, cookieSecure });
   const files = createFiles({ db, dataDir, log, settings: db.settings });
   const appData = createAppData({ db, dataDir });
+  const ai = createAi({ db, log, ...(aiOptions || {}) });
   files.cleanTmp();
   const st = createStatic({ apps, vendorDir, csp });
   const json = express.json({ limit: '64kb' });
@@ -61,7 +64,7 @@ export function createApp({
   const appJson = (slug) => ({ slug, name: apps[slug].name || slug, description: apps[slug].description || '',
     version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [],
     prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {}, mode: apps[slug].mode || 'bridge',
-    data: apps[slug].data || null });
+    data: apps[slug].data || null, tools: apps[slug].tools || [] });
 
   // --- Connexion ---
   app.get('/api/auth/config', (req, res) => {
@@ -140,6 +143,7 @@ export function createApp({
   files.routes(app, auth.requireUser, json);
   prefsRoutes(app, { db, requireUser: auth.requireUser, allowedApps, apps });
   appData.routes(app, { requireUser: auth.requireUser, allowedApps, apps, usage: files.usage });
+  ai.routes(app, { requireUser: auth.requireUser, requireAdmin: auth.requireAdmin, json: express.json({ limit: '8mb' }) });
   adminRoutes(app, { db, auth, files, appData, log, apps, json });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));
 

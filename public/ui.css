@@ -113,3 +113,38 @@ dialog.wide { width: min(640px, calc(100vw - 32px)); }
 
 .app-tile.mini { width: 18px; height: 18px; border-radius: 5px; font-size: 11px; }
 .app-tile { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; flex: none; color: #fff; font-weight: 700; font-size: 17px; }
+
+/* Assistant IA (agent.js) : panneau à droite ; sur grand écran, la page se resserre au lieu d'être recouverte. */
+.agent-btn[hidden] { display: none; }
+.agent-btn svg { color: var(--accent); }
+@media (max-width: 720px) { .agent-btn-label { display: none; } }
+.agent { position: fixed; z-index: 60; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-2); }
+.agent[hidden] { display: none; }
+@media (min-width: 1000px) { body.agent-open { padding-right: 400px; } body.agent-open .sel-bar { margin-left: -200px; } }
+.agent-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--line); }
+.agent-head > svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.agent-provider { flex: 1; min-width: 0; height: 30px; font-size: 12px; padding: 0 6px; }
+.agent-log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.agent-msg { max-width: 92%; padding: 9px 12px; border-radius: 12px; line-height: 1.45; font-size: 14px; overflow-wrap: anywhere; }
+.agent-msg p { margin: 0 0 6px; } .agent-msg p:last-child { margin-bottom: 0; }
+.agent-msg ul { margin: 0; padding-left: 18px; }
+.agent-msg code { font-size: 12.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+.agent-msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-fg); }
+.agent-msg.user code { background: transparent; }
+.agent-msg.assistant { align-self: flex-start; background: var(--surface-2); }
+.agent-msg.note { align-self: stretch; max-width: none; color: var(--mut); font-size: 13px; background: none; padding: 2px 0; }
+.agent-msg.error { align-self: stretch; max-width: none; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.agent-step { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--fg-2); }
+.agent-step svg { width: 14px; height: 14px; flex: none; }
+.agent-step.ok svg { color: #2f9e5f; } .agent-step.err svg { color: var(--danger); }
+.agent-thinking { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--mut); }
+.agent .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+.agent-confirm { border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 12px; padding: 10px 12px; font-size: 14px;
+  background: color-mix(in srgb, var(--danger) 6%, transparent); }
+.agent-confirm p { margin: 0 0 8px; white-space: pre-line; }
+.agent-confirm .row { display: flex; gap: 8px; }
+.agent-confirm.yes { border-color: var(--line); background: none; } .agent-confirm.no { opacity: .6; }
+.agent-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px; border-top: 1px solid var(--line); }
+.agent-input { flex: 1; resize: none; max-height: 160px; min-height: 40px; font: inherit; font-size: 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }

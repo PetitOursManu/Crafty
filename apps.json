@@ -698,6 +698,9 @@
       "idb": [
         "solidcraft-disk-handles"
       ]
-    }
+    },
+    "tools": [
+      "calculator"
+    ]
   }
 }
