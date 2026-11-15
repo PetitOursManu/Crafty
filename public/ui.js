@@ -61,6 +61,7 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
   save: '<path d="M5 4h11l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>',
   home: '<path d="M4 11l8-7 8 7v8.5a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19.5z"/>',
 };
@@ -203,6 +204,15 @@ export function dialog({ title, body, actions, wide = false, onClose }) {
   dlg.append(h('form', { class: 'dlg', method: 'dialog' },
     h('div', { class: 'dlg-head' }, h('h2', {}, title)), h('div', { class: 'dlg-body' }, body), foot));
   for (const a of actions || []) foot.append(a);
+  // Entrée dans un champ : le bouton de validation. Sans cela, l'envoi implicite du formulaire prend le premier bouton
+  // du pied, « Annuler » (« Nouveau dossier » + Entrée annulait au lieu de créer).
+  dlg.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing || !e.target.matches?.('input:not([type=checkbox]):not([type=radio]):not([type=button])')) return;
+    const ok = foot.querySelector('button[value=ok]') || foot.querySelector('button.primary');
+    if (!ok) return;
+    e.preventDefault();
+    ok.click();
+  });
   dlg.addEventListener('close', () => { onClose?.(dlg.returnValue); dlg.remove(); });
   document.body.append(dlg);
   dlg.showModal();

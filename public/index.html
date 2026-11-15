@@ -59,13 +59,22 @@
         <label class="btn primary" id="uploadBtn"><input type="file" id="upload" multiple hidden></label>
       </div>
       <div id="area" class="area">
-        <div id="listHead" class="list-head" hidden><span>Nom</span><span>Modifié</span><span>Taille</span><span></span></div>
+        <div id="listHead" class="list-head" hidden><span id="selectAll" class="check" role="checkbox" aria-checked="false" aria-label="Tout sélectionner" title="Tout sélectionner"></span><span>Nom</span><span>Modifié</span><span>Taille</span><span></span></div>
         <div id="items" class="items grid" role="listbox" aria-label="Fichiers et dossiers" tabindex="-1"></div>
         <div id="empty" class="empty" hidden>
           <p><strong>Ce dossier est vide.</strong></p>
           <p class="mut">Glissez des fichiers ici, ou utilisez « Importer ».</p>
         </div>
         <div id="dropHint" class="drop-hint" hidden></div>
+      </div>
+      <div id="selBar" class="sel-bar" role="toolbar" aria-label="Actions sur la sélection" hidden>
+        <span id="selCount" class="sel-count" aria-live="polite"></span>
+        <button type="button" class="btn sm ghost" id="selAll">Tout sélectionner</button>
+        <span class="sel-sep"></span>
+        <button type="button" class="btn sm" id="selDownload">Télécharger</button>
+        <button type="button" class="btn sm" id="selMove">Déplacer…</button>
+        <button type="button" class="btn sm danger" id="selDelete">Supprimer</button>
+        <button type="button" class="btn icon sm ghost" id="selClear" aria-label="Désélectionner (Échap)" title="Désélectionner (Échap)"></button>
       </div>
     </section>
   </main>

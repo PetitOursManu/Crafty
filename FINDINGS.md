@@ -385,6 +385,8 @@ MailCraft gardent des données dans le navigateur. Un autre compte du même navi
 - **Vérifié** : en mode pont, l'export Word de PdfCraft est capté et rangé à côté du document (plus de téléchargement).
 - **Batterie e2e du 14/11/2026 soir** (26 tests, 6 nouvelles applications comprises) : une passe entièrement verte, puis une passe à
   25/26 (DesignCraft non démarré, ci-dessous). Les tests d'interception se lancent aussi seuls (`--test-name-pattern`).
+  Le 15/11 (27 tests, sélection multiple comprise) : 26/27, DesignCraft encore non démarré : il échoue désormais dans 3 batteries
+  sur 4 (jamais seul). À creuser : il passe après SoundCraft et avant VectorCraft, tous lourds en CPU.
 - **Instable, cause non établie** : DesignCraft n'a pas démarré (aucun signal en 60 puis 150 s) dans 2 batteries complètes
   sur 6 (les deux dernières, après relèvement des délais, sont entièrement vertes) ; il démarre à chaque essai isolé. Diagnostic automatique ajouté au test (capture + état).
 

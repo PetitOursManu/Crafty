@@ -476,7 +476,7 @@ for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
       const ext = c.name.split('.').pop();
       const fname = c.keepName ? c.name : `Interception ${slug}.${ext}`;
       await p.fill('dialog[open] input', fname);
-      await p.click('dialog[open] button[value=ok]');
+      await p.keyboard.press('Enter'); // Entrée valide (elle annulait : premier bouton du formulaire)
       await b.waitFor(() => window.hostState.saves[0]?.status === 'ok', 30_000);
       const file = (await b.api('GET', '/api/fs')).body.files.find((f) => f.name === fname);
       assert.ok(file && file.size > 0);
@@ -522,6 +522,81 @@ for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
     } finally { await b.close(); }
   });
 }
+
+test('accueil : Entrée crée le dossier ; sélection multiple (case, Ctrl, Maj, lasso) ; déplacer et supprimer en groupe', { skip: !browserOk && 'navigateur introuvable', timeout: 90_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  const fs = async (folder = 'root') => (await b.api('GET', `/api/fs?folder=${folder}`)).body;
+  try {
+    await loginE2e0(b);
+    // Repartir d'un dossier racine vide (les autres tests y laissent des fichiers).
+    const old = await fs();
+    for (const f of old.files) await b.api('DELETE', `/api/files/${f.id}`);
+    for (const d of old.folders) await b.api('DELETE', `/api/folders/${d.id}`);
+    for (const n of ['Un.pdf', 'Deux.pdf', 'Trois.pdf']) await b.upload(join(SAMPLES, 'test.pdf'), { name: n });
+    await p.goto(`${base}/`);
+    await p.waitForSelector('.item');
+
+    // « Nouveau dossier » + Entrée : créé (avant : Entrée prenait « Annuler »).
+    await p.click('#newFolder');
+    await p.fill('dialog[open] input', 'Rangement');
+    await p.keyboard.press('Enter');
+    await p.waitForSelector('.item:has-text("Rangement")');
+    assert.deepEqual((await fs()).folders.map((d) => d.name), ['Rangement']);
+
+    const item = (n) => p.locator(`.item:has-text("${n}")`);
+    const selected = () => p.locator('.item[aria-selected=true]').count();
+    // Case à cocher : barre d'actions dès un élément (le dossier créé est sélectionné : Échap d'abord).
+    await p.keyboard.press('Escape');
+    assert.equal(await selected(), 0);
+    await item('Un.pdf').hover();
+    await item('Un.pdf').locator('.check').click();
+    assert.equal(await selected(), 1);
+    assert.equal(await p.isVisible('#selBar'), true);
+    // Ctrl+clic ajoute, Maj+clic prend la plage, Échap vide.
+    await item('Trois.pdf').click({ modifiers: ['Control'] });
+    assert.equal(await selected(), 2);
+    await item('Deux.pdf').click();
+    await item('Un.pdf').click({ modifiers: ['Shift'] });
+    assert.equal(await p.textContent('#selCount'), '3 éléments sélectionnés'); // ordre affiché : Deux, Trois, Un
+    await p.keyboard.press('Escape');
+    assert.equal(await selected(), 0);
+    assert.equal(await p.isVisible('#selBar'), false);
+
+    // Lasso depuis un endroit vide de la zone jusqu'au premier élément : tout est pris.
+    const area = await p.locator('#area').boundingBox(), first = await p.locator('.item').first().boundingBox();
+    await p.mouse.move(area.x + area.width - 8, area.y + area.height - 8);
+    await p.mouse.down();
+    await p.mouse.move(area.x + area.width / 2, area.y + area.height / 2, { steps: 5 });
+    await p.mouse.move(first.x + 6, first.y + 6, { steps: 5 });
+    assert.equal(await p.locator('.lasso').count(), 1);
+    await p.mouse.up();
+    assert.equal(await selected(), 4);
+    assert.equal(await p.textContent('#selCount'), '4 éléments sélectionnés');
+    await p.screenshot({ path: join(tmpdir(), 'e2e-selection.png') });
+
+    // Déplacer les trois fichiers dans « Rangement » (le dossier lui-même est grisé dans la liste).
+    await item('Rangement').click({ modifiers: ['Control'] });
+    assert.equal(await selected(), 3);
+    await p.click('#selMove');
+    await p.click('dialog[open] .picker-list button:has-text("Rangement")');
+    await p.click('dialog[open] button[value=ok]');
+    await p.waitForFunction(() => document.querySelectorAll('.item').length === 1);
+    const folderId = (await fs()).folders[0].id;
+    assert.deepEqual((await fs(folderId)).files.map((f) => f.name).sort(), ['Deux.pdf', 'Trois.pdf', 'Un.pdf']);
+
+    // Dans le dossier : Ctrl+A puis Supprimer (confirmation).
+    await item('Rangement').dblclick();
+    await p.waitForSelector('.item:has-text("Un.pdf")');
+    await p.locator('#items').click({ position: { x: 2, y: 2 } }).catch(() => {});
+    await p.keyboard.press('Control+a');
+    assert.equal(await selected(), 3);
+    await p.click('#selDelete');
+    await p.click('dialog[open] button[value=ok]');
+    await p.waitForSelector('#empty:not([hidden])');
+    assert.equal((await fs(folderId)).files.length, 0);
+  } finally { await b.close(); }
+});
 
 test('craft-anything : n\'importe quel fichier de Crafty est analysé (lecture seule)', { skip: missing('craft-anything'), timeout: 150_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
