@@ -38,7 +38,9 @@ export function createFiles({ db, dataDir, log, settings }) {
       FROM files f WHERE f.user_id = ? AND IFNULL(f.folder_id, '') = IFNULL(?, '') ORDER BY f.name COLLATE NOCASE`),
     fileByName: db.prepare("SELECT * FROM files WHERE user_id = ? AND IFNULL(folder_id, '') = IFNULL(?, '') AND name = ? COLLATE NOCASE"),
     folderByName: db.prepare("SELECT * FROM folders WHERE user_id = ? AND IFNULL(parent_id, '') = IFNULL(?, '') AND name = ? COLLATE NOCASE"),
-    used: db.prepare('SELECT IFNULL(SUM(size), 0) n FROM versions WHERE user_id = ?'),
+    // Versions des fichiers + données des applications (appdata.js) : tout compte dans le quota.
+    used: db.prepare(`SELECT (SELECT IFNULL(SUM(size), 0) FROM versions WHERE user_id = @id)
+      + (SELECT IFNULL(SUM(size), 0) FROM app_data WHERE user_id = @id) n`),
     insertFolder: db.prepare('INSERT INTO folders (id, user_id, parent_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'),
     insertFile: db.prepare('INSERT INTO files (id, user_id, folder_id, name, size, last_app, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)'),
     maxN: db.prepare('SELECT IFNULL(MAX(n), 0) n FROM versions WHERE file_id = ?'),
@@ -58,7 +60,7 @@ export function createFiles({ db, dataDir, log, settings }) {
     userBlobs: db.prepare('SELECT id FROM versions WHERE user_id = ?'),
   };
 
-  const usage = (user) => ({ used: q.used.get(user.id).n, quota: user.quota ?? settings().default_quota });
+  const usage = (user) => ({ used: q.used.get({ id: user.id }).n, quota: user.quota ?? settings().default_quota });
   const folderOf = (user, id) => {
     if (id == null || id === '' || id === 'root') return null;
     const f = q.folder.get(String(id), user.id);

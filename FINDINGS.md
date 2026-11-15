@@ -376,8 +376,23 @@ FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **
 interceptées ne s'y enregistrent pas : « could not be cloned »). API `window.solidcraft` (642 commandes, `document.inspect` donne un vrai
 `dirty`, `file.save`) : sauvegarde automatique possible, pas encore branchée.
 
-**Stockage commun à l'origine (non corrigé)** : EffectCraft rouvre sa dernière session depuis l'OPFS (`session.ecproj`) ; SolidCraft et
-MailCraft gardent des données dans le navigateur. Un autre compte du même navigateur les voit.
+**Stockage du navigateur par application (relevé du 15/11/2026, profil neuf, action typique puis 40 s)** :
+
+| Application | Données (suivent le compte : `data`) | Réglages seulement |
+|---|---|---|
+| MailCraft | `localStorage` `mailcraft.mailbox.v1` : **toute la boîte** (29 Ko pour l'exemple ; limitée par le quota `localStorage` de l'origine, ~5 Mo partagés) | `mailcraft.ui.v1` |
+| EffectCraft | OPFS `effectcraft/config%2Fsession.ecproj` (~750 Ko), `session.json`, `shortcuts.json`, écrits ~10 s après une modification ; `session.lock` effacé, pas copié ; IndexedDB `effectcraft-handles` (poignées, non copiables) | — (cache d'images `effectcraft-cache/` et service worker de 76 Mo : non copiés) |
+| SolidCraft | OPFS `recovery.sc`, `recovery.json` (récupération après plantage) ; IndexedDB `solidcraft-disk-handles` (poignées) | `solidcraft.prefs` (49 Ko, récents compris) |
+| WordCraft | IndexedDB `wordcraft` (table `fonts`, vide au relevé) | `wordcraft.ui` |
+| PdfCraft, GridCraft, CadCraft, TextureCraft, MaterialCraft | — | clés déjà relevées ; TextureCraft et MaterialCraft : `ui`, `ui.json`, `export_presets` génériques |
+| VectorCraft, DesignCraft, SoundCraft, DeckCraft, FigCraft, Craft Anything | rien d'écrit | — |
+
+`egui_memory_ron` (dispositions de fenêtres) est commun à toutes les applications egui.
+
+**Vérifié** (Chrome, base temporaire) : session EffectCraft de A effacée du navigateur à la déconnexion (verrou compris), B ne la
+voit pas sur ce navigateur, A la retrouve sur un autre (test e2e) ; boîte MailCraft : un e-mail importé par A depuis Crafty n'est pas
+chez B et revient chez A sur un autre navigateur (essai scripté). **Non vérifié** : polices WordCraft, récupération SolidCraft.
+Limites : jusqu'à 30 s de changements perdus si l'onglet est tué ; deux appareils du même compte en même temps : le dernier envoi gagne.
 
 - Les téléchargements révoquent souvent l'URL `blob:` juste après le clic : `URL.createObjectURL` est suivi pour garder le Blob.
 - Les octets venus de l'iframe sont d'un autre royaume JavaScript : `instanceof ArrayBuffer` échoue, copie nécessaire.

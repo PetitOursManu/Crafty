@@ -2,7 +2,7 @@
 import { checkCredentials } from './auth.js';
 import { DEFAULT_SETTINGS } from './db.js';
 
-export function adminRoutes(app, { db, auth, files, log, apps, json }) {
+export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) {
   const { requireAdmin } = auth;
   const q = {
     users: db.prepare(`SELECT u.id, u.username, u.role, u.disabled, u.must_change, u.all_apps, u.quota, u.created_at, u.last_login_at,
@@ -85,6 +85,7 @@ export function adminRoutes(app, { db, auth, files, log, apps, json }) {
     if (u.id === req.user.id) return bad(res, 'Vous ne pouvez pas supprimer votre propre compte.');
     if (u.role === 'admin' && !u.disabled && q.admins.get().n <= 1) return bad(res, 'Il doit rester au moins un administrateur actif.');
     const blobs = await files.purgeUser(u.id);
+    await appData?.purgeUser(u.id);
     db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
     log.audit(req, 'admin.user.delete', String(u.id), { username: u.username, versions: blobs });
     res.status(204).end();

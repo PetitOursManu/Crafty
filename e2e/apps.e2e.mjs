@@ -293,6 +293,53 @@ test('réglages des applications par compte : isolés sur un navigateur partagé
   } finally { await shared.close(); }
 });
 
+// Données gardées par l'application dans le navigateur (ici la session EffectCraft, dans l'OPFS) : elles suivent le compte.
+test('données des applications par compte (session EffectCraft) : effacées à la déconnexion, invisibles pour B, retrouvées ailleurs', { skip: missing('effectcraft'), timeout: 420_000 }, async () => {
+  const opfsSession = (p) => p.evaluate(async () => {
+    try { const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('effectcraft'); const out = []; for await (const [n] of d.entries()) out.push(n); return out.sort(); }
+    catch { return []; }
+  });
+  const comps = (b) => b.inApp('effectcraft', async (a) => (await a.execute('project.summary', {})).items.map((i) => i.name));
+  const openEc = async (b) => { await b.host({ app: 'effectcraft' }, 150_000); await b.page.waitForTimeout(15_000); };
+  const shared = await pw.browserFor(base, { headless: !process.env.HEADED });
+  try {
+    // A : renomme une composition ; EffectCraft écrit sa session (OPFS) ; envoi au serveur.
+    await loginE2e0(shared);
+    await shared.api('DELETE', '/api/appdata/effectcraft');
+    await openEc(shared);
+    await shared.inApp('effectcraft', (a) => a.execute('project.rename', { item: 'Lower Third', name: 'Session de A' }));
+    await shared.page.waitForTimeout(12_000); // la session est écrite ~10 s après une modification (vérifié)
+    await shared.page.evaluate(() => window.craftDataFlush());
+    const stored = await shared.api('GET', '/api/appdata/effectcraft');
+    assert.equal(stored.status, 200, 'instantané envoyé');
+    assert.ok((await opfsSession(shared.page)).includes('config%2Fsession.ecproj'));
+
+    // Déconnexion par le menu : la session de A quitte ce navigateur.
+    await shared.page.click('.avatar');
+    await shared.page.click('.menu [role=menuitem]:has-text("Se déconnecter")');
+    await shared.page.waitForURL(/login\.html/);
+    assert.deepEqual((await opfsSession(shared.page)).filter((n) => n.startsWith('config%2Fsession.')), [], 'session de A restée dans le navigateur');
+
+    // B sur le même navigateur : pas la session de A.
+    const admin = await pw.browserFor(base);
+    await loginE2e0(admin);
+    await admin.api('POST', '/api/admin/users', { json: { username: 'datab', password: 'provisoire1' } });
+    await admin.close();
+    await shared.api('POST', '/api/auth/login', { json: { username: 'datab', password: 'provisoire1' } });
+    await shared.api('POST', '/api/auth/password', { json: { current: 'provisoire1', password: 'motdepasse2' } });
+    await openEc(shared);
+    assert.ok(!(await comps(shared)).includes('Session de A'), 'B voit la session de A');
+
+    // A sur un autre navigateur : sa session revient.
+    const other = await pw.browserFor(base, { headless: !process.env.HEADED });
+    try {
+      await loginE2e0(other);
+      await openEc(other);
+      assert.ok((await comps(other)).includes('Session de A'), 'session de A non retrouvée');
+    } finally { await other.close(); }
+  } finally { await shared.close(); }
+});
+
 // Applications ajoutées le 14/11/2026 : nouveau document → modification → Ctrl+S (nom demandé) → Ctrl+S (nouvelle
 // version) → réouverture depuis Crafty (le contenu est là) → modification → sauvegarde automatique (version « auto »).
 const NEW_APPS = {

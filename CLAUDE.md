@@ -133,6 +133,12 @@ charge pas l'application et propose celles qui le lisent.
 - Réglages des applications par compte : la page hôte remet dans le `localStorage` les `prefKeys` du compte (table `prefs`)
   avant de charger l'application et renvoie les clés modifiées (10 s, arrière-plan, sortie) ; déconnexion = clés effacées ;
   jamais les réglages d'un autre compte (marqueur `craft-prefs-sync`). Les applications écrivent leurs réglages ~30 s après.
+- Données des applications par compte (décision du 15/11/2026) : ce qu'une application garde dans le navigateur au-delà des
+  réglages (`data` dans `apps.json` : clés `local`, bases `idb`, fichiers `opfs` avec « dossier/ » et « début* », `clear` = effacé sans
+  être copié) suit le compte : instantané opaque par compte et par application (`DATA_DIR/appdata/`, table `app_data`, compté dans
+  le quota, 512 Mio au plus), remis avant le chargement, renvoyé toutes les 30 s / en arrière-plan / après chaque enregistrement
+  s'il a changé ; données d'un autre compte effacées avant tout chargement (marqueur `craft-data-sync`) ; déconnexion = dernier envoi
+  puis effacement (gardées si l'envoi échoue). Relevé par application dans `FINDINGS.md`.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.
@@ -176,10 +182,8 @@ document par l'API (VectorCraft, EffectCraft). Les poignées et promesses rendue
 vérifie `instanceof`). Pas d'état « modifié » : une frappe ou un clic depuis le dernier enregistrement compte comme modification
 possible (« Pensez à enregistrer »). Pas de sauvegarde automatique ni de thème. `imports: ["*"]` = tout fichier (Craft Anything, lecture
 seule). La capture des téléchargements vaut aussi en mode pont (exports PdfCraft rangés dans Crafty).
-Actives : DesignCraft, SoundCraft, VectorCraft, TextureCraft, MaterialCraft, EffectCraft, Craft Anything, SolidCraft (14/11/2026).
-Désactivées : MailCraft (0.12.0 plante, boîte non enregistrable, données dans le navigateur), FilmCraft et LightCraft (pont, mais
-limites), PhotoCraft. **Point ouvert** : EffectCraft (session OPFS), SolidCraft (récents) et MailCraft gardent des données dans le
-stockage de l'origine, visibles d'un autre compte du même navigateur.
+Actives : DesignCraft, SoundCraft, VectorCraft, TextureCraft, MaterialCraft, EffectCraft, Craft Anything, SolidCraft (14/11/2026),
+MailCraft 0.11.1 (15/11/2026, boîte par compte ; 0.12.0 plante). Désactivées : FilmCraft et LightCraft (pont, mais limites), PhotoCraft.
 
 Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Voir `FINDINGS.md` pour chaque
 application ; PhotoCraft s'emballe autrement et ne démarre pas tel que servi.

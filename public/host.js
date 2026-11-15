@@ -6,6 +6,7 @@
 import { api, h, icon, toast, dialog, confirmDialog, validName, appTile, extOf, accountButton, syncTheme } from '/ui.js';
 import { pickFiles } from '/picker.js';
 import { restorePrefs } from '/prefs-sync.js';
+import { restoreData } from '/appdata-sync.js';
 import { installInterceptors, dropFile } from '/intercept.js';
 
 const $ = (id) => document.getElementById(id);
@@ -17,7 +18,7 @@ const state = (window.hostState = { slug, ready: null, readyMs: null, dirty: fal
   folderId: q.get('folder') || null, saves: [], failed: [], control: undefined, guest: false, docs: {}, autosaves: 0,
   picks: 0, blocked: null, themeApplied: false });
 const hostLog = (window.hostLog = []);
-let me, app, debug = false, unsavedToast = null, prefsSync = null;
+let me, app, debug = false, unsavedToast = null, prefsSync = null, dataSync = null;
 
 // ---------- Journal (visible seulement en débogage) ----------
 function describe(v) {
@@ -321,6 +322,7 @@ async function saveTo(target, bytes, msg) {
     const file = await store(target, bytes);
     entry.status = 'ok'; entry.fileId = file.id;
     log('info', `stocké : ${file.name} (${file.versions} version(s))`, 'out');
+    dataSync?.flush();
     state.unsaved = null;
     if (!target.exported) { state.lastSavedAt = Date.now(); state.lastSaveAuto = !!target.auto; state.maybeDirty = false; }
     if (target.auto) state.autosaves++;
@@ -680,6 +682,10 @@ async function main() {
   // Réglages de l'application du compte remis dans le navigateur avant son chargement (prefs-sync.js).
   try { prefsSync = await restorePrefs(me, app); } catch (e) { log('info', `réglages non restaurés : ${e.message}`, 'err'); }
   window.craftPrefsFlush = () => prefsSync?.flush();
+  // Données de l'application gardées dans le navigateur (app.data) : celles de ce compte (appdata-sync.js).
+  window.craftDataFlush = () => dataSync?.flush();
+  try { dataSync = await restoreData(me, app, (m) => log('info', m, 'out')); }
+  catch (e) { log('info', `données non restaurées : ${e.message}`, 'err'); toast({ type: 'error', title: "Données de l'application non restaurées", detail: e.message }); }
   // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, ?control, drapeaux de rendu.
   // Mode interception : pas de ?host=parent (l'application n'a pas de pont).
   const src = new URLSearchParams(intercept() ? {} : { host: 'parent' });

@@ -10,6 +10,7 @@ import { createStatic, notFound, safeFile } from './static.js';
 import { createFiles } from './files.js';
 import { adminRoutes } from './admin.js';
 import { prefsRoutes } from './prefs.js';
+import { createAppData } from './appdata.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -33,6 +34,7 @@ export function createApp({
   const log = createLogger({ authLogFile: dataDir === ':memory:' ? null : join(dataDir, 'logs', 'auth.log'), db, quiet });
   const auth = createAuth({ db, log, cookieSecure });
   const files = createFiles({ db, dataDir, log, settings: db.settings });
+  const appData = createAppData({ db, dataDir });
   files.cleanTmp();
   const st = createStatic({ apps, vendorDir, csp });
   const json = express.json({ limit: '64kb' });
@@ -58,7 +60,8 @@ export function createApp({
   }
   const appJson = (slug) => ({ slug, name: apps[slug].name || slug, description: apps[slug].description || '',
     version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [],
-    prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {}, mode: apps[slug].mode || 'bridge' });
+    prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {}, mode: apps[slug].mode || 'bridge',
+    data: apps[slug].data || null });
 
   // --- Connexion ---
   app.get('/api/auth/config', (req, res) => {
@@ -136,7 +139,8 @@ export function createApp({
 
   files.routes(app, auth.requireUser, json);
   prefsRoutes(app, { db, requireUser: auth.requireUser, allowedApps, apps });
-  adminRoutes(app, { db, auth, files, log, apps, json });
+  appData.routes(app, { requireUser: auth.requireUser, allowedApps, apps, usage: files.usage });
+  adminRoutes(app, { db, auth, files, appData, log, apps, json });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));
 
   // --- Applications : session obligatoire et application autorisée, sinon 404 ---

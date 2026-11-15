@@ -115,7 +115,12 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "wordcraft-web-0.18.1/",
-    "source": "https://github.com/storytold/wordcraft/releases/tag/v0.18.1"
+    "source": "https://github.com/storytold/wordcraft/releases/tag/v0.18.1",
+    "data": {
+      "idb": [
+        "wordcraft"
+      ]
+    }
   },
   "gridcraft": {
     "enabled": true,
@@ -434,7 +439,22 @@
         "read": "readFile"
       }
     },
-    "description": "Animation et effets visuels (projets ecproj)"
+    "description": "Animation et effets visuels (projets ecproj)",
+    "data": {
+      "opfs": [
+        "effectcraft/config%2Fsession.ecproj",
+        "effectcraft/config%2Fsession.json",
+        "effectcraft/config%2Fshortcuts.json"
+      ],
+      "idb": [
+        "effectcraft-handles"
+      ],
+      "clear": {
+        "opfs": [
+          "effectcraft/config%2Fsession.lock"
+        ]
+      }
+    }
   },
   "designcraft": {
     "enabled": true,
@@ -591,7 +611,7 @@
     "source": "https://github.com/storytold/filmcraft/releases/tag/v0.20.1"
   },
   "mailcraft": {
-    "enabled": false,
+    "enabled": true,
     "version": "0.11.1",
     "tag": "v0.11.1",
     "zip": "mailcraft-web-0.11.1.zip",
@@ -605,11 +625,9 @@
     "repo": "ucs-care-group/mailcraft",
     "source": "https://github.com/ucs-care-group/mailcraft/releases/tag/v0.11.1",
     "name": "MailCraft",
-    "description": "Messagerie (lecture, import et export eml, mbox, ics, vcf)",
+    "description": "Messagerie : boîte gardée par compte, import et export eml, mbox, ics, vcf",
     "mode": "intercept",
-    "extensions": [
-      "mailcraft"
-    ],
+    "extensions": [],
     "imports": [
       "eml",
       "mbox",
@@ -618,11 +636,17 @@
       "ical",
       "vcf",
       "vcard",
+      "mailcraft",
       "json"
     ],
     "prefKeys": [
       "mailcraft.ui.v1"
-    ]
+    ],
+    "data": {
+      "local": [
+        "mailcraft.mailbox.v1"
+      ]
+    }
   },
   "solidcraft": {
     "enabled": true,
@@ -665,6 +689,15 @@
     ],
     "control": {
       "open": "keys"
+    },
+    "data": {
+      "opfs": [
+        "recovery.sc",
+        "recovery.json"
+      ],
+      "idb": [
+        "solidcraft-disk-handles"
+      ]
     }
   }
 }

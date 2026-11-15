@@ -275,6 +275,8 @@ export function changePasswordDialog() {
 export async function logout(me) {
   // Réglages en attente envoyés, puis ceux du compte retirés de ce navigateur (voir prefs-sync.js).
   await window.craftPrefsFlush?.();
+  // Données des applications (appdata-sync.js) : dernier envoi, puis effacées de ce navigateur.
+  try { await (await import('/appdata-sync.js')).flushAndWipe(me); } catch {}
   try { for (const k of [...new Set((me?.apps || []).flatMap((a) => a.prefKeys || [])), 'craft-prefs-sync']) localStorage.removeItem(k); } catch {}
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
   location.href = '/login.html';
