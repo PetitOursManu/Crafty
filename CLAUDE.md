@@ -148,7 +148,7 @@ charge pas l'application et propose celles qui le lisent.
   `host-agent.js`, commandes de `window.<app>`) ; message système composé par le serveur ; suppressions confirmées par un clic ;
   applications sans API : agent limité (enregistrer, renommer, répondre). Conversations non stockées ; consommation par compte
   (table `ai_usage`).
-- Outils de la barre du haut par application : `tools` dans `apps.json` : `calculator`, `converter` (unités), `colors` (HEX/RVB/TSL/CMJN,
+- Outils de la barre du haut par application : `tools` dans `apps.json` : `calculator`, `converter` (unités), `colors` (bouton « Pipette » : HEX/RVB/TSL/CMJN,
   pipette EyeDropper, contraste) ; un seul panneau ouvert ; rien n'est envoyé au serveur.
 - Corbeille (15/11/2026) : supprimer = `deleted_at` (+ `trash_root` pour l'entrée choisie ; le contenu d'un dossier part et revient
   avec lui) ; noms uniques seulement hors corbeille (index partiels) ; restauration à sa place, sinon à la racine, nom changé si pris ;

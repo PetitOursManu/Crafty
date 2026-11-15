@@ -161,9 +161,9 @@ export function mountColors(button) {
   eye.onclick = async () => {
     try { const r = await new window.EyeDropper().open(); rgb = parseColor(r.sRGBHex); remember(); render(); } catch {} // annulé
   };
-  const p = panel('Couleurs', 'palette', h('div', { class: 'col-top' }, swatch, h('div', { class: 'col-in' }, text, h('div', { class: 'row' }, picker, eye))), rows, recentEl);
+  const p = panel('Pipette', 'pipette', h('div', { class: 'col-top' }, swatch, h('div', { class: 'col-in' }, text, h('div', { class: 'row' }, picker, eye))), rows, recentEl);
   render();
-  return wire(button, 'Couleurs', 'palette', p, () => text.focus());
+  return wire(button, 'Pipette', 'pipette', p, () => text.focus());
 }
 
 // Boutons de la barre selon l'application.
