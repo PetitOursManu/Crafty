@@ -183,10 +183,12 @@ function renderSettings() {
   const quota = h('input', { type: 'number', min: 0, step: 0.5, value: String(+(s.default_quota / GIB).toFixed(2)), required: true });
   const maxSize = h('input', { type: 'number', min: 1, max: 512, step: 1, value: String(Math.round(s.max_file_size / MIB)), required: true });
   const autosave = h('input', { type: 'number', min: 0, max: 3600, step: 5, value: String(s.autosave_seconds), required: true });
+  const trashDays = h('input', { type: 'number', min: 0, max: 365, step: 1, value: String(s.trash_days), required: true });
+  const sharing = switchRow('Liens de partage', 'Les comptes peuvent créer un lien public (avec expiration) vers un fichier. Désactiver coupe aussi les liens existants.', s.sharing_enabled);
   const errEl = h('div', { class: 'error-text', role: 'alert' });
   const form = $('settings');
   form.replaceChildren(
-    h('div', { class: 'card' }, h('h3', {}, 'Accès'), signup.el, guest.el, guestBox),
+    h('div', { class: 'card' }, h('h3', {}, 'Accès'), signup.el, guest.el, guestBox, sharing.el),
     h('div', { class: 'card' }, h('h3', {}, 'Fichiers'),
       h('div', { class: 'row' },
         h('label', { class: 'field' }, 'Versions conservées par fichier', versions, h('span', { class: 'hint' }, 'Les plus anciennes sont effacées au prochain enregistrement.')),
@@ -194,7 +196,8 @@ function renderSettings() {
         h('label', { class: 'field' }, 'Taille max. d\'un fichier (Mio)', maxSize, h('span', { class: 'hint' }, '512 au plus (limite des applications).'))),
       h('div', { class: 'row' },
         h('label', { class: 'field' }, 'Sauvegarde automatique (secondes)', autosave, h('span', { class: 'hint' },
-          'Délai après une modification ; 0 = désactivée. Les sauvegardes automatiques successives mettent à jour une seule version ; seuls les « Enregistrer » ajoutent des versions.')))),
+          'Délai après une modification ; 0 = désactivée. Les sauvegardes automatiques successives mettent à jour une seule version ; seuls les « Enregistrer » ajoutent des versions.')),
+        h('label', { class: 'field' }, 'Corbeille (jours)', trashDays, h('span', { class: 'hint' }, 'Durée avant effacement définitif ; 0 = pas de corbeille (suppression immédiate). Compte dans le quota.')))),
     errEl, h('div', {}, h('button', { class: 'btn primary', type: 'submit' }, 'Enregistrer les réglages')));
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -202,7 +205,7 @@ function renderSettings() {
     try {
       settings = await api('/api/admin/settings', { method: 'PATCH', body: {
         signup_open: signup.input.checked, guest_enabled: guest.input.checked, guest_apps: g.allApps ? null : g.apps,
-        max_versions: Number(versions.value), default_quota: Math.round(Number(quota.value) * GIB), max_file_size: Math.round(Number(maxSize.value) * MIB), autosave_seconds: Number(autosave.value) } });
+        max_versions: Number(versions.value), default_quota: Math.round(Number(quota.value) * GIB), max_file_size: Math.round(Number(maxSize.value) * MIB), autosave_seconds: Number(autosave.value), trash_days: Number(trashDays.value), sharing_enabled: sharing.input.checked } });
       errEl.textContent = '';
       toast({ title: 'Réglages enregistrés.' });
       await loadUsers();
@@ -215,7 +218,7 @@ const ACTIONS = { 'auth.login': 'Connexion', 'auth.logout': 'Déconnexion', 'aut
   'auth.password': 'Mot de passe changé', 'file.upload': 'Import', 'file.save': 'Enregistrement', 'file.autosave': 'Sauvegarde automatique', 'file.update': 'Fichier modifié',
   'file.delete': 'Fichier supprimé', 'file.restore': 'Version restaurée', 'folder.create': 'Dossier créé', 'folder.update': 'Dossier modifié',
   'folder.delete': 'Dossier supprimé', 'admin.user.create': 'Compte créé', 'admin.user.update': 'Compte modifié',
-  'admin.user.delete': 'Compte supprimé', 'admin.settings': 'Réglages modifiés', 'admin.ai': 'Assistant IA modifié', 'ai.error': "Erreur de l'assistant" };
+  'admin.user.delete': 'Compte supprimé', 'file.trash': 'Mis à la corbeille', 'folder.trash': 'Dossier à la corbeille', 'file.untrash': 'Restauré de la corbeille', 'folder.restore': 'Dossier restauré', 'share.create': 'Lien de partage créé', 'share.revoke': 'Lien révoqué', 'share.access': 'Lien de partage ouvert', 'admin.settings': 'Réglages modifiés', 'admin.ai': 'Assistant IA modifié', 'ai.error': "Erreur de l'assistant" };
 async function loadAudit() {
   try {
     const rows = await api('/api/admin/audit?limit=200');

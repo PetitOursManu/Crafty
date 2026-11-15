@@ -94,12 +94,12 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) 
   app.get('/api/admin/settings', requireAdmin, (req, res) => res.set('Cache-Control', 'no-store').json(db.settings()));
   app.patch('/api/admin/settings', requireAdmin, json, (req, res) => {
     const b = req.body || {}, patch = {};
-    for (const k of ['signup_open', 'guest_enabled']) if (b[k] !== undefined) patch[k] = !!b[k];
+    for (const k of ['signup_open', 'guest_enabled', 'sharing_enabled']) if (b[k] !== undefined) patch[k] = !!b[k];
     if (b.guest_apps !== undefined) {
       if (b.guest_apps !== null && !validApps(b.guest_apps)) return bad(res, 'Liste d\'applications invalide.');
       patch.guest_apps = b.guest_apps;
     }
-    for (const [k, min, max] of [['max_versions', 1, 100], ['default_quota', 0, 2 ** 50], ['max_file_size', 1, DEFAULT_SETTINGS.max_file_size], ['autosave_seconds', 0, 3600]]) {
+    for (const [k, min, max] of [['max_versions', 1, 100], ['default_quota', 0, 2 ** 50], ['max_file_size', 1, DEFAULT_SETTINGS.max_file_size], ['autosave_seconds', 0, 3600], ['trash_days', 0, 365]]) {
       if (b[k] === undefined) continue;
       if (!Number.isInteger(b[k]) || b[k] < min || b[k] > max) return bad(res, `Valeur invalide pour ${k}.`);
       patch[k] = b[k];

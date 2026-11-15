@@ -9,7 +9,8 @@ import { restorePrefs } from '/prefs-sync.js';
 import { restoreData } from '/appdata-sync.js';
 import { mountAgent } from '/agent.js';
 import { hostTools } from '/host-agent.js';
-import { mountCalculator } from '/calculator.js';
+import { mountBarTools } from '/bar-tools.js';
+import { makeThumb, uploadThumb } from '/explorer-more.js';
 import { installInterceptors, dropFile } from '/intercept.js';
 
 const $ = (id) => document.getElementById(id);
@@ -84,6 +85,32 @@ async function showFile(file) {
   u.searchParams.set('file', file.id); u.searchParams.delete('folder');
   history.replaceState(null, '', u);
   setStatus();
+  if (!state.guest) {
+    api('/api/recents', { method: 'POST', body: { fileId: file.id, app: slug } }).catch(() => {}); // accès rapide de l'accueil
+  }
+}
+// Miniature du document par l'application (control.thumb : commande qui rend une image PNG en base64), après un enregistrement
+// explicite, quand l'application est inactive depuis 3 s et l'assistant au repos : un rendu au milieu d'une série de commandes
+// en a fait perdre une (vérifié, DeckCraft et CadCraft) ; jamais à l'ouverture. Vérifié : DeckCraft file.render, CadCraft preview,
+// VectorCraft document.serialize png. Ailleurs, l'icône du type reste.
+let thumbTimer = null;
+function scheduleThumb(delay) {
+  if (!app.control?.thumb) return;
+  clearTimeout(thumbTimer);
+  thumbTimer = setTimeout(captureThumb, delay);
+}
+async function captureThumb() {
+  const c = app.control?.thumb, a = iframe.contentWindow?.[slug];
+  if (!c || !state.file || !state.ready || typeof a?.execute !== 'function') return;
+  if (state.agentBusy || Date.now() - (state.lastInput || 0) < 3000 || document.visibilityState === 'hidden') return scheduleThumb(3000);
+  try {
+    const r = await apiCall(a, c, {});
+    const b64 = r?.[c.field || 'png'];
+    if (typeof b64 !== 'string' || !b64) return;
+    const png = new Blob([fromB64(b64.replace(/^data:[^,]+,/, ''))], { type: 'image/png' });
+    const f = await api(`/api/files/${state.file.id}`); // version courante
+    if (await uploadThumb(f, await makeThumb(png))) log('info', 'miniature enregistrée', 'out');
+  } catch (e) { log('info', `miniature non faite : ${e.message}`, 'err'); }
 }
 function track(appName, file) {
   state.docs[appName] = file;
@@ -325,6 +352,7 @@ async function saveTo(target, bytes, msg) {
     const file = await store(target, bytes);
     entry.status = 'ok'; entry.fileId = file.id;
     log('info', `stocké : ${file.name} (${file.versions} version(s))`, 'out');
+    if (!target.auto) scheduleThumb(3000);
     dataSync?.flush();
     state.unsaved = null;
     if (!target.exported) { state.lastSavedAt = Date.now(); state.lastSaveAuto = !!target.auto; state.maybeDirty = false; }
@@ -413,6 +441,8 @@ function onAppReady() {
   installPicker();
   if (pendingOpen) (intercept() ? openByDrop(pendingOpen) : openStoredFile(pendingOpen));
   watchInput();
+  // Dernière activité dans l'application (miniatures : jamais pendant qu'on s'en sert).
+  try { for (const t of ['keydown', 'pointerdown', 'wheel']) iframe.contentDocument.addEventListener(t, () => { state.lastInput = Date.now(); }, { capture: true, passive: true }); } catch {}
   waitControl();
   applyAppTheme();
 }
@@ -719,11 +749,11 @@ async function main() {
   t0 = performance.now();
   iframe.src = `/apps/${slug}/?${src.toString().replace(/=(&|$)/g, '$1')}`;
   if (intercept()) waitInterceptReady();
-  if ((app.tools || []).includes('calculator')) mountCalculator($('calcBtn'));
-  if (!state.guest) mountAgent({ button: $('agentBtn'), context: () => ({ page: 'app', app: slug, appName: app.name, document: state.file?.name || null, hasApi: agentApi() }), tools: hostTools({
+  mountBarTools($('barTools'), app.tools || []); // calculatrice, unités, couleurs (apps.json)
+  if (!state.guest) mountAgent({ button: $('agentBtn'), onBusy: (v) => { state.agentBusy = v; }, context: () => ({ page: 'app', app: slug, appName: app.name, document: state.file?.name || null, hasApi: agentApi() }), tools: hostTools({
     slug, appName: app.name, api: () => iframe.contentWindow?.[slug], hasApi: agentApi, docName: () => state.file?.name || '', file: () => state.file,
     status: () => $('statusText').textContent, save: agentSave,
-    touched: () => { if (intercept() && !state.maybeDirty) { state.maybeDirty = true; setStatus(); } },
+    touched: () => { state.lastInput = Date.now(); if (intercept() && !state.maybeDirty) { state.maybeDirty = true; setStatus(); } },
     renamed: async () => { const f = await api(`/api/files/${state.file.id}`); for (const k of Object.keys(state.docs)) if (state.docs[k].id === f.id) state.docs[k] = f; state.docs[f.name] = f; await showFile(f); },
   }) }).catch(() => {});
   setTimeout(() => { if (!state.ready && !state.failed.length && !state.blocked) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);

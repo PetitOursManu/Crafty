@@ -11,6 +11,8 @@ export const DEFAULT_SETTINGS = {
   default_quota: 1024 ** 3,      // 1 Gio par compte, anciennes versions comprises
   max_file_size: 512 * 1024 ** 2, // limite d'ouverture des applications (512 Mio)
   autosave_seconds: 30,          // délai de la sauvegarde automatique après une modification (0 = désactivée)
+  trash_days: 30,                // durée dans la corbeille avant effacement définitif (0 = pas de corbeille)
+  sharing_enabled: true,         // liens de partage publics vers un fichier
 };
 
 const SCHEMA = `
@@ -53,7 +55,6 @@ CREATE TABLE IF NOT EXISTS folders (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS folders_name ON folders(user_id, IFNULL(parent_id, ''), name COLLATE NOCASE);
 CREATE TABLE IF NOT EXISTS files (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -65,7 +66,6 @@ CREATE TABLE IF NOT EXISTS files (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS files_name ON files(user_id, IFNULL(folder_id, ''), name COLLATE NOCASE);
 CREATE TABLE IF NOT EXISTS versions (
   id TEXT PRIMARY KEY,
   file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
@@ -113,6 +113,28 @@ export function openDb(file) {
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
   db.exec(SCHEMA);
+  // Migrations : colonne auto (sauvegarde automatique) ; corbeille (deleted_at, trash_root) et miniatures (thumb_version),
+  // avec des noms uniques seulement hors de la corbeille (index partiels) ; favoris, récents, partages.
+  const cols = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+  for (const t of ['files', 'folders']) {
+    if (!cols(t).includes('deleted_at')) db.exec(`ALTER TABLE ${t} ADD COLUMN deleted_at INTEGER; ALTER TABLE ${t} ADD COLUMN trash_root INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!cols('files').includes('thumb_version')) db.exec('ALTER TABLE files ADD COLUMN thumb_version TEXT');
+  // Lot de suppression : ce qui est parti ensemble revient ensemble (une date ne suffit pas : deux suppressions dans la même ms).
+  for (const t of ['files', 'folders']) if (!cols(t).includes('trash_batch')) db.exec(`ALTER TABLE ${t} ADD COLUMN trash_batch TEXT`);
+  db.exec(`DROP INDEX IF EXISTS folders_name; DROP INDEX IF EXISTS files_name;
+    CREATE UNIQUE INDEX IF NOT EXISTS folders_live_name ON folders(user_id, IFNULL(parent_id, ''), name COLLATE NOCASE) WHERE deleted_at IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS files_live_name ON files(user_id, IFNULL(folder_id, ''), name COLLATE NOCASE) WHERE deleted_at IS NULL;
+    CREATE INDEX IF NOT EXISTS files_trash ON files(user_id, deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS folders_trash ON folders(user_id, deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS favorites (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL,
+      item_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (user_id, kind, item_id));
+    CREATE TABLE IF NOT EXISTS recents (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE, app TEXT, opened_at INTEGER NOT NULL, PRIMARY KEY (user_id, file_id));
+    CREATE TABLE IF NOT EXISTS shares (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL,
+      expires_at INTEGER, downloads INTEGER NOT NULL DEFAULT 0, last_access_at INTEGER, revoked INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS shares_file ON shares(file_id);`);
   // Migration : colonne auto (sauvegarde automatique) ajoutée après la première version du schéma.
   if (!db.prepare('PRAGMA table_info(versions)').all().some((c) => c.name === 'auto')) db.exec('ALTER TABLE versions ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
 

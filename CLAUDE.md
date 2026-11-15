@@ -148,7 +148,20 @@ charge pas l'application et propose celles qui le lisent.
   `host-agent.js`, commandes de `window.<app>`) ; message système composé par le serveur ; suppressions confirmées par un clic ;
   applications sans API : agent limité (enregistrer, renommer, répondre). Conversations non stockées ; consommation par compte
   (table `ai_usage`).
-- Outils de la barre du haut par application : `tools` dans `apps.json` (`calculator` : SolidCraft).
+- Outils de la barre du haut par application : `tools` dans `apps.json` : `calculator`, `converter` (unités), `colors` (HEX/RVB/TSL/CMJN,
+  pipette EyeDropper, contraste) ; un seul panneau ouvert ; rien n'est envoyé au serveur.
+- Corbeille (15/11/2026) : supprimer = `deleted_at` (+ `trash_root` pour l'entrée choisie ; le contenu d'un dossier part et revient
+  avec lui) ; noms uniques seulement hors corbeille (index partiels) ; restauration à sa place, sinon à la racine, nom changé si pris ;
+  effacement définitif à la main ou après `trash_days` (réglage admin, 30 j, 0 = pas de corbeille) ; compte dans le quota.
+  L'accueil supprime sans confirmation avec « Annuler » ; l'assistant demande toujours confirmation.
+- Favoris et récents (tables `favorites`, `recents`) : accès rapide de l'accueil ; un fichier ouvert ou enregistré dans une
+  application devient récent.
+- Partage (`src/shares.js`) : lien `/s/<jeton>` vers la version courante d'un fichier, sans compte ; jeton montré une fois (base :
+  SHA-256), expiration (1 h à sans limite), révocable, coupé par la corbeille, un compte désactivé ou `sharing_enabled` ; aperçu en
+  ligne seulement pour images, PDF et texte (jamais HTML ni SVG), en-têtes noindex / no-referrer / CSP sandbox ; débit limité.
+- Miniatures (`/api/files/:id/thumb`, version courante) : images faites par l'accueil ; documents rendus par l'application
+  (`control.thumb` : DeckCraft `file.render`, CadCraft `preview`, VectorCraft `document.serialize` png). La copie directe du canvas
+  WebGPU donne une image vide (vérifié) et `screenshot()` capture toute l'interface : pas de miniature pour les autres.
 - Couleurs des applications : fond de leur icône officielle (getartcraft.com), mesuré ; jamais inventées.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes

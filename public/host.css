@@ -89,3 +89,27 @@ body.agent-open .calc { right: 416px; }
 .calc-hist button { border: 0; background: none; color: var(--fg-2); font: inherit; font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 5px; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calc-hist button.res { color: var(--fg); font-weight: 600; flex: none; }
 .calc-hist button:hover { background: var(--hover); }
+
+/* Outils de barre (bar-tools.js) : convertisseur et couleurs */
+.bar-tools { display: inline-flex; gap: 6px; }
+.tool-panel select { height: 34px; }
+.conv-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
+.conv-res { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.conv-res .calc-out { font-size: 22px; }
+.conv-all { list-style: none; margin: 0; padding: 6px 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; max-height: 190px; overflow: auto; }
+.conv-all button { width: 100%; display: flex; justify-content: space-between; gap: 6px; border: 0; background: none; color: var(--fg); font: inherit; font-size: 12.5px; padding: 3px 5px; border-radius: 5px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.conv-all button:hover { background: var(--hover); }
+.conv-all span { color: var(--mut); }
+.col-top { display: flex; gap: 10px; align-items: stretch; }
+.col-swatch { width: 72px; min-height: 72px; border-radius: 10px; border: 1px solid var(--line-2); flex: none; }
+.col-in { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.col-in .row { display: flex; gap: 6px; align-items: center; }
+.col-picker { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: none; cursor: pointer; }
+.col-rows { display: flex; flex-direction: column; gap: 2px; }
+.col-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 6px; font-size: 13px; }
+.col-row code { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-contrast { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; margin-top: 6px; }
+.col-contrast span:not(.mut) { padding: 3px 8px; border-radius: 6px; font-weight: 700; }
+.col-recent { display: flex; flex-wrap: wrap; gap: 5px; }
+.col-recent:empty { display: none; }
+.col-chip { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line-2); cursor: pointer; padding: 0; }

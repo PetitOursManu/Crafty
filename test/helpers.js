@@ -24,13 +24,13 @@ export async function startServer(opts = {}) {
     absent: { name: 'Absent', version: '9.9.9' },
   }));
   mkdirSync(join(root, 'public'));
-  for (const p of ['index.html', 'host.html', 'admin.html', 'login.html', 'ui.js']) writeFileSync(join(root, 'public', p), `<!-- ${p} -->`);
+  for (const p of ['index.html', 'host.html', 'admin.html', 'login.html', 'share.html', 'ui.js']) writeFileSync(join(root, 'public', p), `<!-- ${p} -->`);
   const app = createApp({ root, dataDir: join(root, 'data'), quiet: true, trustProxy: 'true', ...opts });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
-    root, base, db: app.locals.db, client: () => client(base),
+    root, base, app, db: app.locals.db, client: () => client(base),
     close: () => { server.close(); app.locals.db.close(); rmSync(root, { recursive: true, force: true }); },
   };
 }

@@ -68,10 +68,13 @@ export function mountCalculator(button) {
     else if (e.key === 'ArrowUp' && !input.value && hist.length) { e.preventDefault(); input.value = hist.at(-1).e; preview(); }
   });
   function toggle(open = panel.hidden) {
+    if (open) for (const other of document.querySelectorAll('.tool-panel:not([hidden])')) if (other !== panel) other.__close?.();
     panel.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
     if (open) { renderHist(); preview(); input.focus(); } else button.focus();
   }
+  panel.classList.add('tool-panel');
+  panel.__close = () => toggle(false);
   button.hidden = false;
   button.replaceChildren(icon('calc'), h('span', { class: 'agent-btn-label' }, 'Calculatrice'));
   button.setAttribute('aria-expanded', 'false');

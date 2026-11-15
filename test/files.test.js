@@ -148,7 +148,7 @@ test('dossiers : arborescence, déplacement, pas de cycle, suppression récursiv
   assert.equal((await a.patch(`/api/files/${f.id}`, { folderId: top.id })).status, 200);
   assert.deepEqual((await a.get(`/api/fs?folder=${top.id}`)).data.files.map((x) => x.name), ['Plan.pdf']);
   const n = blobCount();
-  assert.equal((await a.del(`/api/folders/${top.id}`)).status, 204);
+  assert.equal((await a.del(`/api/folders/${top.id}?permanent=1`)).status, 204); // suppression définitive (sinon : corbeille, voir trash.test.js)
   assert.equal((await a.get(`/api/files/${f.id}`)).status, 404);
   assert.equal(blobCount(), n - 1);
 });

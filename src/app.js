@@ -12,6 +12,7 @@ import { adminRoutes } from './admin.js';
 import { prefsRoutes } from './prefs.js';
 import { createAppData } from './appdata.js';
 import { createAi } from './ai.js';
+import { sharesRoutes } from './shares.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -48,6 +49,7 @@ export function createApp({
   // Correction 4 : derrière Cloudflare + Traefik, TRUST_PROXY doit être réglé (nombre de sauts) et vérifié.
   app.set('trust proxy', /^\d+$/.test(String(trustProxy)) ? Number(trustProxy) : trustProxy === 'true' ? true : trustProxy || false);
   app.locals.db = db;
+  app.locals.files = files;
   app.use(st.headers);
   app.use(auth.loadSession);
   app.use('/api', auth.originCheck);
@@ -143,6 +145,7 @@ export function createApp({
   files.routes(app, auth.requireUser, json);
   prefsRoutes(app, { db, requireUser: auth.requireUser, allowedApps, apps });
   appData.routes(app, { requireUser: auth.requireUser, allowedApps, apps, usage: files.usage });
+  sharesRoutes(app, { db, files, log, settings: db.settings, requireUser: auth.requireUser, json });
   ai.routes(app, { requireUser: auth.requireUser, requireAdmin: auth.requireAdmin, json: express.json({ limit: '8mb' }) });
   adminRoutes(app, { db, auth, files, appData, log, apps, json });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));
@@ -160,6 +163,12 @@ export function createApp({
       if (!f) return notFound(res);
       return await st.sendStatic(req, res, f.file, st.immutable(f.rel));
     } catch (e) { next(e); }
+  });
+
+  // --- Page publique d'un lien de partage (sans compte ; voir src/shares.js) ---
+  app.get(/^\/s\/[A-Za-z0-9_-]{30,60}$/, async (req, res, next) => {
+    try { res.set({ 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' }); return await st.sendStatic(req, res, join(root, 'public', 'share.html'), 'no-store'); }
+    catch (e) { next(e); }
   });
 
   // --- Pages : connexion obligatoire, sinon /login.html ---

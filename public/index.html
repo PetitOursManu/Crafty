@@ -42,10 +42,13 @@
       <a class="btn" href="/login.html" id="guestLogin">Se connecter avec un compte</a>
     </section>
 
+    <section id="quick" class="quick" aria-label="Accès rapide" hidden></section>
+
     <section id="filesSection" class="files-section" aria-labelledby="h-files">
       <h2 id="h-files" class="visually-hidden">Mes fichiers</h2>
       <div class="files-bar">
         <nav id="crumbs" class="crumbs" aria-label="Emplacement"></nav>
+        <button type="button" class="btn ghost sm trash-btn" id="trashBtn" aria-pressed="false" hidden></button>
         <div class="spacer"></div>
         <select id="sort" aria-label="Trier par" class="sort">
           <option value="name">Nom</option>

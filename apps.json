@@ -209,6 +209,14 @@
             "on": true
           }
         ]
+      },
+      "thumb": {
+        "command": "file.render",
+        "params": {
+          "slide": 0,
+          "scale": 0.5
+        },
+        "field": "png"
       }
     },
     "version": "0.18.1",
@@ -221,7 +229,10 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "deckcraft-web-0.18.1/",
-    "source": "https://github.com/storytold/deckcraft/releases/tag/v0.18.1"
+    "source": "https://github.com/storytold/deckcraft/releases/tag/v0.18.1",
+    "tools": [
+      "colors"
+    ]
   },
   "cadcraft": {
     "enabled": true,
@@ -255,7 +266,14 @@
           "ui.theme.system"
         ]
       },
-      "openMultiple": true
+      "openMultiple": true,
+      "thumb": {
+        "command": "preview",
+        "params": {
+          "width": 480
+        },
+        "field": "data"
+      }
     },
     "version": "0.20.1",
     "tag": "v0.20.1",
@@ -267,7 +285,11 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "cadcraft-web-0.20.1/",
-    "source": "https://github.com/storytold/cadcraft/releases/tag/v0.20.1"
+    "source": "https://github.com/storytold/cadcraft/releases/tag/v0.20.1",
+    "tools": [
+      "calculator",
+      "converter"
+    ]
   },
   "figcraft": {
     "enabled": true,
@@ -322,7 +344,11 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "figcraft-web-0.18.1/",
-    "source": "https://github.com/storytold/figcraft/releases/tag/v0.18.1"
+    "source": "https://github.com/storytold/figcraft/releases/tag/v0.18.1",
+    "tools": [
+      "colors",
+      "converter"
+    ]
   },
   "photocraft": {
     "enabled": false,
@@ -386,9 +412,20 @@
           "command": "document.inspect",
           "field": "title"
         }
+      },
+      "thumb": {
+        "command": "document.serialize",
+        "params": {
+          "format": "png"
+        },
+        "field": "dataBase64"
       }
     },
-    "description": "Illustration vectorielle (vectorcraft, import SVG, PDF, AI…)"
+    "description": "Illustration vectorielle (vectorcraft, import SVG, PDF, AI…)",
+    "tools": [
+      "colors",
+      "converter"
+    ]
   },
   "lightcraft": {
     "enabled": false,
@@ -454,7 +491,10 @@
           "effectcraft/config%2Fsession.lock"
         ]
       }
-    }
+    },
+    "tools": [
+      "colors"
+    ]
   },
   "designcraft": {
     "enabled": true,
@@ -481,7 +521,11 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "designcraft-web-0.20.1/",
-    "source": "https://github.com/storytold/designcraft/releases/tag/v0.20.1"
+    "source": "https://github.com/storytold/designcraft/releases/tag/v0.20.1",
+    "tools": [
+      "converter",
+      "colors"
+    ]
   },
   "texturecraft": {
     "enabled": true,
@@ -518,7 +562,10 @@
     ],
     "stripPrefix": "texturecraft-web-0.6.1/",
     "source": "https://github.com/storytold/texturecraft/releases/tag/v0.6.1",
-    "description": "Peinture de textures sur modèles 3D (tcraft)"
+    "description": "Peinture de textures sur modèles 3D (tcraft)",
+    "tools": [
+      "colors"
+    ]
   },
   "materialcraft": {
     "enabled": true,
@@ -544,7 +591,10 @@
     ],
     "stripPrefix": "materialcraft-web-0.4.1/",
     "source": "https://github.com/storytold/materialcraft/releases/tag/v0.4.1",
-    "description": "Matériaux procéduraux par nœuds (mcraft, sbs)"
+    "description": "Matériaux procéduraux par nœuds (mcraft, sbs)",
+    "tools": [
+      "colors"
+    ]
   },
   "soundcraft": {
     "enabled": true,
@@ -700,7 +750,8 @@
       ]
     },
     "tools": [
-      "calculator"
+      "calculator",
+      "converter"
     ]
   }
 }

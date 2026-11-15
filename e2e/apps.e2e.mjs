@@ -638,10 +638,11 @@ test('accueil : Entrée crée le dossier ; sélection multiple (case, Ctrl, Maj,
     await p.locator('#items').click({ position: { x: 2, y: 2 } }).catch(() => {});
     await p.keyboard.press('Control+a');
     assert.equal(await selected(), 3);
-    await p.click('#selDelete');
-    await p.click('dialog[open] button[value=ok]');
+    await p.click('#selDelete'); // corbeille : sans confirmation, avec « Annuler »
+    await p.waitForSelector('.toast:has-text("3 éléments placés dans la corbeille")');
     await p.waitForSelector('#empty:not([hidden])');
     assert.equal((await fs(folderId)).files.length, 0);
+    assert.equal((await b.api('GET', '/api/trash')).body.items.length >= 3, true);
   } finally { await b.close(); }
 });
 
@@ -740,6 +741,126 @@ test('assistant IA : ranger des fichiers sur l\'accueil (suppression confirmée)
     await b.api('PUT', '/api/admin/ai', { json: { enabled: false } }).catch(() => {});
     await b.close(); model.close();
   }
+});
+
+test('accueil : corbeille (annuler, restaurer), favoris, récents, partage sans compte, miniature d\'image', { skip: missing('pdfcraft'), timeout: 180_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  const item = (n) => p.locator(`#items .item:has-text("${n}")`);
+  try {
+    await loginE2e0(b);
+    const old = (await b.api('GET', '/api/fs')).body;
+    for (const f of old.files) await b.api('DELETE', `/api/files/${f.id}?permanent=1`);
+    for (const d of old.folders) await b.api('DELETE', `/api/folders/${d.id}?permanent=1`);
+    await b.api('POST', '/api/trash/delete', { json: { all: true } });
+    await b.upload(join(ROOT, 'public', 'brand', 'crafty-192.png'), { name: 'Logo.png' });
+    const doc = await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Doc.pdf' });
+    await p.goto(`${base}/`);
+
+    // Miniature de l'image, faite par le navigateur.
+    await p.waitForSelector('#items .item:has-text("Logo.png") .thumb img', { timeout: 20_000 });
+    assert.ok(await item('Logo.png').locator('.thumb img').evaluate((i) => i.complete && i.naturalWidth > 0));
+
+    // Favori : étoile et accès rapide.
+    await item('Doc.pdf').click({ button: 'right' });
+    await p.click('.menu [role=menuitem]:has-text("Ajouter aux favoris")');
+    await p.waitForSelector('#items .item:has-text("Doc.pdf") .fav');
+    await p.waitForSelector('#quick:not([hidden])');
+    await p.click('#quick [role=tab]:has-text("Favoris")');
+    await p.waitForSelector('#quick .q-card:has-text("Doc.pdf")');
+
+    // Supprimer → corbeille, « Annuler » ; puis vue Corbeille et « Restaurer ».
+    await item('Doc.pdf').click();
+    await p.keyboard.press('Delete');
+    await p.waitForSelector('.toast:has-text("placé dans la corbeille")');
+    assert.equal(await item('Doc.pdf').count(), 0);
+    await p.click('.toast button:has-text("Annuler")');
+    await p.waitForSelector('#items .item:has-text("Doc.pdf")');
+    await item('Doc.pdf').click();
+    await p.keyboard.press('Delete');
+    await p.waitForSelector('#trashBtn .count');
+    await p.click('#trashBtn');
+    await p.waitForSelector('.trash-row:has-text("Doc.pdf")');
+    assert.match(p.url(), /trash=1/);
+    await p.click('.trash-row:has-text("Doc.pdf") button:has-text("Restaurer")');
+    await p.waitForSelector('#empty:not([hidden])');
+    await p.click('#crumbs button:has-text("Mes fichiers")');
+    await p.waitForSelector('#items .item:has-text("Doc.pdf")');
+
+    // Récents : ouvert dans PdfCraft, puis retour à l'accueil.
+    await b.host({ app: 'pdfcraft', file: doc.id });
+    await b.waitFor(() => window.hostState.file, 60_000);
+    await p.goto(`${base}/`);
+    await p.click('#quick [role=tab]:has-text("Récents")');
+    await p.waitForSelector('#quick .q-card:has-text("Doc.pdf")');
+
+    // Partage : lien créé, ouvert sans compte dans un autre navigateur.
+    await item('Logo.png').click({ button: 'right' });
+    await p.click('.menu [role=menuitem]:has-text("Partager")');
+    await p.click('dialog[open] button:has-text("Créer un lien")');
+    const url = await p.inputValue('dialog[open] .share-fresh input');
+    assert.match(url, /\/s\/[A-Za-z0-9_-]{43}$/);
+    const anon = await pw.browserFor(base, { headless: !process.env.HEADED });
+    try {
+      await anon.page.goto(url);
+      await anon.page.waitForSelector('.share-card h1:has-text("Logo.png")');
+      assert.ok(await anon.page.locator('.share-preview img').evaluate((i) => new Promise((r) => (i.complete ? r(i.naturalWidth > 0) : i.addEventListener('load', () => r(i.naturalWidth > 0))))));
+      assert.match(await anon.page.getAttribute('a:has-text("Télécharger")', 'href'), /content\?dl=1$/);
+      assert.match(await anon.page.textContent('.share-head'), /partagé par e2e0/);
+    } finally { await anon.close(); }
+    await p.click('dialog[open] .share-list button:has-text("Révoquer")');
+    await p.waitForSelector('dialog[open] .share-list li.mut');
+    const gone = await pw.browserFor(base, { headless: true });
+    try { await gone.page.goto(url); await gone.page.waitForSelector('.share-card h1:has-text("Lien indisponible")'); } finally { await gone.close(); }
+  } finally { await b.close(); }
+});
+
+test("miniature d'un document rendue par l'application (DeckCraft), sans toucher au document", { skip: missing('deckcraft'), timeout: 180_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  try {
+    await loginE2e0(b);
+    await b.host({ app: 'deckcraft' });
+    await b.waitFor(() => window.hostState.control === true, 60_000);
+    await b.inApp('deckcraft', (a) => a.execute('shape.insert', { preset: 'rect', rect: [50, 50, 300, 150], text: 'Miniature' }));
+    await b.clickApp(500, 400);
+    await p.keyboard.press('Control+s');
+    await p.waitForSelector('dialog[open] input');
+    await p.fill('dialog[open] input', 'Miniature.deckcraft');
+    await p.keyboard.press('Enter');
+    await b.waitFor(() => window.hostState.saves.at(-1)?.status === 'ok', 30_000);
+    const id = (await b.state()).file.id;
+    // Inactivité de 3 s puis rendu : la miniature suit la version courante.
+    let f;
+    for (let i = 0; i < 60 && !(f = (await b.api('GET', `/api/files/${id}`)).body).thumb; i++) await p.waitForTimeout(500);
+    assert.equal(f.thumb, f.versionId);
+    assert.equal((await b.api('GET', `/api/files/${id}/thumb`)).status, 200);
+    assert.equal(await b.inApp('deckcraft', async (a) => (await a.docInspect()).slides[0].shapes), 3, 'document intact');
+  } finally { await b.close(); }
+});
+
+test('outils de barre : unités (CadCraft), couleurs (FigCraft), un seul panneau ouvert', { skip: missing('figcraft') || missing('cadcraft'), timeout: 180_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  try {
+    await loginE2e0(b);
+    await b.host({ app: 'cadcraft' });
+    await p.waitForSelector('#barTools [data-tool=calculator]');
+    await p.click('#barTools [data-tool=converter]');
+    await p.fill('.tool-panel:not([hidden]) .calc-input', '2');
+    assert.equal(await p.textContent('.tool-panel:not([hidden]) .conv-res .calc-out'), '50,8 mm');
+    await p.fill('.tool-panel:not([hidden]) .calc-input', '1 + 1');
+    assert.equal(await p.textContent('.tool-panel:not([hidden]) .conv-res .calc-out'), '50,8 mm', 'calcul accepté');
+    await p.click('#barTools [data-tool=calculator]');
+    assert.equal(await p.locator('.tool-panel:not([hidden])').count(), 1, 'un seul panneau');
+    await b.host({ app: 'figcraft' });
+    await p.click('#barTools [data-tool=colors]');
+    await p.fill('.tool-panel:not([hidden]) .calc-input', '#ff0000');
+    await p.waitForSelector('.tool-panel:not([hidden]) .col-row code:has-text("rgb(255, 0, 0)")');
+    assert.ok(await p.locator('.tool-panel:not([hidden]) .col-row code:has-text("hsl(0, 100%, 50%)")').count());
+    await p.keyboard.press('Escape');
+    assert.equal(await p.locator('.tool-panel:not([hidden])').count(), 0);
+  } finally { await b.close(); }
 });
 
 test('craft-anything : n\'importe quel fichier de Crafty est analysé (lecture seule)', { skip: missing('craft-anything'), timeout: 150_000 }, async () => {
