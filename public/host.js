@@ -12,6 +12,7 @@ import { hostTools } from '/host-agent.js';
 import { mountBarTools } from '/bar-tools.js';
 import { makeThumb, uploadThumb } from '/explorer-more.js';
 import { installInterceptors, dropFile } from '/intercept.js';
+import { t, locale, translateDom } from '/i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
@@ -55,15 +56,19 @@ const edits = (a, name) => (a.extensions || []).includes(extOf(name));
 function setStatus() {
   const s = $('status');
   let cls, text;
-  if (state.blocked) { cls = ''; text = 'Format non pris en charge'; }
-  else if (state.unsaved) { cls = 'error'; text = 'Non sauvegardé'; }
-  else if (state.saving) { cls = 'saving'; text = 'Enregistrement…'; }
-  else if (state.dirty) { cls = 'dirty'; text = 'Modifications non enregistrées'; }
-  else if (state.maybeDirty) { cls = 'dirty'; text = 'Pensez à enregistrer (Ctrl+S)'; }
-  else if (state.guest) { cls = ''; text = 'Mode invité : rien n\'est conservé'; }
-  else if (state.lastSavedAt) { cls = 'ok'; text = `${state.lastSaveAuto ? 'Enregistré automatiquement' : 'Enregistré'} · ${new Date(state.lastSavedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`; }
-  else if (state.file) { cls = 'ok'; text = 'Enregistré'; }
-  else { cls = ''; text = 'Nouveau document, pas encore enregistré'; }
+  if (state.blocked) { cls = ''; text = t('Format non pris en charge'); }
+  else if (state.unsaved) { cls = 'error'; text = t('Non sauvegardé'); }
+  else if (state.saving) { cls = 'saving'; text = t('Enregistrement…'); }
+  else if (state.dirty) { cls = 'dirty'; text = t('Modifications non enregistrées'); }
+  else if (state.maybeDirty) { cls = 'dirty'; text = t('Pensez à enregistrer (Ctrl+S)'); }
+  else if (state.guest) { cls = ''; text = t('Mode invité : rien n\'est conservé'); }
+  else if (state.lastSavedAt) {
+    cls = 'ok';
+    const time = new Date(state.lastSavedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    text = state.lastSaveAuto ? t('Enregistré automatiquement · {time}', { time }) : t('Enregistré · {time}', { time });
+  }
+  else if (state.file) { cls = 'ok'; text = t('Enregistré'); }
+  else { cls = ''; text = t('Nouveau document, pas encore enregistré'); }
   s.className = `status ${cls}`;
   $('statusText').textContent = text;
   s.title = text;
@@ -73,7 +78,7 @@ function setDoc(name, path) {
   $('docPath').textContent = path ?? '';
   document.title = `${name} · ${app.name}`;
 }
-const pathText = (file) => ['Mes fichiers', ...(file.path || []).map((p) => p.name)].join(' › ');
+const pathText = (file) => [t('Mes fichiers'), ...(file.path || []).map((p) => p.name)].join(' › ');
 // Le document affiché dans l'en-tête devient `file` (dernier ouvert ou enregistré).
 async function showFile(file) {
   if (!file.path) file = await api(`/api/files/${file.id}`);
@@ -121,9 +126,9 @@ function track(appName, file) {
 function showUnsaved() {
   unsavedToast?.close(); unsavedToast = null;
   if (state.unsaved) {
-    unsavedToast = toast({ type: 'error', title: 'Attention : fichier non sauvegardé', closable: true,
-      detail: `${state.unsaved.name} : ${state.unsaved.error.replace(/\.$/, '')}. Vos modifications ne sont que dans cet onglet.`,
-      actions: [{ label: state.unsaved.retryLabel || 'Réessayer', onClick: () => state.unsaved?.retry() }] });
+    unsavedToast = toast({ type: 'error', title: t('Attention : fichier non sauvegardé'), closable: true,
+      detail: t('{name} : {error}. Vos modifications ne sont que dans cet onglet.', { name: state.unsaved.name, error: state.unsaved.error.replace(/\.$/, '') }),
+      actions: [{ label: state.unsaved.retryLabel || t('Réessayer'), onClick: () => state.unsaved?.retry() }] });
   }
   setStatus();
 }
@@ -136,13 +141,13 @@ function showBlocked(file) {
   const others = me.apps.filter((a) => a.slug !== slug && opens(a, file.name));
   const ext = extOf(file.name);
   $('loading').replaceChildren(h('div', { class: 'blocked', role: 'alert' },
-    h('h2', {}, `${app.name} n'ouvre pas les fichiers ${ext ? `.${ext}` : 'sans extension'}`),
-    h('p', { class: 'mut' }, `« ${file.name} » ne peut pas être ouvert dans ${app.name}.`,
-      others.length ? ' Il s\'ouvre avec :' : ' Aucune de vos applications ne lit ce format ; vous pouvez le télécharger.'),
+    h('h2', {}, ext ? t('{app} n\'ouvre pas les fichiers .{ext}', { app: app.name, ext }) : t('{app} n\'ouvre pas les fichiers sans extension', { app: app.name })),
+    h('p', { class: 'mut' }, t('« {name} » ne peut pas être ouvert dans {app}.', { name: file.name, app: app.name }),
+      others.length ? t(' Il s\'ouvre avec :') : t(' Aucune de vos applications ne lit ce format ; vous pouvez le télécharger.')),
     h('div', { class: 'blocked-actions' },
-      ...others.map((a) => h('a', { class: 'btn primary', href: `/host.html?app=${a.slug}&file=${file.id}` }, appTile(a, 'app-tile mini'), `Ouvrir dans ${a.name}`)),
-      others.length ? null : h('a', { class: 'btn primary', href: `/api/files/${file.id}/content`, download: file.name }, icon('download'), 'Télécharger'),
-      h('a', { class: 'btn', href: $('back').href }, icon('back'), 'Retour à mes fichiers'))));
+      ...others.map((a) => h('a', { class: 'btn primary', href: `/host.html?app=${a.slug}&file=${file.id}` }, appTile(a, 'app-tile mini'), t('Ouvrir dans {app}', { app: a.name }))),
+      others.length ? null : h('a', { class: 'btn primary', href: `/api/files/${file.id}/content`, download: file.name }, icon('download'), t('Télécharger')),
+      h('a', { class: 'btn', href: $('back').href }, icon('back'), t('Retour à mes fichiers')))));
   $('loading').hidden = false;
   setStatus();
 }
@@ -157,15 +162,15 @@ async function openStoredFile(file) {
     await showFile(file);
     applyAppTheme();
   } catch (e) {
-    toast({ type: 'error', title: 'Impossible d\'ouvrir le document', detail: e.message });
-    setDoc('Document introuvable');
+    toast({ type: 'error', title: t('Impossible d\'ouvrir le document'), detail: e.message });
+    setDoc(t('Document introuvable'));
   }
 }
 async function openLocal(f) {
-  if (!opens(app, f.name)) return toast({ type: 'error', title: 'Format non pris en charge', detail: `${app.name} n'ouvre pas les fichiers .${extOf(f.name) || '?'}` });
+  if (!opens(app, f.name)) return toast({ type: 'error', title: t('Format non pris en charge'), detail: t('{app} n\'ouvre pas les fichiers .{ext}', { app: app.name, ext: extOf(f.name) || '?' }) });
   const bytes = await f.arrayBuffer();
   send('open', { name: f.name, bytes }, [bytes]);
-  setDoc(f.name, 'Fichier de l\'ordinateur');
+  setDoc(f.name, t('Fichier de l\'ordinateur'));
   applyAppTheme();
 }
 
@@ -186,7 +191,7 @@ function installPicker() {
       if (apiSaving) return log('info', 'téléchargement ignoré : enregistrement par l\'API en cours', 'out');
       // Copie dans le royaume de la page : un ArrayBuffer de l'iframe échoue aux tests instanceof d'ici.
       onSave({ name, bytes: new Uint8Array(await blob.arrayBuffer()).slice().buffer, saveAs: false, captured: true }); },
-    saveLost: (name) => toast({ type: 'error', title: 'Enregistrement non capté', detail: `${name} : le fichier n'a pas pu être récupéré.` }),
+    saveLost: (name) => toast({ type: 'error', title: t('Enregistrement non capté'), detail: t('{name} : le fichier n\'a pas pu être récupéré.', { name }) }),
   });
 }
 // showOpenFilePicker (FilmCraft…) : mêmes fichiers Crafty, rendus sous forme de « poignées ».
@@ -200,7 +205,7 @@ async function pickHandles(opts = {}) {
   const exts = [...new Set((opts.types || []).flatMap((t) => Object.values(t.accept || {}).flat())
     .map((e) => String(e).replace(/^./, '').toLowerCase()).filter((e) => /^[a-z0-9]+$/.test(e)))];
   state.picks++;
-  const files = await pickFiles({ title: 'Ouvrir', exts, multiple: !!opts.multiple, folderId: state.folderId, appName: app.name });
+  const files = await pickFiles({ title: t('Ouvrir'), exts, multiple: !!opts.multiple, folderId: state.folderId, appName: app.name });
   if (!files?.length) return null;
   const out = [];
   for (const f of files) {
@@ -238,7 +243,7 @@ async function pickForInput(input) {
   const isOpen = !intercept() && exts.includes(app.extensions?.[0]) && (!input.multiple || !!app.control?.openMultiple);
   state.picks++;
   log('info', `boîte « Ouvrir » de l'application : accept=${input.accept} multiple=${input.multiple} (${isOpen ? 'ouverture' : 'insertion'})`, 'out');
-  const files = await pickFiles({ title: isOpen ? 'Ouvrir' : 'Choisir des fichiers', exts: [...new Set(exts)], multiple: input.multiple,
+  const files = await pickFiles({ title: isOpen ? t('Ouvrir') : t('Choisir des fichiers'), exts: [...new Set(exts)], multiple: input.multiple,
     folderId: state.folderId, appName: app.name });
   if (!files?.length || isOpen) input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
   if (!files?.length) return;
@@ -258,7 +263,7 @@ async function pickForInput(input) {
     input.dispatchEvent(new w.Event('change', { bubbles: true }));
     if (intercept() && files.length === 1 && edits(app, files[0].name)) { state.maybeDirty = false; await showFile(files[0]); }
   } catch (e) {
-    toast({ type: 'error', title: 'Impossible de transmettre le fichier', detail: e.message });
+    toast({ type: 'error', title: t('Impossible de transmettre le fichier'), detail: e.message });
     if (!isOpen) input.dispatchEvent(new w.Event('cancel', { bubbles: true }));
   }
 }
@@ -272,11 +277,11 @@ function saveAsDialog(suggested) {
   return new Promise((resolve) => {
     const input = h('input', { type: 'text', value: suggested, required: true, maxlength: 255, spellcheck: false });
     const errEl = h('div', { class: 'error-text', role: 'alert' });
-    const where = h('div', { class: 'mut' }, 'Dans : …');
-    listFolder(state.folderId).then((d) => { where.textContent = `Dans : ${['Mes fichiers', ...d.path.map((p) => p.name)].join(' › ')}`; }).catch(() => {});
-    const dlg = dialog({ title: 'Enregistrer sous',
-      body: h('div', { class: 'form' }, h('label', { class: 'field' }, 'Nom du fichier', input), where, errEl),
-      actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, 'Annuler'), h('button', { class: 'btn primary', value: 'ok' }, 'Enregistrer')],
+    const where = h('div', { class: 'mut' }, t('Dans : …'));
+    listFolder(state.folderId).then((d) => { where.textContent = t('Dans : {path}', { path: [t('Mes fichiers'), ...d.path.map((p) => p.name)].join(' › ') }); }).catch(() => {});
+    const dlg = dialog({ title: t('Enregistrer sous'),
+      body: h('div', { class: 'form' }, h('label', { class: 'field' }, t('Nom du fichier'), input), where, errEl),
+      actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, t('Annuler')), h('button', { class: 'btn primary', value: 'ok' }, t('Enregistrer'))],
       onClose: (v) => resolve(v === 'ok' ? dlg.result : null) });
     dlg.querySelector('form').addEventListener('submit', async (e) => {
       if (e.submitter?.value !== 'ok') return;
@@ -284,13 +289,13 @@ function saveAsDialog(suggested) {
       const name = input.value.trim();
       const msg = validName(name);
       if (msg) { errEl.textContent = msg; return; }
-      if (extOf(name) !== extOf(suggested)) { errEl.textContent = `Gardez l'extension .${extOf(suggested)} : c'est le format produit par l'application.`; return; }
+      if (extOf(name) !== extOf(suggested)) { errEl.textContent = t('Gardez l\'extension .{ext} : c\'est le format produit par l\'application.', { ext: extOf(suggested) }); return; }
       let replace = false;
       try {
         const d = await listFolder(state.folderId);
         const existing = d.files.find((f) => f.name.toLowerCase() === name.toLowerCase());
         if (existing && existing.id !== state.file?.id) {
-          replace = await confirmDialog({ title: 'Remplacer le fichier ?', message: `« ${existing.name} » existe déjà ici. Le remplacer en créera une nouvelle version (l'ancienne reste dans l'historique).`, confirm: 'Remplacer' });
+          replace = await confirmDialog({ title: t('Remplacer le fichier ?'), message: t('« {name} » existe déjà ici. Le remplacer en créera une nouvelle version (l\'ancienne reste dans l\'historique).', { name: existing.name }), confirm: t('Remplacer') });
           if (!replace) return;
         }
       } catch {}
@@ -304,10 +309,10 @@ function saveAsDialog(suggested) {
 }
 // Un export ne remplace pas en silence un fichier du même nom : on demande (Remplacer = nouvelle version).
 function conflictDialog(name) {
-  return new Promise((resolve) => dialog({ title: 'Ce fichier existe déjà',
-    body: h('p', {}, `« ${name} » existe déjà dans ce dossier. Le remplacer en crée une nouvelle version (l'ancienne reste dans l'historique).`),
-    actions: [h('button', { class: 'btn', value: 'cancel' }, 'Annuler'), h('button', { class: 'btn', value: 'keep' }, 'Garder les deux'),
-      h('button', { class: 'btn primary', value: 'replace', autofocus: true }, 'Remplacer')],
+  return new Promise((resolve) => dialog({ title: t('Ce fichier existe déjà'),
+    body: h('p', {}, t('« {name} » existe déjà dans ce dossier. Le remplacer en crée une nouvelle version (l\'ancienne reste dans l\'historique).', { name })),
+    actions: [h('button', { class: 'btn', value: 'cancel' }, t('Annuler')), h('button', { class: 'btn', value: 'keep' }, t('Garder les deux')),
+      h('button', { class: 'btn primary', value: 'replace', autofocus: true }, t('Remplacer'))],
     onClose: (v) => resolve(v || 'cancel') }));
 }
 // Où vont les octets d'un `save` :
@@ -337,7 +342,7 @@ async function resolveTarget(msg, { auto = false } = {}) {
   return r ? { kind: 'post', folderId: state.folderId, name: r.name, replace: r.replace, adopt: true } : null;
 }
 async function store(target, bytes) {
-  if (debug && $('simFail').checked) throw new Error('échec simulé (débogage)');
+  if (debug && $('simFail').checked) throw new Error(t('échec simulé (débogage)'));
   const headers = { 'X-App': slug };
   if (target.auto) headers['X-Autosave'] = '1';
   if (target.kind === 'put') return api(`/api/files/${target.fileId}/content`, { method: 'PUT', body: bytes, headers });
@@ -359,7 +364,7 @@ async function saveTo(target, bytes, msg) {
     if (target.auto) state.autosaves++;
     if (target.adopt) track(msg.name, file);
     if (!target.exported && file.id !== state.file?.id) await showFile(file);
-    if (target.exported) toast({ title: `Exporté : ${file.name}`, detail: 'Enregistré à côté du document dans vos fichiers.' });
+    if (target.exported) toast({ title: t('Exporté : {name}', { name: file.name }), detail: t('Enregistré à côté du document dans vos fichiers.') });
     if (msg.id !== undefined && msg.id !== null) send('saved', { id: msg.id });
   } catch (e) {
     entry.status = 'error'; entry.error = e.message;
@@ -377,19 +382,19 @@ async function onSave(msg) {
     const a = h('a', { href: url, download: msg.name });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    toast({ title: `Téléchargé : ${msg.name}`, detail: 'Mode invité : le fichier est dans vos téléchargements.' });
+    toast({ title: t('Téléchargé : {name}', { name: msg.name }), detail: t('Mode invité : le fichier est dans vos téléchargements.') });
     return;
   }
   // Un save qui arrive juste après notre commande d'enregistrement est la sauvegarde automatique.
   const auto = !!autoPending && Date.now() - autoPending < 15_000 && !msg.saveAs;
   autoPending = 0;
   const target = await resolveTarget(msg, { auto });
-  if (target?.cancel) return toast({ title: 'Export annulé', detail: msg.name });
+  if (target?.cancel) return toast({ title: t('Export annulé'), detail: msg.name });
   if (!target || target.defer) {
     // Nom refusé, ou document jamais enregistré pendant une sauvegarde automatique : l'application se croit
     // enregistrée, on le signale et on propose d'enregistrer.
-    state.unsaved = { name: msg.name, error: target?.defer ? 'ce document n\'est pas encore dans vos fichiers' : 'enregistrement annulé',
-      retryLabel: 'Enregistrer…', retry: () => onSave({ ...msg, bytes: msg.bytes.slice(0) }) };
+    state.unsaved = { name: msg.name, error: target?.defer ? t('ce document n\'est pas encore dans vos fichiers') : t('enregistrement annulé'),
+      retryLabel: t('Enregistrer…'), retry: () => onSave({ ...msg, bytes: msg.bytes.slice(0) }) };
     showUnsaved();
     return;
   }
@@ -398,14 +403,14 @@ async function onSave(msg) {
 async function onHandoff(msg) {
   // Jamais observé en phase 0 ; prévu : ranger le fichier à côté du document et proposer de l'ouvrir.
   const bytes = msg.bytes ?? (msg.file ? await msg.file.arrayBuffer() : null);
-  if (!bytes || state.guest) return toast({ type: 'error', title: 'Fichier transmis non pris en charge', detail: msg.name });
+  if (!bytes || state.guest) return toast({ type: 'error', title: t('Fichier transmis non pris en charge'), detail: msg.name });
   try {
     const f = await store({ kind: 'post', folderId: state.folderId, name: msg.name, replace: false }, bytes);
     const target = me.apps.find((a) => edits(a, f.name));
-    toast({ title: `« ${f.name} » enregistré dans vos fichiers`, detail: target ? `Il s'ouvre avec ${target.name}.` : null, timeout: 10000,
-      actions: target ? [{ label: `Ouvrir dans ${target.name}`, onClick: () => window.open(`/host.html?app=${target.slug}&file=${f.id}`, '_blank', 'noopener') }] : [] });
+    toast({ title: t('« {name} » enregistré dans vos fichiers', { name: f.name }), detail: target ? t('Il s\'ouvre avec {app}.', { app: target.name }) : null, timeout: 10000,
+      actions: target ? [{ label: t('Ouvrir dans {app}', { app: target.name }), onClick: () => window.open(`/host.html?app=${target.slug}&file=${f.id}`, '_blank', 'noopener') }] : [] });
     if (target) send('handoff-done', { name: msg.name, app: target.slug });
-  } catch (e) { toast({ type: 'error', title: 'Impossible d\'enregistrer le fichier transmis', detail: e.message }); }
+  } catch (e) { toast({ type: 'error', title: t('Impossible d\'enregistrer le fichier transmis'), detail: e.message }); }
 }
 
 // ---------- Messages de l'application ----------
@@ -428,7 +433,7 @@ window.addEventListener('message', (event) => {
   } else if (kind === 'failed') {
     state.failed.push({ ...msg });
     $('loading').hidden = true;
-    toast({ type: 'error', title: `${app.name} signale une erreur`, detail: String(msg.error ?? '') });
+    toast({ type: 'error', title: t('{app} signale une erreur', { app: app.name }), detail: String(msg.error ?? '') });
   } else if (kind === 'handoff') {
     onHandoff(msg);
   }
@@ -462,7 +467,7 @@ async function waitInterceptReady() {
     await new Promise((r) => setTimeout(r, 100));
   }
   state.failed.push({ error: 'application non démarrée en 3 min' });
-  $('loadingText').textContent = `${app.name} ne démarre pas.`;
+  $('loadingText').textContent = t('{app} ne démarre pas.', { app: app.name });
 }
 // Ouvrir un fichier stocké sans message open : glisser-déposer simulé sur l'application.
 async function openByDrop(file) {
@@ -472,7 +477,7 @@ async function openByDrop(file) {
     if (typeof app.control?.open === 'object') {
       // Réouverture par l'API de l'application (VectorCraft : document.open {name, dataBase64}, vérifié).
       const a = w[slug];
-      if (typeof a?.execute !== 'function') throw new Error("l'API de l'application n'est pas disponible");
+      if (typeof a?.execute !== 'function') throw new Error(t("l'API de l'application n'est pas disponible"));
       // EffectCraft : son système de fichiers en mémoire reçoit le fichier par addFile(url, nom), puis file.open {path}.
       const c = app.control.open, vars = { '{name}': file.name };
       if (JSON.stringify(c.params || {}).includes('{base64}')) vars['{base64}'] = toB64(buf);
@@ -521,21 +526,21 @@ async function openByDrop(file) {
           await new Promise((r) => setTimeout(r, 100));
         }
       }
-      if (autoPick === file) { autoPick = null; toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: `${app.name} n'a pas ouvert sa boîte Ouvrir.` }); return; }
+      if (autoPick === file) { autoPick = null; toast({ type: 'error', title: t("Impossible d'ouvrir le document"), detail: t('{app} n\'a pas ouvert sa boîte Ouvrir.', { app: app.name }) }); return; }
     } else dropFile(w, new w.File([buf], file.name, { lastModified: file.updatedAt }));
     track(file.name, file);
     state.maybeDirty = false;
     state.reopened = file.id;
     await showFile(file);
-  } catch (e) { toast({ type: 'error', title: "Impossible d'ouvrir le document", detail: e.message }); }
+  } catch (e) { toast({ type: 'error', title: t("Impossible d'ouvrir le document"), detail: e.message }); }
 }
 // ---------- Assistant IA : pilotage et enregistrement ----------
 const agentApi = () => { const a = iframe.contentWindow?.[slug]; return !!state.ready && typeof a?.commands === 'function' && typeof a?.execute === 'function'; };
 // Enregistrer pour l'assistant : commande de l'application (pont), API (control.saveData), sinon Ctrl+S simulé.
 // Attend l'issue jusqu'à 20 s ; un nouveau document attend son nom dans la boîte « Enregistrer sous ».
 async function agentSave() {
-  if (state.guest) throw new Error("mode invité : rien n'est conservé");
-  if (!state.ready) throw new Error("l'application n'est pas encore prête");
+  if (state.guest) throw new Error(t("mode invité : rien n'est conservé"));
+  if (!state.ready) throw new Error(t("l'application n'est pas encore prête"));
   const n = state.saves.length, a = iframe.contentWindow?.[slug];
   if (intercept() && app.control?.saveData) saveByApi();
   else if (!intercept() && typeof a?.execute === 'function') await saveCall(a);
@@ -572,12 +577,12 @@ async function saveByApi() {
       bytes = new Uint8Array(await a[c.read](apiPath)).buffer;
     } else {
       const b64 = r?.[c.field || 'dataBase64'];
-      if (typeof b64 !== 'string') throw new Error(r?.pending ? `l'application attend : ${r.pending}` : 'pas de contenu rendu');
+      if (typeof b64 !== 'string') throw new Error(r?.pending ? t('l\'application attend : {what}', { what: r.pending }) : t('pas de contenu rendu'));
       bytes = fromB64(b64);
     }
     log('info', `enregistrement par l'API : ${name} (${bytes.byteLength} octets)`, 'out');
     await onSave({ name, bytes, saveAs: false, captured: true });
-  } catch (e) { toast({ type: 'error', title: "Impossible d'enregistrer", detail: e?.message ?? String(e) }); }
+  } catch (e) { toast({ type: 'error', title: t("Impossible d'enregistrer"), detail: e?.message ?? String(e) }); }
 }
 // Sans pont, l'état « modifié » est inconnu : une frappe ou un clic dans l'application depuis le dernier enregistrement
 // est compté comme une modification possible (avertissement avant de quitter).
@@ -698,6 +703,7 @@ addEventListener('beforeunload', (e) => { if (state.dirty || state.unsaved || st
 // ---------- Démarrage ----------
 let t0 = performance.now();
 async function main() {
+  translateDom();
   me = await api('/api/me');
   syncTheme(me);
   state.guest = !!me.guest;
@@ -705,14 +711,14 @@ async function main() {
   $('account').replaceWith(accountButton(me));
   app = me.apps.find((a) => a.slug === slug);
   if (!app) {
-    $('loading').replaceChildren(h('p', {}, 'Cette application n\'est pas disponible pour votre compte.'), h('a', { class: 'btn', href: '/' }, 'Retour'));
-    setDoc('Application indisponible'); app = { name: 'Craft' }; return;
+    $('loading').replaceChildren(h('p', {}, t('Cette application n\'est pas disponible pour votre compte.')), h('a', { class: 'btn', href: '/' }, t('Retour')));
+    setDoc(t('Application indisponible')); app = { name: 'Craft' }; return;
   }
   debug = q.has('debug') && me.user?.role === 'admin';
   $('debug').hidden = !debug;
   $('clearLog').onclick = () => { $('log').textContent = ''; };
   $('appTile').replaceWith(appTile(app));
-  $('loadingText').textContent = `Chargement de ${app.name}…`;
+  $('loadingText').textContent = t('Chargement de {app}…', { app: app.name });
   if (state.folderId) $('back').href = `/?folder=${encodeURIComponent(state.folderId)}`;
   if (state.guest) {
     $('localOpen').hidden = false;
@@ -721,17 +727,17 @@ async function main() {
   }
   // Document demandé : vérifié avant de charger l'application (un format qu'elle ne lit pas n'est jamais envoyé).
   if (q.get('file') && !state.guest) {
-    setDoc('Ouverture…');
+    setDoc(t('Ouverture…'));
     try { pendingOpen = await api(`/api/files/${encodeURIComponent(q.get('file'))}`); }
     catch (e) {
-      $('loading').replaceChildren(h('div', { class: 'blocked', role: 'alert' }, h('h2', {}, 'Document introuvable'),
-        h('p', { class: 'mut' }, e.message), h('div', { class: 'blocked-actions' }, h('a', { class: 'btn', href: '/' }, icon('back'), 'Retour à mes fichiers'))));
-      setDoc('Document introuvable'); return;
+      $('loading').replaceChildren(h('div', { class: 'blocked', role: 'alert' }, h('h2', {}, t('Document introuvable')),
+        h('p', { class: 'mut' }, e.message), h('div', { class: 'blocked-actions' }, h('a', { class: 'btn', href: '/' }, icon('back'), t('Retour à mes fichiers')))));
+      setDoc(t('Document introuvable')); return;
     }
     if (!opens(app, pendingOpen.name)) return showBlocked(pendingOpen);
     setDoc(pendingOpen.name, pathText(pendingOpen));
     $('back').href = pendingOpen.folderId ? `/?folder=${pendingOpen.folderId}` : '/';
-  } else setDoc('Nouveau document');
+  } else setDoc(t('Nouveau document'));
   setStatus();
   // Réglages de l'application du compte remis dans le navigateur avant son chargement (prefs-sync.js).
   try { prefsSync = await restorePrefs(me, app); } catch (e) { log('info', `réglages non restaurés : ${e.message}`, 'err'); }
@@ -739,7 +745,7 @@ async function main() {
   // Données de l'application gardées dans le navigateur (app.data) : celles de ce compte (appdata-sync.js).
   window.craftDataFlush = () => dataSync?.flush();
   try { dataSync = await restoreData(me, app, (m) => log('info', m, 'out')); }
-  catch (e) { log('info', `données non restaurées : ${e.message}`, 'err'); toast({ type: 'error', title: "Données de l'application non restaurées", detail: e.message }); }
+  catch (e) { log('info', `données non restaurées : ${e.message}`, 'err'); toast({ type: 'error', title: t("Données de l'application non restaurées"), detail: e.message }); }
   // URL de l'application : ?host=parent, nom de l'auteur pour les commentaires, ?control, drapeaux de rendu.
   // Mode interception : pas de ?host=parent (l'application n'a pas de pont).
   const src = new URLSearchParams(intercept() ? {} : { host: 'parent' });
@@ -756,7 +762,7 @@ async function main() {
     touched: () => { state.lastInput = Date.now(); if (intercept() && !state.maybeDirty) { state.maybeDirty = true; setStatus(); } },
     renamed: async () => { const f = await api(`/api/files/${state.file.id}`); for (const k of Object.keys(state.docs)) if (state.docs[k].id === f.id) state.docs[k] = f; state.docs[f.name] = f; await showFile(f); },
   }) }).catch(() => {});
-  setTimeout(() => { if (!state.ready && !state.failed.length && !state.blocked) $('loadingText').textContent = `${app.name} met du temps à démarrer… (premier chargement : environ 15 Mo)`; }, 15000);
+  setTimeout(() => { if (!state.ready && !state.failed.length && !state.blocked) $('loadingText').textContent = t('{app} met du temps à démarrer… (premier chargement : environ 15 Mo)', { app: app.name }); }, 15000);
 }
-main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: 'Chargement impossible', detail: e.message }); });
+main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: t('Chargement impossible'), detail: e.message }); });
 window.hostApi = { send, openStoredFile, get api() { return iframe.contentWindow[slug]; } };

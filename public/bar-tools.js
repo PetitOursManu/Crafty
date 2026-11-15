@@ -1,12 +1,13 @@
 // Outils de la barre du haut d'une application (tools dans apps.json) : calculatrice, convertisseur d'unités, couleurs.
 // Un seul panneau ouvert à la fois ; Échap le ferme. Rien n'est envoyé au serveur.
 import { h, icon } from '/ui.js';
-import { mountCalculator } from '/calculator.js';
-import { evaluate, formatNumber } from '/calc-eval.js';
+import { mountCalculator, formatNumber, decimal, calcError } from '/calculator.js';
+import { evaluate } from '/calc-eval.js';
+import { t, lang } from '/i18n.js';
 
 // ---------- Panneau commun ----------
 function panel(title, iconName, ...body) {
-  const close = h('button', { type: 'button', class: 'btn icon ghost sm', 'aria-label': 'Fermer', title: 'Fermer (Échap)' }, icon('close'));
+  const close = h('button', { type: 'button', class: 'btn icon ghost sm', 'aria-label': t('Fermer'), title: t('Fermer (Échap)') }, icon('close'));
   const el = h('div', { class: 'calc tool-panel', role: 'dialog', 'aria-label': title, hidden: true },
     h('div', { class: 'calc-head' }, icon(iconName), h('strong', {}, title), close), ...body);
   document.body.append(el);
@@ -29,8 +30,8 @@ function wire(button, label, iconName, p, onOpen) {
   return { toggle };
 }
 const copyBtn = (get) => {
-  const b = h('button', { type: 'button', class: 'btn sm ghost', title: 'Copier' }, 'Copier');
-  b.onclick = async () => { try { await navigator.clipboard.writeText(get()); b.textContent = 'Copié'; setTimeout(() => { b.textContent = 'Copier'; }, 1200); } catch {} };
+  const b = h('button', { type: 'button', class: 'btn sm ghost', title: t('Copier') }, t('Copier'));
+  b.onclick = async () => { try { await navigator.clipboard.writeText(get()); b.textContent = t('Copié'); setTimeout(() => { b.textContent = t('Copier'); }, 1200); } catch {} };
   return b;
 };
 
@@ -44,6 +45,11 @@ const CATS = {
   'Température': { '°C': 'C', '°F': 'F', K: 'K' },
   'Données': { o: 1, Ko: 1e3, Mo: 1e6, Go: 1e9, Kio: 1024, Mio: 1024 ** 2, Gio: 1024 ** 3 },
 };
+// Noms affichés (les clés de CATS restent les identifiants).
+const catLabel = (c) => ({ 'Longueur': t('Longueur'), 'Surface': t('Surface'), 'Volume': t('Volume'), 'Masse': t('Masse'), 'Angle': t('Angle'),
+  'Température': t('Température'), 'Données': t('Données') })[c] ?? c;
+const unitLabel = (u) => ({ 'px (96 ppp)': t('px (96 ppp)'), 'gal US': t('gal US'), tour: t('tour'), o: t('o'), Ko: t('Ko'), Mo: t('Mo'), Go: t('Go'),
+  Kio: t('Kio'), Mio: t('Mio'), Gio: t('Gio') })[u] ?? u;
 function convert(cat, v, from, to) {
   const u = CATS[cat];
   if (cat !== 'Température') return (v * u[from]) / u[to];
@@ -52,50 +58,50 @@ function convert(cat, v, from, to) {
 }
 export function mountConverter(button) {
   let cat = 'Longueur';
-  const catSel = h('select', { 'aria-label': 'Grandeur' }, ...Object.keys(CATS).map((c) => h('option', { value: c }, c)));
-  const value = h('input', { type: 'text', inputmode: 'decimal', value: '1', 'aria-label': 'Valeur (calcul accepté)', class: 'calc-input' });
-  const from = h('select', { 'aria-label': 'De' }), to = h('select', { 'aria-label': 'Vers' });
+  const catSel = h('select', { 'aria-label': t('Grandeur') }, ...Object.keys(CATS).map((c) => h('option', { value: c }, catLabel(c))));
+  const value = h('input', { type: 'text', inputmode: 'decimal', value: '1', 'aria-label': t('Valeur (calcul accepté)'), class: 'calc-input' });
+  const from = h('select', { 'aria-label': t('De') }), to = h('select', { 'aria-label': t('Vers') });
   const out = h('output', { class: 'calc-out' });
   const table = h('ul', { class: 'conv-all' });
-  const swap = h('button', { type: 'button', class: 'btn sm icon', title: 'Inverser', 'aria-label': 'Inverser les unités' }, '⇄');
+  const swap = h('button', { type: 'button', class: 'btn sm icon', title: t('Inverser'), 'aria-label': t('Inverser les unités') }, '⇄');
   const fillUnits = () => {
     const units = Object.keys(CATS[cat]);
-    from.replaceChildren(...units.map((u) => h('option', { value: u }, u)));
-    to.replaceChildren(...units.map((u) => h('option', { value: u }, u)));
+    from.replaceChildren(...units.map((u) => h('option', { value: u }, unitLabel(u))));
+    to.replaceChildren(...units.map((u) => h('option', { value: u }, unitLabel(u))));
     to.value = units[Math.min(1, units.length - 1)];
     if (cat === 'Longueur') { from.value = 'in'; to.value = 'mm'; }
   };
   let last = 0;
   function update() {
     let v;
-    try { v = evaluate(value.value || '0', { deg: true }); } catch (e) { out.textContent = e.message; out.classList.add('err'); table.replaceChildren(); return; }
+    try { v = evaluate(value.value || '0', { deg: true }); } catch (e) { out.textContent = calcError(e); out.classList.add('err'); table.replaceChildren(); return; }
     out.classList.remove('err');
     last = convert(cat, v, from.value, to.value);
-    out.textContent = `${formatNumber(last)} ${to.value}`;
+    out.textContent = `${formatNumber(last)} ${unitLabel(to.value)}`;
     table.replaceChildren(...Object.keys(CATS[cat]).filter((u) => u !== from.value).map((u) => {
       const r = convert(cat, v, from.value, u);
-      return h('li', {}, h('button', { type: 'button', title: 'Copier', onclick: () => navigator.clipboard?.writeText(String(r).replace('.', ',')).catch(() => {}) },
-        h('span', {}, u), h('strong', {}, formatNumber(r))));
+      return h('li', {}, h('button', { type: 'button', title: t('Copier'), onclick: () => navigator.clipboard?.writeText(decimal(r)).catch(() => {}) },
+        h('span', {}, unitLabel(u)), h('strong', {}, formatNumber(r))));
     }));
   }
   catSel.onchange = () => { cat = catSel.value; fillUnits(); update(); };
   from.onchange = to.onchange = update;
   value.addEventListener('input', update);
   swap.onclick = () => { const f = from.value; from.value = to.value; to.value = f; update(); };
-  const p = panel('Convertisseur', 'convert', catSel, value, h('div', { class: 'conv-row' }, from, swap, to), h('div', { class: 'conv-res' }, out, copyBtn(() => String(last).replace('.', ','))), table);
+  const p = panel(t('Convertisseur'), 'convert', catSel, value, h('div', { class: 'conv-row' }, from, swap, to), h('div', { class: 'conv-res' }, out, copyBtn(() => decimal(last))), table);
   fillUnits(); update();
-  return wire(button, 'Unités', 'convert', p, () => { value.focus(); value.select(); });
+  return wire(button, t('Unités'), 'convert', p, () => { value.focus(); value.select(); });
 }
 
 // ---------- Couleurs ----------
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function parseColor(s) {
-  const t = String(s).trim().toLowerCase();
-  let m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/.exec(t);
+  const str = String(s).trim().toLowerCase();
+  let m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/.exec(str);
   if (m) { let x = m[1]; if (x.length === 3) x = [...x].map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)); }
-  m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(t);
+  m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(str);
   if (m) return m.slice(1, 4).map((x) => clamp(Number(x), 0, 255));
-  m = /^hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/.exec(t);
+  m = /^hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/.exec(str);
   if (m) return hslToRgb(Number(m[1]), Number(m[2]), Number(m[3]));
   return null;
 }
@@ -129,13 +135,13 @@ export function mountColors(button) {
   let rgb = [47, 111, 237];
   let recent = [];
   try { recent = JSON.parse(sessionStorage.getItem('craft-colors') || '[]'); } catch {}
-  const picker = h('input', { type: 'color', 'aria-label': 'Choisir une couleur', class: 'col-picker' });
-  const text = h('input', { type: 'text', class: 'calc-input', 'aria-label': 'Couleur (HEX, rgb(), hsl())', spellcheck: false });
+  const picker = h('input', { type: 'color', 'aria-label': t('Choisir une couleur'), class: 'col-picker' });
+  const text = h('input', { type: 'text', class: 'calc-input', 'aria-label': t('Couleur (HEX, rgb(), hsl())'), spellcheck: false });
   const swatch = h('div', { class: 'col-swatch' });
   const rows = h('div', { class: 'col-rows' });
-  const recentEl = h('div', { class: 'col-recent', 'aria-label': 'Couleurs récentes' });
-  const eye = h('button', { type: 'button', class: 'btn sm', title: 'Prendre une couleur à l\'écran (application comprise)' }, icon('pipette'), 'Pipette');
-  if (!('EyeDropper' in window)) { eye.disabled = true; eye.title = 'Pipette indisponible dans ce navigateur'; }
+  const recentEl = h('div', { class: 'col-recent', 'aria-label': t('Couleurs récentes') });
+  const eye = h('button', { type: 'button', class: 'btn sm', title: t('Prendre une couleur à l\'écran (application comprise)') }, icon('pipette'), t('Pipette'));
+  if (!('EyeDropper' in window)) { eye.disabled = true; eye.title = t('Pipette indisponible dans ce navigateur'); }
   const remember = () => {
     const x = hex(rgb);
     recent = [x, ...recent.filter((c) => c !== x)].slice(0, 12);
@@ -148,22 +154,30 @@ export function mountColors(button) {
     if (!fromText) text.value = x.toUpperCase();
     const line = (label, value) => h('div', { class: 'col-row' }, h('span', { class: 'mut' }, label), h('code', {}, value), copyBtn(() => value));
     const cw = contrast(rgb, [255, 255, 255]), cb = contrast(rgb, [0, 0, 0]);
-    rows.replaceChildren(line('HEX', x.toUpperCase()), line('RVB', `rgb(${rgb.join(', ')})`), line('TSL', `hsl(${hh}, ${s}%, ${l}%)`), line('CMJN', `${c.join(' % ')} %`),
+    // CMJN : espace avant « % » en français seulement.
+    rows.replaceChildren(line('HEX', x.toUpperCase()), line(t('RVB'), `rgb(${rgb.join(', ')})`), line(t('TSL'), `hsl(${hh}, ${s}%, ${l}%)`),
+      line(t('CMJN'), lang === 'fr' ? `${c.join(' % ')} %` : `${c.join('% ')}%`),
       h('div', { class: 'col-contrast' },
         sample(x, '#fff', `Aa ${cw.toFixed(1)}`), sample(x, '#000', `Aa ${cb.toFixed(1)}`),
-        h('span', { class: 'mut' }, `Contraste WCAG : ${Math.max(cw, cb) >= 4.5 ? 'texte lisible' : 'faible'} (4,5 pour du texte)`)));
+        h('span', { class: 'mut' }, Math.max(cw, cb) >= 4.5 ? t('Contraste WCAG : texte lisible (4,5 pour du texte)') : t('Contraste WCAG : faible (4,5 pour du texte)'))));
     recentEl.replaceChildren(...recent.map((c2) => { const chip = h('button', { type: 'button', class: 'col-chip', title: c2.toUpperCase(), 'aria-label': c2.toUpperCase(), onclick: () => { rgb = parseColor(c2); render(); } }); chip.style.background = c2; return chip; }));
   }
   picker.addEventListener('input', () => { rgb = parseColor(picker.value); render(); });
   picker.addEventListener('change', () => { remember(); render(); });
   text.addEventListener('input', () => { const v = parseColor(text.value); if (v) { rgb = v; render(true); } });
   text.addEventListener('keydown', (e) => { if (e.key === 'Enter' && parseColor(text.value)) { remember(); render(); } });
-  eye.onclick = async () => {
-    try { const r = await new window.EyeDropper().open(); rgb = parseColor(r.sRGBHex); remember(); render(); } catch {} // annulé
+  // Pipette du navigateur (EyeDropper) : appelée dans le clic (geste de l'utilisateur exigé). Son délai d'apparition vient de
+  // Chrome, qui capture l'écran ; la page reste réactive pendant ce temps (mesuré : < 1 ms dans chaque application).
+  const pick = async () => {
+    if (!('EyeDropper' in window)) return;
+    try { const r = await new window.EyeDropper().open(); rgb = parseColor(r.sRGBHex); remember(); render(); } catch {} // Échap : annulé
+    text.focus();
   };
-  const p = panel('Pipette', 'pipette', h('div', { class: 'col-top' }, swatch, h('div', { class: 'col-in' }, text, h('div', { class: 'row' }, picker, eye))), rows, recentEl);
+  eye.onclick = pick;
+  const p = panel(t('Pipette'), 'pipette', h('div', { class: 'col-top' }, swatch, h('div', { class: 'col-in' }, text, h('div', { class: 'row' }, picker, eye))), rows, recentEl);
   render();
-  return wire(button, 'Pipette', 'pipette', p, () => text.focus());
+  // Un seul clic : le bouton de la barre ouvre le panneau et lance aussitôt la pipette.
+  return wire(button, t('Pipette'), 'pipette', p, () => { if ('EyeDropper' in window) pick(); else text.focus(); });
 }
 
 // Boutons de la barre selon l'application.

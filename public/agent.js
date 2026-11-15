@@ -5,6 +5,7 @@
 // Les outils avec confirm() (suppressions) attendent un clic de l'utilisateur dans le panneau.
 // Rien n'est stocké : la conversation vit le temps de la page (choix du 15/11/2026).
 import { api, h, icon, toast } from '/ui.js';
+import { t } from '/i18n.js';
 
 const MAX_RESULT = 24_000; // caractères d'un résultat d'outil renvoyé au modèle
 
@@ -13,10 +14,10 @@ export async function mountAgent({ button, context, tools, onBusy }) {
   try { info = await api('/api/ai'); } catch { return null; }
   if (!info?.available) return null;
   button.hidden = false;
-  button.replaceChildren(icon('sparkles'), h('span', { class: 'agent-btn-label' }, 'Assistant'));
+  button.replaceChildren(icon('sparkles'), h('span', { class: 'agent-btn-label' }, t('Assistant')));
 
   let messages = [], busy = false, stopped = false;
-  const providerSel = h('select', { class: 'agent-provider', 'aria-label': 'Modèle', title: 'Fournisseur et modèle' },
+  const providerSel = h('select', { class: 'agent-provider', 'aria-label': t('Modèle'), title: t('Fournisseur et modèle') },
     ...info.providers.map((p) => h('option', { value: p.id }, `${p.label} · ${p.model}`)));
   try { providerSel.value = localStorage.getItem('craft-agent-provider') || info.defaultProvider; } catch { providerSel.value = info.defaultProvider; }
   if (!providerSel.value) providerSel.value = info.defaultProvider;
@@ -24,12 +25,12 @@ export async function mountAgent({ button, context, tools, onBusy }) {
   if (info.providers.length < 2) providerSel.disabled = true;
 
   const log = h('div', { class: 'agent-log', role: 'log', 'aria-live': 'polite' });
-  const input = h('textarea', { class: 'agent-input', rows: 2, placeholder: 'Demandez à l\'assistant… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)', 'aria-label': 'Message à l\'assistant' });
-  const sendBtn = h('button', { type: 'button', class: 'btn primary icon', 'aria-label': 'Envoyer', title: 'Envoyer' }, icon('send'));
-  const panel = h('aside', { class: 'agent', role: 'complementary', 'aria-label': 'Assistant IA', hidden: true },
-    h('div', { class: 'agent-head' }, icon('sparkles'), h('strong', {}, 'Assistant'), providerSel,
-      h('button', { type: 'button', class: 'btn icon ghost sm', title: 'Nouvelle conversation', 'aria-label': 'Nouvelle conversation', onclick: reset }, icon('plus')),
-      h('button', { type: 'button', class: 'btn icon ghost sm', title: 'Fermer', 'aria-label': 'Fermer l\'assistant', onclick: () => toggle(false) }, icon('close'))),
+  const input = h('textarea', { class: 'agent-input', rows: 2, placeholder: t('Demandez à l\'assistant… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)'), 'aria-label': t('Message à l\'assistant') });
+  const sendBtn = h('button', { type: 'button', class: 'btn primary icon', 'aria-label': t('Envoyer'), title: t('Envoyer') }, icon('send'));
+  const panel = h('aside', { class: 'agent', role: 'complementary', 'aria-label': t('Assistant IA'), hidden: true },
+    h('div', { class: 'agent-head' }, icon('sparkles'), h('strong', {}, t('Assistant')), providerSel,
+      h('button', { type: 'button', class: 'btn icon ghost sm', title: t('Nouvelle conversation'), 'aria-label': t('Nouvelle conversation'), onclick: reset }, icon('plus')),
+      h('button', { type: 'button', class: 'btn icon ghost sm', title: t('Fermer'), 'aria-label': t('Fermer l\'assistant'), onclick: () => toggle(false) }, icon('close'))),
     log,
     h('div', { class: 'agent-foot' }, input, sendBtn));
   document.body.append(panel);
@@ -49,9 +50,9 @@ export async function mountAgent({ button, context, tools, onBusy }) {
   function hello() {
     const ctx = context();
     add(h('div', { class: 'agent-msg note' }, ctx.page === 'home'
-      ? 'Je peux chercher, filtrer, ranger, renommer et déplacer vos fichiers et dossiers. Exemple : « Range les PDF dans un dossier Factures ».'
-      : ctx.hasApi ? `Je peux piloter ${ctx.appName} : « ajoute une page », « mets le titre en gras », « crée un cube de 20 mm »…`
-        : `${ctx.appName} n'a pas d'interface de pilotage : je peux enregistrer, ranger le fichier et répondre aux questions, pas modifier le document.`));
+      ? t('Je peux chercher, filtrer, ranger, renommer et déplacer vos fichiers et dossiers. Exemple : « Range les PDF dans un dossier Factures ».')
+      : ctx.hasApi ? t('Je peux piloter {app} : « ajoute une page », « mets le titre en gras », « crée un cube de 20 mm »…', { app: ctx.appName })
+        : t('{app} n\'a pas d\'interface de pilotage : je peux enregistrer, ranger le fichier et répondre aux questions, pas modifier le document.', { app: ctx.appName })));
   }
   function reset() { if (busy) stopped = true; messages = []; log.replaceChildren(); hello(); input.focus(); }
 
@@ -79,24 +80,24 @@ export async function mountAgent({ button, context, tools, onBusy }) {
       const card = add(h('div', { class: 'agent-confirm' }, h('p', {}, text)));
       const done = (v) => { card.querySelectorAll('button').forEach((b) => { b.disabled = true; }); card.classList.add(v ? 'yes' : 'no'); resolve(v); };
       card.append(h('div', { class: 'row' },
-        h('button', { type: 'button', class: 'btn sm danger solid', onclick: () => done(true) }, 'Confirmer'),
-        h('button', { type: 'button', class: 'btn sm', onclick: () => done(false) }, 'Refuser')));
+        h('button', { type: 'button', class: 'btn sm danger solid', onclick: () => done(true) }, t('Confirmer')),
+        h('button', { type: 'button', class: 'btn sm', onclick: () => done(false) }, t('Refuser'))));
     });
   }
 
-  const defs = () => tools().map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters || { type: 'object', properties: {} } } }));
+  const defs = () => tools().map((x) => ({ type: 'function', function: { name: x.name, description: x.description, parameters: x.parameters || { type: 'object', properties: {} } } }));
   async function runTool(call) {
-    const t = tools().find((x) => x.name === call.function?.name);
-    if (!t) return { error: `outil inconnu : ${call.function?.name}` };
+    const tool = tools().find((x) => x.name === call.function?.name);
+    if (!tool) return { error: `outil inconnu : ${call.function?.name}` };
     let args = {};
     try { args = call.function.arguments ? JSON.parse(call.function.arguments) : {}; } catch { return { error: 'arguments JSON invalides' }; }
-    const s = step(t.label?.(args) || t.name);
+    const s = step(tool.label?.(args) || tool.name);
     try {
-      if (t.confirm) {
-        const ok = await askConfirm(await t.confirm(args));
-        if (!ok) { s.done(false, 'refusé'); return { refused: true, message: 'L\'utilisateur a refusé.' }; }
+      if (tool.confirm) {
+        const ok = await askConfirm(await tool.confirm(args));
+        if (!ok) { s.done(false, t('refusé')); return { refused: true, message: 'L\'utilisateur a refusé.' }; }
       }
-      const r = await t.run(args);
+      const r = await tool.run(args);
       s.done(true);
       return r ?? { ok: true };
     } catch (e) { s.done(false, e.message); return { error: e.message }; }
@@ -109,8 +110,8 @@ export async function mountAgent({ button, context, tools, onBusy }) {
     bubble('user', text);
     messages.push({ role: 'user', content: text });
     busy = true; stopped = false; onBusy?.(true);
-    sendBtn.replaceChildren(icon('stop')); sendBtn.title = 'Arrêter'; sendBtn.setAttribute('aria-label', 'Arrêter');
-    const thinking = add(h('div', { class: 'agent-thinking' }, h('span', { class: 'spin' }), 'Réflexion…'));
+    sendBtn.replaceChildren(icon('stop')); sendBtn.title = t('Arrêter'); sendBtn.setAttribute('aria-label', t('Arrêter'));
+    const thinking = add(h('div', { class: 'agent-thinking' }, h('span', { class: 'spin' }), t('Réflexion…')));
     try {
       for (let i = 0; i < info.maxSteps && !stopped; i++) {
         const r = await api('/api/ai/chat', { method: 'POST', body: { provider: providerSel.value, messages, tools: defs(), context: context() } });
@@ -129,9 +130,9 @@ export async function mountAgent({ button, context, tools, onBusy }) {
           if (content.length > MAX_RESULT) content = `${content.slice(0, MAX_RESULT)}… (tronqué)`;
           messages.push({ role: 'tool', tool_call_id: c.id, content });
         }
-        if (i === info.maxSteps - 1) add(h('div', { class: 'agent-msg note' }, `Arrêté après ${info.maxSteps} étapes. Dites « continue » pour poursuivre.`));
+        if (i === info.maxSteps - 1) add(h('div', { class: 'agent-msg note' }, t('Arrêté après {n} étapes. Dites « continue » pour poursuivre.', { n: info.maxSteps })));
       }
-      if (stopped) add(h('div', { class: 'agent-msg note' }, 'Arrêté.'));
+      if (stopped) add(h('div', { class: 'agent-msg note' }, t('Arrêté.')));
     } catch (e) {
       add(h('div', { class: 'agent-msg error' }, e.message));
       // Le dernier message assistant sans réponse d'outil rendrait la conversation invalide : on le retire.
@@ -139,7 +140,7 @@ export async function mountAgent({ button, context, tools, onBusy }) {
     } finally {
       thinking.remove();
       busy = false; onBusy?.(false);
-      sendBtn.replaceChildren(icon('send')); sendBtn.title = 'Envoyer'; sendBtn.setAttribute('aria-label', 'Envoyer');
+      sendBtn.replaceChildren(icon('send')); sendBtn.title = t('Envoyer'); sendBtn.setAttribute('aria-label', t('Envoyer'));
       input.focus();
     }
   }

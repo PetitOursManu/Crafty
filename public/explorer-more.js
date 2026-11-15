@@ -1,6 +1,7 @@
 // Accueil, compléments : vue Corbeille, accès rapide (récents et favoris), miniatures des images.
 // x : ce que l'explorateur partage (état, rechargement, ouverture, icônes).
 import { api, h, icon, toast, confirmDialog, formatSize, formatDate, formatDateTime, appTile } from '/ui.js';
+import { t } from '/i18n.js';
 
 // ---------- Miniatures ----------
 // Images : faites ici depuis le fichier (version courante), envoyées au serveur. Documents : par les applications (host.js).
@@ -52,8 +53,8 @@ export function wantThumb(el, file, onReady) {
       if (!r.ok) return;
       const blob = await r.blob();
       const typed = ext === 'svg' ? new Blob([blob], { type: 'image/svg+xml' }) : blob;
-      const t = await makeThumb(typed);
-      if (await uploadThumb(file, t)) onReady(file.versionId);
+      const tb = await makeThumb(typed);
+      if (await uploadThumb(file, tb)) onReady(file.versionId);
     } catch {} // image illisible : l'icône reste
   }); pump(); };
   observer.observe(el);
@@ -71,7 +72,7 @@ export function quickAccess(x) {
     const thumb = h('div', { class: 'q-thumb' });
     if (!isFolder && it.thumb) thumb.append(h('img', { src: thumbUrl(it), alt: '', loading: 'lazy' }));
     else thumb.append(isFolder ? x.folderIcon() : x.docIcon(it.name));
-    const sub = isFolder ? 'Dossier' : tab === 'recents' ? `${app ? `${app.name} · ` : ''}${formatDate(it.openedAt)}` : `${formatSize(it.size)} · ${formatDate(it.updatedAt)}`;
+    const sub = isFolder ? t('Dossier') : tab === 'recents' ? `${app ? `${app.name} · ` : ''}${formatDate(it.openedAt)}` : `${formatSize(it.size)} · ${formatDate(it.updatedAt)}`;
     return h('button', { type: 'button', class: 'q-card', title: it.name, onclick: () => (isFolder ? x.openFolder(it.id) : x.openFile(it, it.openedWith && app ? it.openedWith : undefined)) },
       thumb, h('div', { class: 'q-meta' }, h('div', { class: 'q-name' }, app && !isFolder ? appTile(app, 'app-tile mini') : null, h('span', {}, it.name)), h('div', { class: 'q-sub' }, sub)));
   };
@@ -82,52 +83,57 @@ export function quickAccess(x) {
     const tabBtn = (id, label, n) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(tab === id), onclick: () => { tab = id; try { localStorage.setItem('craft-quick-tab', id); } catch {} render(); } },
       label, n ? h('span', { class: 'count' }, String(n)) : null);
     root.replaceChildren(
-      h('div', { class: 'q-head', role: 'tablist', 'aria-label': 'Accès rapide' }, tabBtn('recents', 'Récents', data.recents.length), tabBtn('favorites', 'Favoris', data.favorites.length)),
+      h('div', { class: 'q-head', role: 'tablist', 'aria-label': t('Accès rapide') }, tabBtn('recents', t('Récents'), data.recents.length), tabBtn('favorites', t('Favoris'), data.favorites.length)),
       list.length ? h('div', { class: 'q-row' }, ...list.map(card))
-        : h('p', { class: 'mut q-empty' }, tab === 'recents' ? 'Les fichiers ouverts dans une application apparaîtront ici.' : 'Ajoutez des fichiers ou des dossiers aux favoris (clic droit › Ajouter aux favoris).'));
+        : h('p', { class: 'mut q-empty' }, tab === 'recents' ? t('Les fichiers ouverts dans une application apparaîtront ici.') : t('Ajoutez des fichiers ou des dossiers aux favoris (clic droit › Ajouter aux favoris).')));
   }
   return { refresh: async () => { try { data = await api('/api/quick'); } catch {} render(); } };
 }
 
 // ---------- Vue Corbeille ----------
+// Origine d'un élément (« Mes fichiers / … » ou « dossier supprimé », en français côté serveur) : traduite à l'affichage.
+function fromLabel(from) {
+  if (from === 'dossier supprimé') return t('dossier supprimé');
+  return String(from || '').startsWith('Mes fichiers') ? t('Mes fichiers') + from.slice('Mes fichiers'.length) : from;
+}
 export function trashView(x) {
   async function restore(items) {
     const r = await api('/api/trash/restore', { method: 'POST', body: { items } });
     const moved = r.restored.filter((it) => it.folderId === null);
-    toast({ title: `${r.restored.length} élément${r.restored.length > 1 ? 's' : ''} restauré${r.restored.length > 1 ? 's' : ''}.`,
-      detail: r.restored.some((it, i) => it.name !== items[i]?.name && it.name) ? 'Un nom déjà pris a été changé.' : moved.length && r.restored.length === 1 ? 'Son dossier n\'existe plus : remis dans « Mes fichiers ».' : null });
+    toast({ title: r.restored.length > 1 ? t('{n} éléments restaurés.', { n: r.restored.length }) : t('{n} élément restauré.', { n: r.restored.length }),
+      detail: r.restored.some((it, i) => it.name !== items[i]?.name && it.name) ? t('Un nom déjà pris a été changé.') : moved.length && r.restored.length === 1 ? t('Son dossier n\'existe plus : remis dans « Mes fichiers ».') : null });
     await render();
     x.refreshCount();
   }
   async function destroy(items, all = false) {
-    const ok = await confirmDialog({ title: all ? 'Vider la corbeille ?' : `Supprimer définitivement ${items.length > 1 ? `${items.length} éléments` : `« ${items[0].name} »`} ?`,
-      message: all ? 'Tout son contenu sera effacé définitivement, versions comprises.' : 'Effacement définitif, versions comprises : impossible de revenir en arrière.', confirm: 'Supprimer définitivement', danger: true });
+    const ok = await confirmDialog({ title: all ? t('Vider la corbeille ?') : items.length > 1 ? t('Supprimer définitivement {n} éléments ?', { n: items.length }) : t('Supprimer définitivement « {name} » ?', { name: items[0].name }),
+      message: all ? t('Tout son contenu sera effacé définitivement, versions comprises.') : t('Effacement définitif, versions comprises : impossible de revenir en arrière.'), confirm: t('Supprimer définitivement'), danger: true });
     if (!ok) return;
     const r = await api('/api/trash/delete', { method: 'POST', body: all ? { all: true } : { items: items.map((it) => ({ type: it.type, id: it.id })) } });
-    toast({ title: `${r.deleted} élément${r.deleted > 1 ? 's' : ''} supprimé${r.deleted > 1 ? 's' : ''} définitivement.` });
+    toast({ title: r.deleted > 1 ? t('{n} éléments supprimés définitivement.', { n: r.deleted }) : t('{n} élément supprimé définitivement.', { n: r.deleted }) });
     await render();
     x.refreshCount();
   }
   async function render() {
     const items = document.getElementById('items');
     let d;
-    try { d = await api('/api/trash'); } catch (e) { toast({ type: 'error', title: 'Corbeille indisponible', detail: e.message }); return; }
+    try { d = await api('/api/trash'); } catch (e) { toast({ type: 'error', title: t('Corbeille indisponible'), detail: e.message }); return; }
     items.className = 'items trash';
     document.getElementById('empty').hidden = d.items.length > 0;
-    document.getElementById('empty').querySelector('strong').textContent = 'La corbeille est vide.';
-    document.getElementById('empty').querySelector('.mut').textContent = d.days ? `Les éléments supprimés y restent ${d.days} jours.` : 'Corbeille désactivée : les suppressions sont définitives.';
+    document.getElementById('empty').querySelector('strong').textContent = t('La corbeille est vide.');
+    document.getElementById('empty').querySelector('.mut').textContent = d.days ? t('Les éléments supprimés y restent {n} jours.', { n: d.days }) : t('Corbeille désactivée : les suppressions sont définitives.');
     const bar = h('div', { class: 'trash-bar' },
-      h('span', { class: 'mut' }, d.days ? `Effacement automatique après ${d.days} jours.` : ''),
+      h('span', { class: 'mut' }, d.days ? t('Effacement automatique après {n} jours.', { n: d.days }) : ''),
       h('div', { class: 'spacer' }),
-      d.items.length ? h('button', { type: 'button', class: 'btn sm', onclick: () => restore(d.items.map((it) => ({ type: it.type, id: it.id, name: it.name }))) }, icon('history'), 'Tout restaurer') : null,
-      d.items.length ? h('button', { type: 'button', class: 'btn sm danger', onclick: () => destroy(d.items, true) }, icon('trash'), 'Vider la corbeille') : null);
+      d.items.length ? h('button', { type: 'button', class: 'btn sm', onclick: () => restore(d.items.map((it) => ({ type: it.type, id: it.id, name: it.name }))) }, icon('history'), t('Tout restaurer')) : null,
+      d.items.length ? h('button', { type: 'button', class: 'btn sm danger', onclick: () => destroy(d.items, true) }, icon('trash'), t('Vider la corbeille')) : null);
     const rows = d.items.map((it) => h('div', { class: 'trash-row' },
       h('div', { class: 'thumb' }, it.type === 'folder' ? x.folderIcon() : x.docIcon(it.name)),
       h('div', { class: 't-main' }, h('div', { class: 'name' }, it.name),
-        h('div', { class: 'mut t-sub' }, `${it.type === 'folder' ? `Dossier · ${it.files} fichier${it.files > 1 ? 's' : ''}` : 'Fichier'} · ${formatSize(it.size)} · venait de « ${it.from} »`)),
-      h('div', { class: 'mut t-date', title: it.purgeAt ? `Effacé définitivement le ${formatDateTime(it.purgeAt)}` : '' }, `Supprimé ${formatDate(it.deletedAt)}`),
-      h('button', { type: 'button', class: 'btn sm', onclick: () => restore([{ type: it.type, id: it.id, name: it.name }]) }, icon('history'), 'Restaurer'),
-      h('button', { type: 'button', class: 'btn sm icon ghost danger', title: 'Supprimer définitivement', 'aria-label': `Supprimer définitivement ${it.name}`, onclick: () => destroy([it]) }, icon('trash'))));
+        h('div', { class: 'mut t-sub' }, `${it.type === 'folder' ? (it.files > 1 ? t('Dossier · {n} fichiers', { n: it.files }) : t('Dossier · {n} fichier', { n: it.files })) : t('Fichier')} · ${formatSize(it.size)} · ${t('venait de « {from} »', { from: fromLabel(it.from) })}`)),
+      h('div', { class: 'mut t-date', title: it.purgeAt ? t('Effacé définitivement le {date}', { date: formatDateTime(it.purgeAt) }) : '' }, t('Supprimé {date}', { date: formatDate(it.deletedAt) })),
+      h('button', { type: 'button', class: 'btn sm', onclick: () => restore([{ type: it.type, id: it.id, name: it.name }]) }, icon('history'), t('Restaurer')),
+      h('button', { type: 'button', class: 'btn sm icon ghost danger', title: t('Supprimer définitivement'), 'aria-label': t('Supprimer définitivement {name}', { name: it.name }), onclick: () => destroy([it]) }, icon('trash'))));
     items.replaceChildren(bar, ...rows);
     if (!d.items.length) bar.remove();
   }
@@ -139,38 +145,40 @@ const EXPIRIES = [['1h', '1 heure'], ['1d', '1 jour'], ['7d', '7 jours'], ['30d'
 export async function shareDialog(file) {
   const { dialog } = await import('/ui.js');
   let d;
-  try { d = await api(`/api/files/${file.id}/shares`); } catch (e) { toast({ type: 'error', title: 'Partage indisponible', detail: e.message }); return; }
-  if (!d.enabled) { toast({ type: 'error', title: 'Partage désactivé', detail: 'L\'administrateur a désactivé les liens de partage.' }); return; }
+  try { d = await api(`/api/files/${file.id}/shares`); } catch (e) { toast({ type: 'error', title: t('Partage indisponible'), detail: e.message }); return; }
+  if (!d.enabled) { toast({ type: 'error', title: t('Partage désactivé'), detail: t('L\'administrateur a désactivé les liens de partage.') }); return; }
   const list = h('ul', { class: 'share-list' });
   const fresh = h('div', { class: 'share-fresh', hidden: true });
-  const expires = h('select', { 'aria-label': 'Durée du lien' }, ...EXPIRIES.map(([v, l]) => h('option', { value: v, selected: v === '7d' }, l)));
+  const expires = h('select', { 'aria-label': t('Durée du lien') }, ...EXPIRIES.map(([v, l]) => h('option', { value: v, selected: v === '7d' }, t(l))));
   const fill = (shares) => {
     list.replaceChildren(...(shares.length ? shares.map((sh) => h('li', {},
-      h('div', { class: 'share-l' }, h('strong', {}, `Lien du ${formatDateTime(sh.createdAt)}`),
-        h('span', { class: 'mut' }, `${sh.expiresAt ? `expire le ${formatDateTime(sh.expiresAt)}` : 'sans limite'} · ${sh.downloads} téléchargement${sh.downloads > 1 ? 's' : ''}${sh.lastAccessAt ? ` · dernière visite ${formatDate(sh.lastAccessAt)}` : ''}`)),
+      h('div', { class: 'share-l' }, h('strong', {}, t('Lien du {date}', { date: formatDateTime(sh.createdAt) })),
+        h('span', { class: 'mut' }, [sh.expiresAt ? t('expire le {date}', { date: formatDateTime(sh.expiresAt) }) : t('sans limite'),
+          sh.downloads > 1 ? t('{n} téléchargements', { n: sh.downloads }) : t('{n} téléchargement', { n: sh.downloads }),
+          sh.lastAccessAt ? t('dernière visite {date}', { date: formatDate(sh.lastAccessAt) }) : null].filter(Boolean).join(' · '))),
       h('button', { type: 'button', class: 'btn sm danger', onclick: async () => {
-        try { await api(`/api/shares/${sh.id}`, { method: 'DELETE' }); fill((await api(`/api/files/${file.id}/shares`)).shares); toast({ title: 'Lien révoqué.' }); }
-        catch (e) { toast({ type: 'error', title: 'Révocation impossible', detail: e.message }); }
-      } }, 'Révoquer')))
-      : [h('li', { class: 'mut' }, 'Aucun lien actif.')]));
+        try { await api(`/api/shares/${sh.id}`, { method: 'DELETE' }); fill((await api(`/api/files/${file.id}/shares`)).shares); toast({ title: t('Lien révoqué.') }); }
+        catch (e) { toast({ type: 'error', title: t('Révocation impossible'), detail: e.message }); }
+      } }, t('Révoquer'))))
+      : [h('li', { class: 'mut' }, t('Aucun lien actif.'))]));
   };
   fill(d.shares);
   const create = h('button', { type: 'button', class: 'btn primary', onclick: async () => {
     try {
       const r = await api(`/api/files/${file.id}/shares`, { method: 'POST', body: { expires: expires.value } });
       const url = `${location.origin}${r.url}`;
-      const input = h('input', { type: 'text', value: url, readonly: true, 'aria-label': 'Lien de partage', onfocus: (e) => e.target.select() });
-      const copy = h('button', { type: 'button', class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(url); copy.textContent = 'Copié'; } catch { input.select(); } } }, icon('link'), 'Copier');
-      fresh.replaceChildren(h('div', { class: 'row' }, input, copy), h('p', { class: 'hint' }, 'Copiez-le maintenant : il n\'est affiché qu\'une fois. Toute personne qui l\'a peut voir et télécharger ce fichier.'));
+      const input = h('input', { type: 'text', value: url, readonly: true, 'aria-label': t('Lien de partage'), onfocus: (e) => e.target.select() });
+      const copy = h('button', { type: 'button', class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(url); copy.textContent = t('Copié'); } catch { input.select(); } } }, icon('link'), t('Copier'));
+      fresh.replaceChildren(h('div', { class: 'row' }, input, copy), h('p', { class: 'hint' }, t('Copiez-le maintenant : il n\'est affiché qu\'une fois. Toute personne qui l\'a peut voir et télécharger ce fichier.')));
       fresh.hidden = false;
       input.focus();
       fill((await api(`/api/files/${file.id}/shares`)).shares);
-    } catch (e) { toast({ type: 'error', title: 'Lien non créé', detail: e.message }); }
-  } }, icon('link'), 'Créer un lien');
-  dialog({ title: `Partager « ${file.name} »`, wide: true,
+    } catch (e) { toast({ type: 'error', title: t('Lien non créé'), detail: e.message }); }
+  } }, icon('link'), t('Créer un lien'));
+  dialog({ title: t('Partager « {name} »', { name: file.name }), wide: true,
     body: h('div', { class: 'share-dlg' },
-      h('p', { class: 'mut' }, 'Un lien permet de voir et de télécharger la version actuelle de ce fichier, sans compte. Il cesse de fonctionner à son expiration, si vous le révoquez ou si le fichier part à la corbeille.'),
-      h('div', { class: 'row' }, h('label', { class: 'field' }, 'Durée', expires), create), fresh,
-      h('h3', {}, 'Liens actifs'), list),
-    actions: [h('button', { class: 'btn', value: 'close' }, 'Fermer')] });
+      h('p', { class: 'mut' }, t('Un lien permet de voir et de télécharger la version actuelle de ce fichier, sans compte. Il cesse de fonctionner à son expiration, si vous le révoquez ou si le fichier part à la corbeille.')),
+      h('div', { class: 'row' }, h('label', { class: 'field' }, t('Durée'), expires), create), fresh,
+      h('h3', {}, t('Liens actifs')), list),
+    actions: [h('button', { class: 'btn', value: 'close' }, t('Fermer'))] });
 }

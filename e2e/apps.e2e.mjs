@@ -863,6 +863,53 @@ test('outils de barre : unités (CadCraft), couleurs (FigCraft), un seul panneau
   } finally { await b.close(); }
 });
 
+// Interface anglaise (navigateur en-US) : aucun texte français visible dans Crafty (hors applications et noms de fichiers).
+test('interface en anglais selon la langue du navigateur', { skip: missing('cadcraft'), timeout: 240_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED, locale: 'en-US' });
+  const p = b.page;
+  const FRENCH = /[éèêëàâçùûôîï«»]|\b(Mes fichiers|Enregistr\w*|Supprimer|Annuler|Corbeille|Dossier|Fichier|Nouveau|Partager|Applications? \w+ \w+ de)\b/;
+  // Texte visible de Crafty, hors iframe de l'application et hors noms de fichiers de l'utilisateur.
+  const leftovers = () => p.evaluate((src) => {
+    const re = new RegExp(src);
+    const out = [];
+    const walk = (n) => {
+      if (n.nodeType === 3) { const s = n.textContent.trim(); if (s && re.test(s)) out.push(s.slice(0, 80)); return; }
+      if (n.nodeType !== 1 || n.matches('iframe, script, style, .name, .q-name, .doc-name, .t-main, [hidden]') || getComputedStyle(n).display === 'none') return;
+      for (const a of ['title', 'aria-label', 'placeholder']) { const v = n.getAttribute(a); if (v && re.test(v)) out.push(`[${a}] ${v.slice(0, 80)}`); }
+      for (const c of n.childNodes) walk(c);
+    };
+    walk(document.body);
+    return [...new Set(out)];
+  }, FRENCH.source);
+  try {
+    await p.goto(`${base}/login.html`);
+    assert.equal(await p.evaluate(() => document.documentElement.lang), 'en');
+    assert.deepEqual(await leftovers(), [], 'connexion');
+    const bad = await b.api('POST', '/api/auth/login', { json: { username: 'e2e0', password: 'mauvais-mdp' }, headers: { 'accept-language': 'en-US' } });
+    assert.doesNotMatch(bad.body.error, /[éèàç]|mot de passe/i, 'message du serveur en anglais');
+    await loginE2e0(b);
+    await b.upload(join(SAMPLES, 'test.pdf'), { name: 'Report.pdf' });
+    await p.goto(`${base}/`);
+    await p.waitForSelector('#items .item');
+    assert.deepEqual(await leftovers(), [], 'accueil');
+    await p.locator('#items .item:has-text("Report.pdf")').click({ button: 'right' });
+    assert.deepEqual(await leftovers(), [], 'menu d\'un fichier');
+    await p.keyboard.press('Escape');
+    await p.click('#trashBtn');
+    await p.waitForSelector('#items.trash', { state: 'attached' }); // masquée si la corbeille est vide
+    assert.deepEqual(await leftovers(), [], 'corbeille');
+    await b.host({ app: 'cadcraft' });
+    for (const tool of ['calculator', 'converter', 'colors']) {
+      await p.click(`#barTools [data-tool=${tool}]`);
+      await p.keyboard.press('Escape'); // pipette du navigateur, si elle s'est ouverte
+      assert.deepEqual(await leftovers(), [], `page d'application, outil ${tool}`);
+    }
+    await p.goto(`${base}/admin.html#settings`);
+    await p.waitForSelector('#settings .card');
+    assert.deepEqual(await leftovers(), [], 'administration');
+  } finally { await b.close(); }
+});
+
 test('craft-anything : n\'importe quel fichier de Crafty est analysé (lecture seule)', { skip: missing('craft-anything'), timeout: 150_000 }, async () => {
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   try {

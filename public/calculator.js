@@ -4,23 +4,47 @@
 // round, floor, ceil, min, max, hypot ; arguments séparés par « ; »), constantes pi, π, e, tau, « ans » (dernier
 // résultat), unités de longueur en, mm, cm, m, in, ft (résultat en mm). Angles en degrés ou radians au choix.
 import { h, icon } from '/ui.js';
-import { evaluate, formatNumber } from '/calc-eval.js';
+import { evaluate, formatNumber as fmt } from '/calc-eval.js';
+import { t, lang, locale } from '/i18n.js';
+
+// Nombres affichés et copiés selon la langue : virgule décimale en français, point sinon (l'analyseur lit les deux).
+export const formatNumber = (v) => fmt(v, locale);
+export const decimal = (v) => (lang === 'fr' ? String(v).replace('.', ',') : String(v));
+// Erreur de l'analyseur (calc-eval.js : message français, code et variables stables) → texte dans la langue de l'interface.
+export function calcError(e) {
+  const v = e?.vars || {};
+  switch (e?.code) {
+    case 'sqrt-negative': return t('racine d\'un nombre négatif');
+    case 'log-domain': return t('logarithme d\'un nombre ≤ 0');
+    case 'incomplete': return t('expression incomplète');
+    case 'unclosed-paren': return t('parenthèse non fermée');
+    case 'unexpected-char': return t('caractère inattendu « {char} »', { char: v.char });
+    case 'needs-parens': return t('{name}(…) attend des parenthèses', { name: v.name });
+    case 'unit-without-number': return t('unité « {name} » sans nombre devant', { name: v.name });
+    case 'unknown-name': return t('inconnu : « {name} »', { name: v.name });
+    case 'division-by-zero': return t('division par zéro');
+    case 'empty': return t('expression vide');
+    case 'trailing': return t('en trop : « {rest} »', { rest: v.rest });
+    case 'not-finite': return t('résultat non fini');
+    default: return e?.message ?? String(e);
+  }
+}
 
 export function mountCalculator(button) {
   let ans = 0, deg = true;
   const hist = [];
   try { Object.assign(hist, JSON.parse(sessionStorage.getItem('craft-calc') || '[]')); ans = hist.at(-1)?.v ?? 0; } catch {}
-  const input = h('input', { type: 'text', class: 'calc-input', inputmode: 'decimal', autocomplete: 'off', spellcheck: false, 'aria-label': 'Calcul', placeholder: 'ex. 2 × (15 + 3,5)' });
+  const input = h('input', { type: 'text', class: 'calc-input', inputmode: 'decimal', autocomplete: 'off', spellcheck: false, 'aria-label': t('Calcul'), placeholder: t('ex. 2 × (15 + 3,5)') });
   const out = h('output', { class: 'calc-out', 'aria-live': 'polite' }, '0');
-  const list = h('ol', { class: 'calc-hist', 'aria-label': 'Historique' });
-  const degBtn = h('button', { type: 'button', class: 'btn sm calc-mode', title: 'Unité des angles' });
+  const list = h('ol', { class: 'calc-hist', 'aria-label': t('Historique') });
+  const degBtn = h('button', { type: 'button', class: 'btn sm calc-mode', title: t('Unité des angles') });
   const syncDeg = () => { degBtn.textContent = deg ? 'DEG' : 'RAD'; degBtn.setAttribute('aria-pressed', String(deg)); };
   degBtn.onclick = () => { deg = !deg; syncDeg(); input.focus(); };
   syncDeg();
-  const insert = (t) => {
+  const insert = (s) => {
     const a = input.selectionStart ?? input.value.length, b = input.selectionEnd ?? a;
-    input.value = input.value.slice(0, a) + t + input.value.slice(b);
-    const p = a + t.length - (t.endsWith('()') ? 1 : 0);
+    input.value = input.value.slice(0, a) + s + input.value.slice(b);
+    const p = a + s.length - (s.endsWith('()') ? 1 : 0);
     input.setSelectionRange(p, p); input.focus(); preview();
   };
   function preview() {
@@ -39,26 +63,26 @@ export function mountCalculator(button) {
       out.textContent = formatNumber(v); out.classList.remove('err', 'live');
       input.value = '';
       renderHist();
-    } catch (e) { out.textContent = e.message; out.classList.add('err'); }
+    } catch (e) { out.textContent = calcError(e); out.classList.add('err'); }
   }
   function renderHist() {
     list.replaceChildren(...hist.slice(-8).reverse().map((x) => h('li', {},
-      h('button', { type: 'button', title: 'Reprendre ce calcul', onclick: () => { input.value = x.e; preview(); input.focus(); } }, x.e),
-      h('button', { type: 'button', class: 'res', title: 'Insérer ce résultat', onclick: () => insert(String(x.v).replace('.', ',')) }, `= ${formatNumber(x.v)}`))));
+      h('button', { type: 'button', title: t('Reprendre ce calcul'), onclick: () => { input.value = x.e; preview(); input.focus(); } }, x.e),
+      h('button', { type: 'button', class: 'res', title: t('Insérer ce résultat'), onclick: () => insert(decimal(x.v)) }, `= ${formatNumber(x.v)}`))));
   }
   const key = (label, act, cls = '') => h('button', { type: 'button', class: `calc-key ${cls}`, onclick: act }, label);
   const keys = [
-    ['(', ')', '%', '÷', '√'], ['7', '8', '9', '×', '^'], ['4', '5', '6', '−', 'π'], ['1', '2', '3', '+', 'sin'], ['0', ',', 'ans', '=', 'cos'],
+    ['(', ')', '%', '÷', '√'], ['7', '8', '9', '×', '^'], ['4', '5', '6', '−', 'π'], ['1', '2', '3', '+', 'sin'], ['0', decimal('.'), 'ans', '=', 'cos'],
   ];
   const pad = h('div', { class: 'calc-pad' }, ...keys.flat().map((k) => key(k,
     k === '=' ? run : () => insert(k === '√' ? 'sqrt()' : ['sin', 'cos'].includes(k) ? `${k}()` : k === 'ans' ? 'ans' : k),
-    k === '=' ? 'eq' : /^[\d,]$/.test(k) ? 'num' : '')));
-  const copyBtn = h('button', { type: 'button', class: 'btn sm', onclick: () => { navigator.clipboard?.writeText(String(ans).replace('.', ',')).catch(() => {}); } }, 'Copier');
-  const panel = h('div', { class: 'calc', role: 'dialog', 'aria-label': 'Calculatrice', hidden: true },
-    h('div', { class: 'calc-head' }, icon('calc'), h('strong', {}, 'Calculatrice'), degBtn,
-      h('button', { type: 'button', class: 'btn icon ghost sm', 'aria-label': 'Fermer', title: 'Fermer (Échap)', onclick: () => toggle(false) }, icon('close'))),
+    k === '=' ? 'eq' : /^[\d,.]$/.test(k) ? 'num' : '')));
+  const copyBtn = h('button', { type: 'button', class: 'btn sm', onclick: () => { navigator.clipboard?.writeText(decimal(ans)).catch(() => {}); } }, t('Copier'));
+  const panel = h('div', { class: 'calc', role: 'dialog', 'aria-label': t('Calculatrice'), hidden: true },
+    h('div', { class: 'calc-head' }, icon('calc'), h('strong', {}, t('Calculatrice')), degBtn,
+      h('button', { type: 'button', class: 'btn icon ghost sm', 'aria-label': t('Fermer'), title: t('Fermer (Échap)'), onclick: () => toggle(false) }, icon('close'))),
     out, input, pad,
-    h('div', { class: 'calc-foot' }, h('span', { class: 'mut' }, 'Unités : 2in, 3cm… → mm ; fonctions : sqrt, sin, atan, ln, round(x;2)…'), copyBtn),
+    h('div', { class: 'calc-foot' }, h('span', { class: 'mut' }, t('Unités : 2in, 3cm… → mm ; fonctions : sqrt, sin, atan, ln, round(x;2)…')), copyBtn),
     list);
   document.body.append(panel);
   input.addEventListener('input', preview);
@@ -76,7 +100,7 @@ export function mountCalculator(button) {
   panel.classList.add('tool-panel');
   panel.__close = () => toggle(false);
   button.hidden = false;
-  button.replaceChildren(icon('calc'), h('span', { class: 'agent-btn-label' }, 'Calculatrice'));
+  button.replaceChildren(icon('calc'), h('span', { class: 'agent-btn-label' }, t('Calculatrice')));
   button.setAttribute('aria-expanded', 'false');
   button.onclick = () => toggle();
   return { toggle };

@@ -163,6 +163,13 @@ charge pas l'application et propose celles qui le lisent.
   (`control.thumb` : DeckCraft `file.render`, CadCraft `preview`, VectorCraft `document.serialize` png). La copie directe du canvas
   WebGPU donne une image vide (vérifié) et `screenshot()` capture toute l'interface : pas de miniature pour les autres.
 - Couleurs des applications : fond de leur icône officielle (getartcraft.com), mesuré ; jamais inventées.
+- Langue (15/11/2026) : français ou anglais selon la langue du navigateur (`navigator.languages[0]` commence par `fr` →
+  français, sinon anglais). Le français est la source : `t('texte français {x}', { x })` (`public/i18n.js`), dictionnaires
+  `public/i18n/en-*.js` ; pages : `data-i18n` / `data-i18n-attr` traduits par `translateDom()` (`theme.js` masque la page
+  jusque-là). Serveur : `src/i18n.js` traduit le champ `error` des réponses selon `Accept-Language` (français sans en-tête ou
+  avec `*`, ce qu'envoie `fetch` de Node), textes exacts et motifs dans `src/i18n-en.js`. `test/i18n.test.js` vérifie que chaque
+  texte a sa traduction avec les mêmes variables : jamais de `t(\`…${x}…\`)`. Restent en français : journal `?debug`, textes
+  destinés au modèle d'IA (descriptions d'outils). Playwright : contexte `fr-FR` par défaut (`scripts/pw.mjs`).
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.

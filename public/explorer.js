@@ -3,6 +3,7 @@ import {
   api, h, icon, toast, openMenu, menuAt, closeMenus, dialog, confirmDialog, promptDialog, validName,
   appTile, extOf, extColor, formatSize, formatDate, formatDateTime, accountButton, syncTheme,
 } from '/ui.js';
+import { t, locale, translateDom } from '/i18n.js';
 import { mountAgent } from '/agent.js';
 import { explorerTools } from '/explorer-agent.js';
 import { quickAccess, trashView, wantThumb, thumbUrl, shareDialog } from '/explorer-more.js';
@@ -29,7 +30,7 @@ function docIcon(name) {
     ${ext ? `<rect x="4" y="48" width="${Math.max(24, ext.length * 7 + 10)}" height="14" rx="3" fill="${extColor(extOf(name))}"/>
     <text class="label" x="9" y="58.5"></text>` : ''}`, 'doc');
   s.setAttribute('viewBox', '0 0 54 68');
-  const t = s.querySelector('text'); if (t) t.textContent = ext;
+  const label = s.querySelector('text'); if (label) label.textContent = ext;
   return s;
 }
 function folderIcon() {
@@ -65,8 +66,8 @@ function downloadFile(file, versionId) {
 function renderApps() {
   $('apps').replaceChildren(...state.apps.map((a) => h('li', {},
     h('a', { class: 'app-card', href: hostUrl(a.slug, state.me.guest ? {} : { folder: state.folder?.id || '' }) },
-      appTile(a), h('div', {}, h('div', { class: 'name' }, a.name), h('div', { class: 'desc' }, a.description))))));
-  if (!state.apps.length) $('apps').replaceChildren(h('li', { class: 'mut' }, 'Aucune application ne vous est attribuée. Contactez l\'administrateur.'));
+      appTile(a), h('div', {}, h('div', { class: 'name' }, a.name), h('div', { class: 'desc' }, t(a.description)))))));
+  if (!state.apps.length) $('apps').replaceChildren(h('li', { class: 'mut' }, t('Aucune application ne vous est attribuée. Contactez l\'administrateur.')));
 }
 
 // ---------- Chargement d'un dossier ----------
@@ -84,7 +85,7 @@ async function load(folderId = state.folder?.id ?? null, { push = false } = {}) 
   const url = data.folder ? `/?folder=${data.folder.id}` : '/';
   if (push) history.pushState({ folder: data.folder?.id ?? null }, '', url);
   else history.replaceState({ folder: data.folder?.id ?? null }, '', url);
-  document.title = `${data.folder ? data.folder.name : 'Mes fichiers'} · Crafty`;
+  document.title = `${data.folder ? data.folder.name : t('Mes fichiers')} · Crafty`;
 }
 const findItem = (key) => {
   const [kind, id] = key.split(':');
@@ -94,15 +95,15 @@ function renderUsage(u) {
   if (!u) return;
   const ratio = u.quota ? Math.min(1, u.used / u.quota) : 0;
   const bar = h('div', { class: `meter${ratio > .95 ? ' full' : ''}`, role: 'meter', 'aria-valuemin': 0, 'aria-valuemax': u.quota, 'aria-valuenow': u.used,
-    'aria-label': 'Espace utilisé' }, h('span'));
+    'aria-label': t('Espace utilisé') }, h('span'));
   bar.firstChild.style.width = `${(ratio * 100).toFixed(1)}%`;
-  $('usage').replaceChildren(h('span', {}, `${formatSize(u.used)} sur ${formatSize(u.quota)}`), bar);
+  $('usage').replaceChildren(h('span', {}, t('{used} sur {quota}', { used: formatSize(u.used), quota: formatSize(u.quota) })), bar);
   $('usage').hidden = false;
 }
 function renderTrashBtn() {
-  const t = state.trash || { days: 0, count: 0 };
-  $('trashBtn').hidden = !t.days && !t.count;
-  $('trashBtn').replaceChildren(icon('trash'), h('span', {}, 'Corbeille'), t.count ? h('span', { class: 'count' }, String(t.count)) : null);
+  const tr = state.trash || { days: 0, count: 0 };
+  $('trashBtn').hidden = !tr.days && !tr.count;
+  $('trashBtn').replaceChildren(icon('trash'), h('span', {}, t('Corbeille')), tr.count ? h('span', { class: 'count' }, String(tr.count)) : '');
   $('trashBtn').setAttribute('aria-pressed', String(!!state.inTrash));
 }
 // Corbeille : à la place du dossier (URL /?trash=1).
@@ -110,16 +111,16 @@ async function showTrash({ push = false } = {}) {
   state.inTrash = true; state.sel = new Set(); paintSelection();
   $('filesSection').classList.add('in-trash');
   const nav = $('crumbs');
-  nav.replaceChildren(h('button', { type: 'button', onclick: () => load(null, { push: true }) }, 'Mes fichiers'), icon('chevron', 'sep'),
-    h('button', { type: 'button', 'aria-current': 'location' }, 'Corbeille'));
+  nav.replaceChildren(h('button', { type: 'button', onclick: () => load(null, { push: true }) }, t('Mes fichiers')), icon('chevron', 'sep'),
+    h('button', { type: 'button', 'aria-current': 'location' }, t('Corbeille')));
   $('listHead').hidden = true;
   renderTrashBtn();
   if (push) history.pushState({ trash: true }, '', '/?trash=1'); else history.replaceState({ trash: true }, '', '/?trash=1');
-  document.title = 'Corbeille · Crafty';
+  document.title = `${t('Corbeille')} · Crafty`;
   await trash.render();
 }
 function renderCrumbs() {
-  const parts = [{ id: null, name: 'Mes fichiers' }, ...state.path];
+  const parts = [{ id: null, name: t('Mes fichiers') }, ...state.path];
   const nav = $('crumbs');
   nav.replaceChildren();
   parts.forEach((p, i) => {
@@ -135,7 +136,7 @@ function sorted(list, isFolder) {
   const by = state.sort, f = state.filter.toLowerCase();
   const out = list.filter((x) => !f || x.name.toLowerCase().includes(f));
   out.sort((a, b) => by === 'date' ? b.updatedAt - a.updatedAt : by === 'size' && !isFolder ? b.size - a.size
-    : a.name.localeCompare(b.name, 'fr', { numeric: true, sensitivity: 'base' }));
+    : a.name.localeCompare(b.name, locale, { numeric: true, sensitivity: 'base' }));
   return out;
 }
 function render() {
@@ -149,26 +150,27 @@ function render() {
   items.replaceChildren(...folders.map((f) => itemEl('d', f)), ...files.map((f) => itemEl('f', f)));
   paintSelection();
   $('empty').hidden = folders.length + files.length > 0;
-  if (state.filter && !(folders.length + files.length)) $('empty').querySelector('strong').textContent = 'Aucun résultat dans ce dossier.';
-  else $('empty').querySelector('strong').textContent = 'Ce dossier est vide.';
+  if (state.filter && !(folders.length + files.length)) $('empty').querySelector('strong').textContent = t('Aucun résultat dans ce dossier.');
+  else $('empty').querySelector('strong').textContent = t('Ce dossier est vide.');
+  $('empty').querySelector('.mut').textContent = t('Glissez des fichiers ici, ou utilisez « Importer ».'); // la corbeille le remplace
 }
 function itemEl(kind, x) {
   const key = `${kind}:${x.id}`;
   const isFile = kind === 'f';
   const app = isFile ? defaultApp(x) : null;
-  const more = h('button', { type: 'button', class: 'btn icon ghost more', tabindex: -1, 'aria-label': `Actions pour ${x.name}`,
+  const more = h('button', { type: 'button', class: 'btn icon ghost more', tabindex: -1, 'aria-label': t('Actions pour {name}', { name: x.name }),
     onclick: (e) => { e.stopPropagation(); contextFor(key, kind, x, menuAt(more)); } }, icon('more'));
   // Case à cocher : ajoute ou retire l'élément sans toucher au reste de la sélection.
-  const check = h('span', { class: 'check', role: 'checkbox', 'aria-checked': String(state.sel.has(key)), 'aria-label': `Sélectionner ${x.name}`,
-    title: 'Sélectionner', onclick: (e) => { e.stopPropagation(); state.checkMode = true; toggle(key); el.focus({ preventScroll: true }); } }, icon('check'));
+  const check = h('span', { class: 'check', role: 'checkbox', 'aria-checked': String(state.sel.has(key)), 'aria-label': t('Sélectionner {name}', { name: x.name }),
+    title: t('Sélectionner'), onclick: (e) => { e.stopPropagation(); state.checkMode = true; toggle(key); el.focus({ preventScroll: true }); } }, icon('check'));
   check.addEventListener('dblclick', (e) => e.stopPropagation());
   const el = h('div', { class: 'item', role: 'option', tabindex: 0, 'aria-selected': String(state.sel.has(key)), draggable: 'true',
-    dataset: { key }, title: isFile ? `${x.name}\n${formatSize(x.size)} · modifié ${formatDateTime(x.updatedAt)}${app ? `\nOuvrir avec ${app.name}` : ''}` : x.name },
+    dataset: { key }, title: isFile ? `${x.name}\n${t('{size} · modifié {date}', { size: formatSize(x.size), date: formatDateTime(x.updatedAt) })}${app ? `\n${t('Ouvrir avec {app}', { app: app.name })}` : ''}` : x.name },
     check,
     h('div', { class: 'main' }, h('div', { class: `thumb${isFile && x.thumb ? ' has-img' : ''}` }, isFile && x.thumb ? h('img', { src: thumbUrl(x), alt: '', loading: 'lazy', draggable: 'false' }) : isFile ? docIcon(x.name) : folderIcon(),
-        x.favorite ? h('span', { class: 'fav', title: 'Favori', 'aria-label': 'Favori' }, '★') : null),
+        x.favorite ? h('span', { class: 'fav', title: t('Favori'), 'aria-label': t('Favori') }, '★') : null),
       h('div', { class: 'name' }, x.name)),
-    h('div', { class: 'meta' }, isFile ? `${formatSize(x.size)} · ${formatDate(x.updatedAt)}` : 'Dossier'),
+    h('div', { class: 'meta' }, isFile ? `${formatSize(x.size)} · ${formatDate(x.updatedAt)}` : t('Dossier')),
     h('div', { class: 'col date' }, formatDate(x.updatedAt)),
     h('div', { class: 'col' }, isFile ? formatSize(x.size) : '—'),
     more);
@@ -198,20 +200,20 @@ function itemEl(kind, x) {
     e.dataTransfer.setData('application/x-craft', JSON.stringify(list));
     e.dataTransfer.effectAllowed = 'move';
     if (list.length > 1) {
-      const ghost = h('div', { class: 'drag-count' }, `${list.length} éléments`);
+      const ghost = h('div', { class: 'drag-count' }, t('{n} éléments', { n: list.length }));
       document.body.append(ghost); e.dataTransfer.setDragImage(ghost, 10, 10); setTimeout(() => ghost.remove());
     }
   });
   if (!isFile) dropTarget(el, x.id);
   // Miniature d'une image, faite quand l'élément devient visible.
-  if (isFile && !x.thumb) wantThumb(el, x, (v) => { x.thumb = v; clearTimeout(quickTimer); quickTimer = setTimeout(() => quick?.refresh(), 800); const t = el.querySelector('.thumb'); t.classList.add('has-img'); t.firstChild.replaceWith(h('img', { src: thumbUrl(x), alt: '', loading: 'lazy', draggable: 'false' })); });
+  if (isFile && !x.thumb) wantThumb(el, x, (v) => { x.thumb = v; clearTimeout(quickTimer); quickTimer = setTimeout(() => quick?.refresh(), 800); const th = el.querySelector('.thumb'); th.classList.add('has-img'); th.firstChild.replaceWith(h('img', { src: thumbUrl(x), alt: '', loading: 'lazy', draggable: 'false' })); });
   return el;
 }
 async function toggleFavorite(kind, x) {
   try {
     await api('/api/favorites', { method: 'PUT', body: { type: kind === 'd' ? 'folder' : 'file', id: x.id, on: !x.favorite } });
     x.favorite = !x.favorite; render(); quick?.refresh();
-  } catch (e) { fail('Favori non enregistré')(e); }
+  } catch (e) { fail(t('Favori non enregistré'))(e); }
 }
 function moveFocus(el, key, extend = false) {
   const all = [...$('items').children];
@@ -261,9 +263,9 @@ function paintSelection() {
   bar.hidden = !show;
   if (!show) return;
   const items = selectedItems(), files = items.filter((s) => s.kind === 'f');
-  $('selCount').textContent = `${n} élément${n > 1 ? 's' : ''} sélectionné${n > 1 ? 's' : ''}`;
+  $('selCount').textContent = n > 1 ? t('{n} éléments sélectionnés', { n }) : t('{n} élément sélectionné', { n });
   $('selDownload').disabled = !files.length;
-  $('selDownload').title = files.length ? `Télécharger ${files.length} fichier${files.length > 1 ? 's' : ''}${files.length < n ? ' (les dossiers sont ignorés)' : ''}` : 'Aucun fichier dans la sélection';
+  $('selDownload').title = files.length ? `${files.length > 1 ? t('Télécharger {n} fichiers', { n: files.length }) : t('Télécharger {n} fichier', { n: files.length })}${files.length < n ? ` ${t('(les dossiers sont ignorés)')}` : ''}` : t('Aucun fichier dans la sélection');
 }
 // Menu contextuel : celui de l'élément, ou celui de la sélection si l'élément en fait partie avec d'autres.
 function contextFor(key, kind, x, at) {
@@ -274,12 +276,12 @@ function contextFor(key, kind, x, at) {
 function showSelectionMenu(at) {
   const items = selectedItems(), files = items.filter((s) => s.kind === 'f');
   openMenu([
-    { heading: `${items.length} éléments` },
-    { label: 'Télécharger', icon: 'download', hint: files.length < items.length ? `${files.length} fichier${files.length > 1 ? 's' : ''}` : null,
+    { heading: t('{n} éléments', { n: items.length }) },
+    { label: t('Télécharger'), icon: 'download', hint: files.length < items.length ? (files.length > 1 ? t('{n} fichiers', { n: files.length }) : t('{n} fichier', { n: files.length })) : null,
       disabled: !files.length, onClick: () => downloadMany(files) },
-    { label: 'Déplacer vers…', icon: 'move', onClick: () => moveDialog(items) },
+    { label: t('Déplacer vers…'), icon: 'move', onClick: () => moveDialog(items) },
     { separator: true },
-    { label: 'Supprimer', icon: 'trash', danger: true, hint: 'Suppr', onClick: () => removeMany(items) },
+    { label: t('Supprimer'), icon: 'trash', danger: true, hint: t('Suppr'), onClick: () => removeMany(items) },
   ], at);
 }
 
@@ -347,13 +349,13 @@ function installLasso(area) {
 function showItemMenu(kind, x, at) {
   if (kind === 'd') {
     return openMenu([
-      { label: 'Ouvrir', icon: 'open', onClick: () => load(x.id, { push: true }) },
-      { label: x.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris', icon: 'star', onClick: () => toggleFavorite(kind, x) },
+      { label: t('Ouvrir'), icon: 'open', onClick: () => load(x.id, { push: true }) },
+      { label: x.favorite ? t('Retirer des favoris') : t('Ajouter aux favoris'), icon: 'star', onClick: () => toggleFavorite(kind, x) },
       { separator: true },
-      { label: 'Renommer', icon: 'edit', hint: 'F2', onClick: () => rename(kind, x) },
-      { label: 'Déplacer vers…', icon: 'move', onClick: () => moveDialog([{ kind, x }]) },
+      { label: t('Renommer'), icon: 'edit', hint: 'F2', onClick: () => rename(kind, x) },
+      { label: t('Déplacer vers…'), icon: 'move', onClick: () => moveDialog([{ kind, x }]) },
       { separator: true },
-      { label: 'Supprimer', icon: 'trash', danger: true, hint: 'Suppr', onClick: () => remove(kind, x) },
+      { label: t('Supprimer'), icon: 'trash', danger: true, hint: t('Suppr'), onClick: () => remove(kind, x) },
     ], at);
   }
   const def = defaultApp(x);
@@ -363,50 +365,50 @@ function showItemMenu(kind, x, at) {
   const ext = extOf(x.name);
   // Seules les applications qui lisent ce format sont proposées (les autres afficheraient une erreur).
   openMenu([
-    def ? { label: `Ouvrir dans ${def.name}`, icon: 'open', hint: 'Entrée', onClick: () => openFile(x, def.slug) }
-      : { label: `Aucune application n'ouvre les fichiers ${ext ? `.${ext}` : 'sans extension'}`, icon: 'open', disabled: true },
-    compatible.length + importers.length ? { label: 'Ouvrir avec', icon: 'grid', submenu: [
+    def ? { label: t('Ouvrir dans {app}', { app: def.name }), icon: 'open', hint: t('Entrée'), onClick: () => openFile(x, def.slug) }
+      : { label: ext ? t('Aucune application n\'ouvre les fichiers .{ext}', { ext }) : t('Aucune application n\'ouvre les fichiers sans extension'), icon: 'open', disabled: true },
+    compatible.length + importers.length ? { label: t('Ouvrir avec'), icon: 'grid', submenu: [
       ...compatible.map(withApp),
       importers.length && compatible.length ? { separator: true } : null,
-      importers.length ? { heading: 'Convertir avec' } : null,
+      importers.length ? { heading: t('Convertir avec') } : null,
       ...importers.map(withApp),
     ] } : null,
     { separator: true },
-    { label: 'Télécharger', icon: 'download', onClick: () => downloadFile(x) },
-    { label: 'Partager…', icon: 'share', onClick: () => shareDialog(x) },
-    { label: x.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris', icon: 'star', onClick: () => toggleFavorite(kind, x) },
-    { label: 'Versions…', icon: 'history', hint: `${x.versions ?? 1}`, onClick: () => versionsDialog(x) },
-    { label: 'Renommer', icon: 'edit', hint: 'F2', onClick: () => rename(kind, x) },
-    { label: 'Déplacer vers…', icon: 'move', onClick: () => moveDialog([{ kind, x }]) },
+    { label: t('Télécharger'), icon: 'download', onClick: () => downloadFile(x) },
+    { label: t('Partager…'), icon: 'share', onClick: () => shareDialog(x) },
+    { label: x.favorite ? t('Retirer des favoris') : t('Ajouter aux favoris'), icon: 'star', onClick: () => toggleFavorite(kind, x) },
+    { label: t('Versions…'), icon: 'history', hint: `${x.versions ?? 1}`, onClick: () => versionsDialog(x) },
+    { label: t('Renommer'), icon: 'edit', hint: 'F2', onClick: () => rename(kind, x) },
+    { label: t('Déplacer vers…'), icon: 'move', onClick: () => moveDialog([{ kind, x }]) },
     { separator: true },
-    { label: 'Supprimer', icon: 'trash', danger: true, hint: 'Suppr', onClick: () => remove(kind, x) },
+    { label: t('Supprimer'), icon: 'trash', danger: true, hint: t('Suppr'), onClick: () => remove(kind, x) },
   ], at);
 }
 function showAreaMenu(at) {
   openMenu([
-    { label: 'Nouveau dossier', icon: 'folderPlus', onClick: newFolder },
-    { label: 'Importer des fichiers…', icon: 'upload', onClick: () => $('upload').click() },
+    { label: t('Nouveau dossier'), icon: 'folderPlus', onClick: newFolder },
+    { label: t('Importer des fichiers…'), icon: 'upload', onClick: () => $('upload').click() },
     { separator: true },
-    { label: state.view === 'grid' ? 'Affichage en liste' : 'Affichage en grille', icon: state.view === 'grid' ? 'list' : 'grid', onClick: () => setView(state.view === 'grid' ? 'list' : 'grid') },
+    { label: state.view === 'grid' ? t('Affichage en liste') : t('Affichage en grille'), icon: state.view === 'grid' ? 'list' : 'grid', onClick: () => setView(state.view === 'grid' ? 'list' : 'grid') },
   ], at);
 }
 
 // ---------- Actions ----------
 const fail = (title) => (e) => toast({ type: 'error', title, detail: e.message });
 async function newFolder() {
-  const name = await promptDialog({ title: 'Nouveau dossier', label: 'Nom du dossier', value: 'Nouveau dossier', confirm: 'Créer', validate: validName });
+  const name = await promptDialog({ title: t('Nouveau dossier'), label: t('Nom du dossier'), value: t('Nouveau dossier'), confirm: t('Créer'), validate: validName });
   if (!name) return;
   try { const f = await api('/api/folders', { method: 'POST', body: { parentId: state.folder?.id ?? null, name } }); await load(); selectOnly(`d:${f.id}`); }
-  catch (e) { fail('Impossible de créer le dossier')(e); }
+  catch (e) { fail(t('Impossible de créer le dossier'))(e); }
 }
 async function rename(kind, x) {
-  const name = await promptDialog({ title: kind === 'd' ? 'Renommer le dossier' : 'Renommer le fichier', label: 'Nouveau nom', value: x.name,
-    confirm: 'Renommer', selectBase: kind === 'f', validate: validName });
+  const name = await promptDialog({ title: kind === 'd' ? t('Renommer le dossier') : t('Renommer le fichier'), label: t('Nouveau nom'), value: x.name,
+    confirm: t('Renommer'), selectBase: kind === 'f', validate: validName });
   if (!name || name === x.name) return;
-  if (kind === 'f' && extOf(name) !== extOf(x.name) && !(await confirmDialog({ title: 'Changer l\'extension ?',
-    message: `« .${extOf(x.name)} » deviendra « .${extOf(name) || 'aucune'} ». Le fichier risque de ne plus s'ouvrir dans la bonne application.`, confirm: 'Changer' }))) return;
+  if (kind === 'f' && extOf(name) !== extOf(x.name) && !(await confirmDialog({ title: t('Changer l\'extension ?'),
+    message: t('« .{old} » deviendra « .{next} ». Le fichier risque de ne plus s\'ouvrir dans la bonne application.', { old: extOf(x.name), next: extOf(name) || t('aucune') }), confirm: t('Changer') }))) return;
   try { await api(`/api/${kind === 'd' ? 'folders' : 'files'}/${x.id}`, { method: 'PATCH', body: { name } }); await load(); }
-  catch (e) { fail('Impossible de renommer')(e); }
+  catch (e) { fail(t('Impossible de renommer'))(e); }
 }
 const remove = (kind, x) => deleteItems([{ kind, x }]);
 // Supprimer : vers la corbeille (sans confirmation, avec « Annuler ») ; corbeille désactivée par l'admin : définitif, confirmé.
@@ -414,26 +416,28 @@ async function deleteItems(items) {
   const toTrash = (state.trash?.days ?? 0) > 0;
   if (!toTrash) {
     const folders = items.filter((s) => s.kind === 'd').length, one = items[0];
-    const ok = await confirmDialog({ title: items.length > 1 ? `Supprimer ${items.length} éléments ?` : one.kind === 'd' ? 'Supprimer le dossier ?' : 'Supprimer le fichier ?',
-      message: items.length > 1 ? `${items.length} éléments${folders ? `, dont ${folders} dossier${folders > 1 ? 's' : ''} avec tout leur contenu,` : ''} seront supprimés définitivement, versions comprises.`
-        : one.kind === 'd' ? `« ${one.x.name} » et tout son contenu (fichiers, sous-dossiers, versions) seront supprimés définitivement.`
-          : `« ${one.x.name} » et ses ${one.x.versions ?? 1} version(s) seront supprimés définitivement.`, confirm: 'Supprimer', danger: true });
+    const ok = await confirmDialog({ title: items.length > 1 ? t('Supprimer {n} éléments ?', { n: items.length }) : one.kind === 'd' ? t('Supprimer le dossier ?') : t('Supprimer le fichier ?'),
+      message: items.length > 1 ? (!folders ? t('{n} éléments seront supprimés définitivement, versions comprises.', { n: items.length })
+        : folders > 1 ? t('{n} éléments, dont {f} dossiers avec tout leur contenu, seront supprimés définitivement, versions comprises.', { n: items.length, f: folders })
+          : t('{n} éléments, dont {f} dossier avec tout leur contenu, seront supprimés définitivement, versions comprises.', { n: items.length, f: folders }))
+        : one.kind === 'd' ? t('« {name} » et tout son contenu (fichiers, sous-dossiers, versions) seront supprimés définitivement.', { name: one.x.name })
+          : t('« {name} » et ses {n} version(s) seront supprimés définitivement.', { name: one.x.name, n: one.x.versions ?? 1 }), confirm: t('Supprimer'), danger: true });
     if (!ok) return;
   }
   const errors = [], done = [];
   for (const { kind, x } of items) {
     try { await api(`/api/${kind === 'd' ? 'folders' : 'files'}/${x.id}`, { method: 'DELETE' }); done.push({ type: kind === 'd' ? 'folder' : 'file', id: x.id, name: x.name }); state.sel.delete(`${kind}:${x.id}`); }
-    catch (e) { if (e.status !== 404) errors.push(`${x.name} : ${e.message}`); } // 404 : déjà parti avec un dossier supprimé
+    catch (e) { if (e.status !== 404) errors.push(t('{name} : {error}', { name: x.name, error: e.message })); } // 404 : déjà parti avec un dossier supprimé
   }
   await load();
   quick?.refresh();
   if (done.length) {
-    const what = done.length === 1 ? `« ${done[0].name} »` : `${done.length} éléments`;
-    toast(toTrash ? { title: `${what} placé${done.length > 1 ? 's' : ''} dans la corbeille.`, timeout: 8000,
-      actions: [{ label: 'Annuler', onClick: async () => { try { await api('/api/trash/restore', { method: 'POST', body: { items: done } }); await load(); quick?.refresh(); } catch (e) { fail('Impossible de restaurer')(e); } } }] }
-      : { title: `${what} supprimé${done.length > 1 ? 's' : ''}.` });
+    const one = done.length === 1, vars = { name: done[0].name, n: done.length };
+    toast(toTrash ? { title: one ? t('« {name} » placé dans la corbeille.', vars) : t('{n} éléments placés dans la corbeille.', vars), timeout: 8000,
+      actions: [{ label: t('Annuler'), onClick: async () => { try { await api('/api/trash/restore', { method: 'POST', body: { items: done } }); await load(); quick?.refresh(); } catch (e) { fail(t('Impossible de restaurer'))(e); } } }] }
+      : { title: one ? t('« {name} » supprimé.', vars) : t('{n} éléments supprimés.', vars) });
   }
-  for (const e of errors) toast({ type: 'error', title: 'Impossible de supprimer', detail: e });
+  for (const e of errors) toast({ type: 'error', title: t('Impossible de supprimer'), detail: e });
 }
 // Déplace une liste [{ kind, id, name? }] ; un dossier n'est jamais déplacé dans lui-même ; erreurs regroupées.
 async function moveItems(list, targetId) {
@@ -441,11 +445,11 @@ async function moveItems(list, targetId) {
   const errors = [];
   for (const it of todo) {
     try { await api(`/api/${it.kind === 'd' ? 'folders' : 'files'}/${it.id}`, { method: 'PATCH', body: it.kind === 'd' ? { parentId: targetId } : { folderId: targetId } }); }
-    catch (e) { errors.push(`${it.name || findItem(`${it.kind}:${it.id}`)?.name || it.id} : ${e.message}`); }
+    catch (e) { errors.push(t('{name} : {error}', { name: it.name || findItem(`${it.kind}:${it.id}`)?.name || it.id, error: e.message })); }
   }
   await load();
-  if (todo.length > 1 && todo.length > errors.length) toast({ title: `${todo.length - errors.length} élément${todo.length - errors.length > 1 ? 's' : ''} déplacé${todo.length - errors.length > 1 ? 's' : ''}.` });
-  for (const e of errors) toast({ type: 'error', title: 'Impossible de déplacer', detail: e });
+  if (todo.length > 1 && todo.length > errors.length) { const n = todo.length - errors.length; toast({ title: n > 1 ? t('{n} éléments déplacés.', { n }) : t('{n} élément déplacé.', { n }) }); }
+  for (const e of errors) toast({ type: 'error', title: t('Impossible de déplacer'), detail: e });
 }
 const removeMany = (items) => deleteItems(items);
 async function downloadMany(files) {
@@ -463,34 +467,34 @@ function moveDialog(items) {
   const go = async (id) => {
     const d = await api(`/api/fs?folder=${encodeURIComponent(id || 'root')}`);
     cur = d.folder?.id ?? null;
-    where.textContent = ['Mes fichiers', ...d.path.map((p) => p.name)].join(' › ');
+    where.textContent = [t('Mes fichiers'), ...d.path.map((p) => p.name)].join(' › ');
     const up = d.path.length ? d.path[d.path.length - 2]?.id ?? null : undefined;
     list.replaceChildren(
-      up !== undefined ? h('li', {}, h('button', { type: 'button', onclick: () => go(up) }, icon('back'), 'Dossier parent')) : null,
+      up !== undefined ? h('li', {}, h('button', { type: 'button', onclick: () => go(up) }, icon('back'), t('Dossier parent'))) : null,
       ...d.folders.map((f) => h('li', {}, h('button', { type: 'button', disabled: movingFolders.has(f.id), onclick: () => go(f.id) }, folderIcon(), f.name))));
-    if (!list.children.length) list.append(h('li', { class: 'mut' }, 'Aucun sous-dossier.'));
+    if (!list.children.length) list.append(h('li', { class: 'mut' }, t('Aucun sous-dossier.')));
   };
-  dialog({ title: kind ? `Déplacer « ${x.name} »` : `Déplacer ${items.length} éléments`, body: h('div', { class: 'picker' }, where, list),
-    actions: [h('button', { class: 'btn', value: 'cancel' }, 'Annuler'), h('button', { class: 'btn primary', value: 'ok' }, 'Déplacer ici')],
+  dialog({ title: kind ? t('Déplacer « {name} »', { name: x.name }) : t('Déplacer {n} éléments', { n: items.length }), body: h('div', { class: 'picker' }, where, list),
+    actions: [h('button', { class: 'btn', value: 'cancel' }, t('Annuler')), h('button', { class: 'btn primary', value: 'ok' }, t('Déplacer ici'))],
     onClose: (v) => { if (v === 'ok') moveItems(items.map((s) => ({ kind: s.kind, id: s.x.id, name: s.x.name })), cur); } });
   go(state.folder?.id ?? null);
 }
 async function versionsDialog(file) {
-  const list = h('ul', { class: 'versions' }, h('li', { class: 'mut' }, 'Chargement…'));
-  const dlg = dialog({ title: `Versions de « ${file.name} »`, wide: true,
-    body: h('div', {}, h('p', { class: 'mut' }, 'Chaque enregistrement crée une version. Les plus anciennes sont effacées au-delà de la limite fixée par l\'administrateur.'), list),
-    actions: [h('button', { class: 'btn', value: 'close' }, 'Fermer')] });
+  const list = h('ul', { class: 'versions' }, h('li', { class: 'mut' }, t('Chargement…')));
+  const dlg = dialog({ title: t('Versions de « {name} »', { name: file.name }), wide: true,
+    body: h('div', {}, h('p', { class: 'mut' }, t('Chaque enregistrement crée une version. Les plus anciennes sont effacées au-delà de la limite fixée par l\'administrateur.')), list),
+    actions: [h('button', { class: 'btn', value: 'close' }, t('Fermer'))] });
   const fill = async () => {
     const vs = await api(`/api/files/${file.id}/versions`);
     list.replaceChildren(...vs.map((v) => h('li', {},
-      h('div', { class: 'v-main' }, h('strong', {}, `Version ${v.n} `, v.current ? h('span', { class: 'badge accent' }, 'actuelle') : null, ' ',
-          v.auto ? h('span', { class: 'badge', title: 'Sauvegarde automatique, mise à jour jusqu\'au prochain « Enregistrer »' }, 'auto') : null),
+      h('div', { class: 'v-main' }, h('strong', {}, `${t('Version {n}', { n: v.n })} `, v.current ? h('span', { class: 'badge accent' }, t('actuelle')) : null, ' ',
+          v.auto ? h('span', { class: 'badge', title: t('Sauvegarde automatique, mise à jour jusqu\'au prochain « Enregistrer »') }, t('auto')) : null),
         h('span', { class: 'v-meta' }, `${formatDateTime(v.createdAt)} · ${formatSize(v.size)}${v.app ? ` · ${appBySlug(v.app)?.name || v.app}` : ''}`)),
-      h('button', { class: 'btn sm', type: 'button', onclick: () => downloadFile(file, v.id) }, icon('download'), 'Télécharger'),
+      h('button', { class: 'btn sm', type: 'button', onclick: () => downloadFile(file, v.id) }, icon('download'), t('Télécharger')),
       v.current ? null : h('button', { class: 'btn sm', type: 'button', onclick: async () => {
-        try { await api(`/api/files/${file.id}/versions/${v.id}/restore`, { method: 'POST' }); toast({ title: `Version ${v.n} restaurée`, detail: 'Elle devient la version actuelle ; l\'historique est conservé.' }); await fill(); await load(); }
-        catch (e) { fail('Restauration impossible')(e); }
-      } }, icon('history'), 'Restaurer'))));
+        try { await api(`/api/files/${file.id}/versions/${v.id}/restore`, { method: 'POST' }); toast({ title: t('Version {n} restaurée', { n: v.n }), detail: t('Elle devient la version actuelle ; l\'historique est conservé.') }); await fill(); await load(); }
+        catch (e) { fail(t('Restauration impossible'))(e); }
+      } }, icon('history'), t('Restaurer')))));
   };
   fill().catch((e) => { list.replaceChildren(h('li', { class: 'error-text' }, e.message)); });
   return dlg;
@@ -504,35 +508,35 @@ function uploadOne(file, folderId, onProgress) {
     x.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
     x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
     x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {}
-      x.status >= 200 && x.status < 300 ? resolve(d) : reject(new Error(d?.error || `Erreur ${x.status}`)); };
-    x.onerror = () => reject(new Error('Serveur injoignable.'));
+      x.status >= 200 && x.status < 300 ? resolve(d) : reject(new Error(d?.error || t('Erreur {status}', { status: x.status }))); };
+    x.onerror = () => reject(new Error(t('Serveur injoignable.')));
     x.send(file);
   });
 }
 async function upload(fileList, folderId = state.folder?.id ?? null) {
   const files = [...fileList].filter((f) => f.size > 0 || f.type);
   if (!files.length) return;
-  const t = toast({ title: `Import de ${files.length} fichier${files.length > 1 ? 's' : ''}…`, detail: '', progress: 0, timeout: 0, closable: false });
+  const tst = toast({ title: files.length > 1 ? t('Import de {n} fichiers…', { n: files.length }) : t('Import de {n} fichier…', { n: files.length }), detail: '', progress: 0, timeout: 0, closable: false });
   let ok = 0;
   const errors = [];
   for (const [i, f] of files.entries()) {
-    t.update({ detail: `${i + 1}/${files.length} · ${f.name}` });
-    try { await uploadOne(f, folderId, (p) => t.update({ progress: (i + p) / files.length })); ok++; }
-    catch (e) { errors.push(`${f.name} : ${e.message}`); }
+    tst.update({ detail: `${i + 1}/${files.length} · ${f.name}` });
+    try { await uploadOne(f, folderId, (p) => tst.update({ progress: (i + p) / files.length })); ok++; }
+    catch (e) { errors.push(t('{name} : {error}', { name: f.name, error: e.message })); }
   }
-  t.close();
-  if (ok) toast({ title: `${ok} fichier${ok > 1 ? 's' : ''} importé${ok > 1 ? 's' : ''}.` });
-  for (const e of errors) toast({ type: 'error', title: 'Import impossible', detail: e });
+  tst.close();
+  if (ok) toast({ title: ok > 1 ? t('{n} fichiers importés.', { n: ok }) : t('{n} fichier importé.', { n: ok }) });
+  for (const e of errors) toast({ type: 'error', title: t('Import impossible'), detail: e });
   await load();
 }
 function dropTarget(el, folderId) {
   el.addEventListener('dragover', (e) => {
-    const t = e.dataTransfer.types;
-    if (!t.includes('Files') && !t.includes('application/x-craft')) return;
+    const types = e.dataTransfer.types;
+    if (!types.includes('Files') && !types.includes('application/x-craft')) return;
     e.preventDefault(); e.stopPropagation();
-    e.dataTransfer.dropEffect = t.includes('Files') ? 'copy' : 'move';
+    e.dataTransfer.dropEffect = types.includes('Files') ? 'copy' : 'move';
     el.classList.add('drop-target');
-    if (t.includes('Files')) showDropHint(folderId);
+    if (types.includes('Files')) showDropHint(folderId);
   });
   el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
   el.addEventListener('drop', (e) => {
@@ -544,9 +548,9 @@ function dropTarget(el, folderId) {
   });
 }
 function showDropHint(folderId) {
-  const name = folderId === (state.folder?.id ?? null) ? (state.folder?.name || 'Mes fichiers')
-    : state.folders.find((f) => f.id === folderId)?.name || [{ id: null, name: 'Mes fichiers' }, ...state.path].find((p) => p.id === folderId)?.name;
-  $('dropHint').textContent = `Déposer dans « ${name} »`;
+  const name = folderId === (state.folder?.id ?? null) ? (state.folder?.name || t('Mes fichiers'))
+    : state.folders.find((f) => f.id === folderId)?.name || [{ id: null, name: t('Mes fichiers') }, ...state.path].find((p) => p.id === folderId)?.name;
+  $('dropHint').textContent = t('Déposer dans « {name} »', { name });
   $('dropHint').hidden = false;
 }
 let dragDepth = 0;
@@ -557,6 +561,7 @@ function setView(v) { state.view = v; try { localStorage.setItem('craft-view', v
 
 // ---------- Démarrage ----------
 async function main() {
+  translateDom();
   state.me = await api('/api/me');
   syncTheme(state.me);
   state.apps = state.me.apps;
@@ -564,12 +569,12 @@ async function main() {
   renderApps();
   if (state.me.guest) {
     $('filesSection').hidden = true; $('searchBox').hidden = true; $('guestSection').hidden = false;
-    $('appsHint').textContent = 'Ouvrez une application, puis un fichier de votre ordinateur';
+    $('appsHint').textContent = t('Ouvrez une application, puis un fichier de votre ordinateur');
     return;
   }
   $('viewGrid').append(icon('grid')); $('viewList').append(icon('list'));
-  $('newFolder').append(icon('folderPlus'), 'Nouveau dossier');
-  $('uploadBtn').prepend(icon('upload'), 'Importer');
+  $('newFolder').append(icon('folderPlus'), t('Nouveau dossier'));
+  $('uploadBtn').prepend(icon('upload'), t('Importer'));
   $('viewGrid').onclick = () => setView('grid');
   $('viewList').onclick = () => setView('list');
   $('sort').value = state.sort;
@@ -620,7 +625,7 @@ async function main() {
     tools: explorerTools({
       reload: async () => { await load(); quick?.refresh(); },
       show: async (id) => { await load(id, { push: true }); return state.folder?.name || 'Mes fichiers'; },
-      filter: (t) => { $('search').value = state.filter = t; render(); return $('items').children.length; },
+      filter: (text) => { $('search').value = state.filter = text; render(); return $('items').children.length; },
       select: (keys) => { state.sel = new Set(keys.filter((k) => findItem(k))); state.checkMode = true; paintSelection(); return state.sel.size; },
       unselect: (k) => state.sel.delete(k),
       open: (f, slug) => openFile(f, slug),
@@ -628,4 +633,4 @@ async function main() {
     }),
   }).catch(() => {});
 }
-main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: 'Chargement impossible', detail: e.message }); });
+main().catch((e) => { if (e.status !== 401) toast({ type: 'error', title: t('Chargement impossible'), detail: e.message }); });

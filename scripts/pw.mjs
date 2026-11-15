@@ -22,9 +22,9 @@ export function chromiumPath() {
 }
 
 // Navigateur + contexte ; `base` = URL du serveur. Les requêtes d'API de page.request portent l'en-tête Origin.
-export async function browserFor(base, { headless = true, args = [], colorScheme = 'light' } = {}) {
+export async function browserFor(base, { headless = true, args = [], colorScheme = 'light', locale = 'fr-FR' } = {}) {
   const browser = await chromium.launch({ headless, args, executablePath: chromiumPath() });
-  const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, colorScheme, acceptDownloads: true });
+  const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, colorScheme, locale, acceptDownloads: true }); // locale : langue du navigateur (fr-FR par défaut, en-US pour l'interface anglaise)
   const page = await context.newPage();
   const consoleMsgs = [], requests = [];
   page.on('console', (m) => consoleMsgs.push(`[${m.type()}] ${m.text()}`));

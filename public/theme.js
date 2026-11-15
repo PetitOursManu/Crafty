@@ -10,6 +10,14 @@
     document.documentElement.setAttribute('data-theme-choice', choice);
   }
   apply(read());
+  // Interface en anglais : page masquée jusqu'à la traduction de ses textes (public/i18n.js), une seconde au plus.
+  try {
+    var l = String((navigator.languages && navigator.languages[0]) || navigator.language || 'fr').toLowerCase();
+    if (l.indexOf('fr') !== 0) {
+      document.documentElement.classList.add('i18n-pending');
+      setTimeout(function () { document.documentElement.classList.remove('i18n-pending'); }, 1000);
+    }
+  } catch (e) {}
   if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (read() === 'system') apply('system'); });
   window.craftTheme = {
     get: read,

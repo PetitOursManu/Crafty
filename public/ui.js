@@ -1,4 +1,5 @@
 // Outils d'interface communs : appels d'API, éléments, icônes, menus, dialogues, notifications, thème, compte.
+import { t, lang, locale } from '/i18n.js';
 
 export class ApiError extends Error {
   constructor(status, message, data) { super(message); this.status = status; this.data = data; }
@@ -10,14 +11,14 @@ export async function api(path, { method = 'GET', body, headers = {}, raw = fals
     else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
   }
   let r;
-  try { r = await fetch(path, opts); } catch { throw new ApiError(0, 'Serveur injoignable.'); }
+  try { r = await fetch(path, opts); } catch { throw new ApiError(0, t('Serveur injoignable.')); }
   if (r.status === 401 && !path.startsWith('/api/auth/')) {
     location.href = `/login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
-    throw new ApiError(401, 'Connexion requise.');
+    throw new ApiError(401, t('Connexion requise.'));
   }
   if (raw) { if (!r.ok) throw new ApiError(r.status, await r.json().then((d) => d.error, () => r.statusText)); return r; }
   const data = r.status === 204 ? null : await r.json().catch(() => null);
-  if (!r.ok) throw new ApiError(r.status, data?.error || `Erreur ${r.status}`, data);
+  if (!r.ok) throw new ApiError(r.status, data?.error || t('Erreur {status}', { status: r.status }), data);
   return data;
 }
 
@@ -76,12 +77,12 @@ const ICONS = {
   home: '<path d="M4 11l8-7 8 7v8.5a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19.5z"/>',
 };
 export function icon(name, cls = '') {
-  const t = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  t.setAttribute('viewBox', '0 0 24 24');
-  t.setAttribute('class', `i ${cls}`);
-  t.setAttribute('aria-hidden', 'true');
-  t.innerHTML = ICONS[name] || ICONS.file;
-  return t;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', `i ${cls}`);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = ICONS[name] || ICONS.file;
+  return svg;
 }
 
 // Couleurs par application (pas de logo : les logos ArtCraft ne s'utilisent qu'inchangés, avec l'application).
@@ -97,9 +98,9 @@ export function appColor(slug) {
   return `hsl(${x} 55% 45%)`;
 }
 export function appTile(app, cls = 'app-tile') {
-  const t = h('span', { class: cls, 'aria-hidden': 'true' }, app.name.slice(0, 1));
-  t.style.background = appColor(app.slug);
-  return t;
+  const tile = h('span', { class: cls, 'aria-hidden': 'true' }, app.name.slice(0, 1));
+  tile.style.background = appColor(app.slug);
+  return tile;
 }
 // Couleur d'un type de fichier, pour l'icône.
 const C = APP_COLORS;
@@ -114,21 +115,24 @@ const EXT_COLORS = { pdf: C.pdfcraft, docx: C.wordcraft, doc: C.wordcraft, odt: 
 export const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '');
 export const extColor = (ext) => EXT_COLORS[ext] || '#7a7f8c';
 
+// Unités binaires : « Kio » et virgule décimale en français, « KiB » et point en anglais.
+const FR = lang === 'fr';
 export function formatSize(n) {
-  if (n < 1024) return `${n} o`;
-  const u = ['Kio', 'Mio', 'Gio', 'Tio']; let i = -1;
+  if (n < 1024) return FR ? `${n} o` : `${n} B`;
+  const u = FR ? ['Kio', 'Mio', 'Gio', 'Tio'] : ['KiB', 'MiB', 'GiB', 'TiB']; let i = -1;
   do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
-  return `${n.toFixed(n < 10 ? 1 : 0).replace('.', ',')} ${u[i]}`;
+  const v = n.toFixed(n < 10 ? 1 : 0);
+  return `${FR ? v.replace('.', ',') : v} ${u[i]}`;
 }
 export function formatDate(ms) {
   const d = new Date(ms), now = new Date();
-  const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === now.toDateString()) return `aujourd'hui ${time}`;
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return t("aujourd'hui {time}", { time });
   const y = new Date(now); y.setDate(now.getDate() - 1);
-  if (d.toDateString() === y.toDateString()) return `hier ${time}`;
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+  if (d.toDateString() === y.toDateString()) return t('hier {time}', { time });
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }
-export const formatDateTime = (ms) => new Date(ms).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+export const formatDateTime = (ms) => new Date(ms).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 
 // --- Notifications ---
 function toastHost() {
@@ -143,12 +147,12 @@ export function toast({ type = 'info', title, detail, actions = [], timeout = ty
   const el = h('div', { class: `toast ${type}`, role: type === 'error' ? 'alert' : 'status' },
     h('div', { class: 't-body' }, titleEl, detail != null ? det : null, bar),
     actions.map((a) => h('button', { class: 'btn sm', type: 'button', onclick: () => a.onClick(api_) }, a.label)),
-    closable ? h('button', { class: 't-close', type: 'button', 'aria-label': 'Fermer', onclick: () => api_.close() }, '×') : null);
+    closable ? h('button', { class: 't-close', type: 'button', 'aria-label': t('Fermer'), onclick: () => api_.close() }, '×') : null);
   const api_ = {
     el,
     close() { el.remove(); },
-    update({ title: t, detail: d, progress: p } = {}) {
-      if (t !== undefined) titleEl.textContent = t;
+    update({ title: ti, detail: d, progress: p } = {}) {
+      if (ti !== undefined) titleEl.textContent = ti;
       if (d !== undefined) { det.textContent = d; if (!det.parentNode) titleEl.after(det); }
       if (p !== undefined && bar) bar.value = p;
     },
@@ -239,21 +243,21 @@ export function dialog({ title, body, actions, wide = false, onClose }) {
   dlg.showModal();
   return dlg;
 }
-export function confirmDialog({ title, message, confirm = 'Confirmer', danger = false }) {
+export function confirmDialog({ title, message, confirm = t('Confirmer'), danger = false }) {
   return new Promise((resolve) => {
     dialog({ title, body: h('p', {}, message), onClose: (v) => resolve(v === 'ok'),
-      actions: [h('button', { class: 'btn', value: 'cancel' }, 'Annuler'),
+      actions: [h('button', { class: 'btn', value: 'cancel' }, t('Annuler')),
         h('button', { class: `btn ${danger ? 'danger solid' : 'primary'}`, value: 'ok', autofocus: true }, confirm)] });
   });
 }
-export function promptDialog({ title, label, value = '', confirm = 'Valider', selectBase = false, hint, validate }) {
+export function promptDialog({ title, label, value = '', confirm = t('Valider'), selectBase = false, hint, validate }) {
   return new Promise((resolve) => {
     const input = h('input', { type: 'text', value, required: true, maxlength: 255, autocomplete: 'off', spellcheck: false });
     const errEl = h('div', { class: 'error-text', role: 'alert' });
     const dlg = dialog({ title,
       body: h('div', { class: 'form' }, h('label', { class: 'field' }, label, input, hint ? h('span', { class: 'hint' }, hint) : null), errEl),
       onClose: (v) => resolve(v === 'ok' ? input.value.trim() : null),
-      actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, 'Annuler'), h('button', { class: 'btn primary', value: 'ok' }, confirm)] });
+      actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, t('Annuler')), h('button', { class: 'btn primary', value: 'ok' }, confirm)] });
     dlg.querySelector('form').addEventListener('submit', (e) => {
       if (e.submitter?.value !== 'ok') return;
       const msg = validate?.(input.value.trim());
@@ -264,10 +268,10 @@ export function promptDialog({ title, label, value = '', confirm = 'Valider', se
     if (selectBase && dot > 0) input.setSelectionRange(0, dot); else input.select();
   });
 }
-export const validName = (n) => (!n ? 'Le nom ne peut pas être vide.' : /[\\/]/.test(n) ? 'Le nom ne peut pas contenir / ou \\.' : n.length > 255 ? 'Nom trop long.' : null);
+export const validName = (n) => (!n ? t('Le nom ne peut pas être vide.') : /[\\/]/.test(n) ? t('Le nom ne peut pas contenir / ou \\.') : n.length > 255 ? t('Nom trop long.') : null);
 
 // --- Thème et compte ---
-export const THEMES = [{ id: 'light', label: 'Clair', icon: 'sun' }, { id: 'dark', label: 'Sombre', icon: 'moon' }, { id: 'system', label: 'Système', icon: 'monitor' }];
+export const THEMES = [{ id: 'light', label: t('Clair'), icon: 'sun' }, { id: 'dark', label: t('Sombre'), icon: 'moon' }, { id: 'system', label: t('Système'), icon: 'monitor' }];
 export function setTheme(choice, sync = true) {
   window.craftTheme.set(choice);
   if (sync) api('/api/me', { method: 'PATCH', body: { theme: choice } }).catch(() => {});
@@ -277,19 +281,19 @@ export function changePasswordDialog() {
   const p1 = h('input', { type: 'password', autocomplete: 'new-password', required: true, minlength: 8 });
   const p2 = h('input', { type: 'password', autocomplete: 'new-password', required: true, minlength: 8 });
   const errEl = h('div', { class: 'error-text', role: 'alert' });
-  const dlg = dialog({ title: 'Changer le mot de passe',
-    body: h('div', { class: 'form' }, h('label', { class: 'field' }, 'Mot de passe actuel', cur),
-      h('label', { class: 'field' }, 'Nouveau mot de passe', p1, h('span', { class: 'hint' }, 'Au moins 8 caractères. Vos autres sessions seront fermées.')),
-      h('label', { class: 'field' }, 'Confirmer', p2), errEl),
-    actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, 'Annuler'), h('button', { class: 'btn primary', value: 'ok' }, 'Enregistrer')] });
+  const dlg = dialog({ title: t('Changer le mot de passe'),
+    body: h('div', { class: 'form' }, h('label', { class: 'field' }, t('Mot de passe actuel'), cur),
+      h('label', { class: 'field' }, t('Nouveau mot de passe'), p1, h('span', { class: 'hint' }, t('Au moins 8 caractères. Vos autres sessions seront fermées.'))),
+      h('label', { class: 'field' }, t('Confirmer'), p2), errEl),
+    actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, t('Annuler')), h('button', { class: 'btn primary', value: 'ok' }, t('Enregistrer'))] });
   dlg.querySelector('form').addEventListener('submit', async (e) => {
     if (e.submitter?.value !== 'ok') return;
     e.preventDefault();
-    if (p1.value !== p2.value) { errEl.textContent = 'Les deux mots de passe ne correspondent pas.'; return; }
+    if (p1.value !== p2.value) { errEl.textContent = t('Les deux mots de passe ne correspondent pas.'); return; }
     try {
       await api('/api/auth/password', { method: 'POST', body: { current: cur.value, password: p1.value } });
       dlg.close('done');
-      toast({ title: 'Mot de passe changé.' });
+      toast({ title: t('Mot de passe changé.') });
     } catch (err) { errEl.textContent = err.message; }
   });
 }
@@ -304,19 +308,19 @@ export async function logout(me) {
 }
 // Menu du compte (avatar en haut à droite).
 export function accountButton(me) {
-  const name = me.guest ? 'Invité' : me.user.username;
-  const btn = h('button', { class: 'avatar', type: 'button', 'aria-haspopup': 'menu', title: name, 'aria-label': `Compte : ${name}` },
+  const name = me.guest ? t('Invité') : me.user.username;
+  const btn = h('button', { class: 'avatar', type: 'button', 'aria-haspopup': 'menu', title: name, 'aria-label': t('Compte : {name}', { name }) },
     me.guest ? icon('user') : name.slice(0, 1).toUpperCase());
   btn.addEventListener('click', () => {
     const choice = window.craftTheme.get();
     openMenu([
-      { heading: me.guest ? 'Session invitée' : `${name}${me.user.role === 'admin' ? ' · administrateur' : ''}` },
-      { label: 'Thème', icon: THEMES.find((t) => t.id === choice)?.icon || 'sun',
-        submenu: THEMES.map((t) => ({ label: t.label, icon: t.id === choice ? 'check' : t.icon, onClick: () => setTheme(t.id, !me.guest) })) },
-      !me.guest && { label: 'Changer le mot de passe', icon: 'key', onClick: changePasswordDialog },
-      !me.guest && me.user.role === 'admin' && { label: 'Administration', icon: 'shield', onClick: () => { location.href = '/admin.html'; } },
+      { heading: me.guest ? t('Session invitée') : me.user.role === 'admin' ? t('{name} · administrateur', { name }) : name },
+      { label: t('Thème'), icon: THEMES.find((th) => th.id === choice)?.icon || 'sun',
+        submenu: THEMES.map((th) => ({ label: th.label, icon: th.id === choice ? 'check' : th.icon, onClick: () => setTheme(th.id, !me.guest) })) },
+      !me.guest && { label: t('Changer le mot de passe'), icon: 'key', onClick: changePasswordDialog },
+      !me.guest && me.user.role === 'admin' && { label: t('Administration'), icon: 'shield', onClick: () => { location.href = '/admin.html'; } },
       { separator: true },
-      me.guest ? { label: 'Se connecter', icon: 'user', onClick: () => logout(me) } : { label: 'Se déconnecter', icon: 'logout', onClick: () => logout(me) },
+      me.guest ? { label: t('Se connecter'), icon: 'user', onClick: () => logout(me) } : { label: t('Se déconnecter'), icon: 'logout', onClick: () => logout(me) },
     ], menuAt(btn));
   });
   return btn;

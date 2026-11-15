@@ -16,28 +16,28 @@
 </head>
 <body>
   <header class="hostbar">
-    <a class="btn icon ghost" id="back" href="/" title="Retour à mes fichiers" aria-label="Retour à mes fichiers"></a>
+    <a class="btn icon ghost" id="back" href="/" title="Retour à mes fichiers" aria-label="Retour à mes fichiers" data-i18n-attr="title,aria-label"></a>
     <span id="appTile"></span>
     <div class="doc">
-      <div class="doc-name" id="docName">Chargement…</div>
+      <div class="doc-name" id="docName" data-i18n>Chargement…</div>
       <div class="doc-path" id="docPath"></div>
     </div>
     <span id="status" class="status" role="status" aria-live="polite"><span class="dot"></span><span id="statusText"></span></span>
     <div class="spacer"></div>
-    <label class="btn sm" id="localOpen" hidden><span>Ouvrir un fichier de l'ordinateur</span><input type="file" id="localFile" hidden></label>
+    <label class="btn sm" id="localOpen" hidden><span data-i18n>Ouvrir un fichier de l'ordinateur</span><input type="file" id="localFile" hidden></label>
     <span id="barTools" class="bar-tools"></span>
-    <button type="button" class="btn agent-btn" id="agentBtn" title="Assistant IA" hidden></button>
+    <button type="button" class="btn agent-btn" id="agentBtn" title="Assistant IA" data-i18n-attr="title" hidden></button>
     <div id="account"></div>
   </header>
   <main class="host-main">
     <div class="frame-wrap">
-      <iframe id="app" title="Application" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
-      <div id="loading" class="loading"><img class="loading-logo" src="/brand/crafty-128.webp" alt="" width="64" height="64"><div class="spinner" aria-hidden="true"></div><span id="loadingText">Chargement de l'application…</span></div>
+      <iframe id="app" title="Application" data-i18n-attr="title" allow="fullscreen; clipboard-read; clipboard-write"></iframe>
+      <div id="loading" class="loading"><img class="loading-logo" src="/brand/crafty-128.webp" alt="" width="64" height="64"><div class="spinner" aria-hidden="true"></div><span id="loadingText" data-i18n>Chargement de l'application…</span></div>
     </div>
     <aside id="debug" class="debug" hidden>
-      <div class="debug-bar"><strong>Journal (débogage)</strong>
-        <label class="check"><input type="checkbox" id="simFail"> simuler un échec</label>
-        <button class="btn sm" id="clearLog" type="button">effacer</button></div>
+      <div class="debug-bar"><strong data-i18n>Journal (débogage)</strong>
+        <label class="check"><input type="checkbox" id="simFail"> <span data-i18n>simuler un échec</span></label>
+        <button class="btn sm" id="clearLog" type="button" data-i18n>effacer</button></div>
       <ol id="log"></ol>
     </aside>
   </main>

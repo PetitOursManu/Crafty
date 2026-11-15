@@ -13,6 +13,7 @@ import { prefsRoutes } from './prefs.js';
 import { createAppData } from './appdata.js';
 import { createAi } from './ai.js';
 import { sharesRoutes } from './shares.js';
+import { i18nMiddleware } from './i18n.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -52,6 +53,7 @@ export function createApp({
   app.locals.files = files;
   app.use(st.headers);
   app.use(auth.loadSession);
+  app.use(i18nMiddleware); // messages d'erreur en anglais selon Accept-Language (src/i18n.js)
   app.use('/api', auth.originCheck);
 
   // Applications autorisées : invité → réglage guest_apps ; compte → toutes, ou la liste choisie par l'admin.

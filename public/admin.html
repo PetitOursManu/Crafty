@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Administration · Crafty</title>
+  <title data-i18n>Administration · Crafty</title>
   <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="icon" href="/brand/favicon-16.png" sizes="16x16" type="image/png">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -17,50 +17,50 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/"><img class="brand-logo" src="/brand/crafty-64.png" alt="" width="28" height="28"><span>Crafty</span></a>
-    <span class="badge">Administration</span>
+    <span class="badge" data-i18n>Administration</span>
     <div class="spacer"></div>
-    <a class="btn ghost" href="/">Mes fichiers</a>
+    <a class="btn ghost" href="/" data-i18n>Mes fichiers</a>
     <div id="account"></div>
   </header>
   <main class="admin">
-    <nav class="tabs" role="tablist" aria-label="Sections">
-      <button role="tab" id="tab-users" aria-controls="panel-users" aria-selected="true">Comptes</button>
-      <button role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Réglages</button>
-      <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false" tabindex="-1">Assistant IA</button>
-      <button role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="false" tabindex="-1">Journal</button>
+    <nav class="tabs" role="tablist" aria-label="Sections" data-i18n-attr="aria-label">
+      <button role="tab" id="tab-users" aria-controls="panel-users" aria-selected="true" data-i18n>Comptes</button>
+      <button role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1" data-i18n>Réglages</button>
+      <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false" tabindex="-1" data-i18n>Assistant IA</button>
+      <button role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="false" tabindex="-1" data-i18n>Journal</button>
     </nav>
 
     <section role="tabpanel" id="panel-users" aria-labelledby="tab-users">
       <div class="panel-head">
-        <div><h2>Comptes</h2><p class="mut">Créez des comptes (mot de passe provisoire à changer) et choisissez leurs applications.</p></div>
-        <button class="btn primary" id="newUser" type="button">Nouveau compte</button>
+        <div><h2 data-i18n>Comptes</h2><p class="mut" data-i18n>Créez des comptes (mot de passe provisoire à changer) et choisissez leurs applications.</p></div>
+        <button class="btn primary" id="newUser" type="button" data-i18n>Nouveau compte</button>
       </div>
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th>Compte</th><th>Applications</th><th>Espace</th><th>Dernière connexion</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <thead><tr><th data-i18n>Compte</th><th data-i18n>Applications</th><th data-i18n>Espace</th><th data-i18n>Dernière connexion</th><th><span class="visually-hidden" data-i18n>Actions</span></th></tr></thead>
           <tbody id="users"></tbody>
         </table>
       </div>
     </section>
 
     <section role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
-      <div class="panel-head"><div><h2>Réglages</h2><p class="mut">S'appliquent à tout le service.</p></div></div>
+      <div class="panel-head"><div><h2 data-i18n>Réglages</h2><p class="mut" data-i18n>S'appliquent à tout le service.</p></div></div>
       <form id="settings" class="settings"></form>
     </section>
 
     <section role="tabpanel" id="panel-ai" aria-labelledby="tab-ai" hidden>
-      <div class="panel-head"><div><h2>Assistant IA</h2><p class="mut">Fournisseurs, modèles et comptes autorisés. Les conversations ne sont pas conservées.</p></div></div>
+      <div class="panel-head"><div><h2 data-i18n>Assistant IA</h2><p class="mut" data-i18n>Fournisseurs, modèles et comptes autorisés. Les conversations ne sont pas conservées.</p></div></div>
       <div id="ai"></div>
     </section>
 
     <section role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden>
       <div class="panel-head">
-        <div><h2>Journal</h2><p class="mut">200 derniers événements : connexions, fichiers, administration.</p></div>
-        <button class="btn" id="refreshAudit" type="button">Actualiser</button>
+        <div><h2 data-i18n>Journal</h2><p class="mut" data-i18n>200 derniers événements : connexions, fichiers, administration.</p></div>
+        <button class="btn" id="refreshAudit" type="button" data-i18n>Actualiser</button>
       </div>
       <div class="table-wrap">
         <table class="table compact">
-          <thead><tr><th>Date</th><th>Compte</th><th>Action</th><th>Cible</th><th>Détail</th><th>IP</th></tr></thead>
+          <thead><tr><th data-i18n>Date</th><th data-i18n>Compte</th><th data-i18n>Action</th><th data-i18n>Cible</th><th data-i18n>Détail</th><th>IP</th></tr></thead>
           <tbody id="audit"></tbody>
         </table>
       </div>

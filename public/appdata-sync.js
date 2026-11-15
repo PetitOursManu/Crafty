@@ -10,6 +10,7 @@
 // ArrayBuffer des bases). Déterministe (ordre trié, pas d'horodatage) : même contenu, même empreinte.
 // Les valeurs IndexedDB que le navigateur ne laisse pas copier (poignées de fichiers…) sont ignorées.
 import { api } from '/ui.js';
+import { t } from '/i18n.js';
 
 const META = 'craft-data-sync';
 const MAGIC = 'CRAFTDATA1\n';
@@ -139,7 +140,7 @@ export async function wipe(data) {
 
 export async function apply(data, blob) {
   const buf = await blob.arrayBuffer();
-  if (new TextDecoder().decode(buf.slice(0, MAGIC.length)) !== MAGIC) throw new Error('instantané illisible');
+  if (new TextDecoder().decode(buf.slice(0, MAGIC.length)) !== MAGIC) throw new Error(t('instantané illisible'));
   const len = new DataView(buf, MAGIC.length, 4).getUint32(0);
   let off = MAGIC.length + 4;
   const header = JSON.parse(new TextDecoder().decode(buf.slice(off, off + len)));
@@ -179,7 +180,7 @@ export async function apply(data, blob) {
 async function upload(slug, blob) {
   const r = await fetch(`/api/appdata/${encodeURIComponent(slug)}`, { method: 'PUT', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
-  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `erreur ${r.status}`);
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || t('erreur {status}', { status: r.status }));
   return r.json();
 }
 
@@ -202,7 +203,7 @@ export async function restoreData(me, app, log = () => {}) {
   meta.owner = uid; meta.base ||= {};
   const local = await snapshot(data);
   const r = await fetch(`/api/appdata/${encodeURIComponent(slug)}`, { credentials: 'same-origin', cache: 'no-store' });
-  if (!r.ok && r.status !== 204) throw new Error(`données non lues (${r.status})`);
+  if (!r.ok && r.status !== 204) throw new Error(t('données non lues ({status})', { status: r.status }));
   const remote = r.status === 204 ? null : { blob: await r.blob(), sha: (r.headers.get('etag') || '').replace(/"/g, '') };
   let pending = false;
   if (mine && !local.empty && local.sha !== meta.base[slug]) {

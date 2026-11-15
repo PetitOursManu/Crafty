@@ -148,3 +148,6 @@ dialog.wide { width: min(640px, calc(100vw - 32px)); }
 .agent-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px; border-top: 1px solid var(--line); }
 .agent-input { flex: 1; resize: none; max-height: 160px; min-height: 40px; font: inherit; font-size: 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Traduction en cours (theme.js, i18n.js) */
+.i18n-pending body { visibility: hidden; }

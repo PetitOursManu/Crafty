@@ -49,7 +49,10 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "pdfcraft-web-0.21.1/",
-    "source": "https://github.com/storytold/pdfcraft/releases/tag/v0.21.1"
+    "source": "https://github.com/storytold/pdfcraft/releases/tag/v0.21.1",
+    "tools": [
+      "colors"
+    ]
   },
   "wordcraft": {
     "enabled": true,
@@ -120,7 +123,10 @@
       "idb": [
         "wordcraft"
       ]
-    }
+    },
+    "tools": [
+      "colors"
+    ]
   },
   "gridcraft": {
     "enabled": true,
@@ -177,7 +183,10 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "gridcraft-web-0.19.1/",
-    "source": "https://github.com/storytold/gridcraft/releases/tag/v0.19.1"
+    "source": "https://github.com/storytold/gridcraft/releases/tag/v0.19.1",
+    "tools": [
+      "colors"
+    ]
   },
   "deckcraft": {
     "enabled": true,
@@ -288,7 +297,8 @@
     "source": "https://github.com/storytold/cadcraft/releases/tag/v0.20.1",
     "tools": [
       "calculator",
-      "converter"
+      "converter",
+      "colors"
     ]
   },
   "figcraft": {
@@ -362,7 +372,10 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "photocraft-web-0.23.1/",
-    "source": "https://github.com/storytold/photocraft/releases/tag/v0.23.1"
+    "source": "https://github.com/storytold/photocraft/releases/tag/v0.23.1",
+    "tools": [
+      "colors"
+    ]
   },
   "vectorcraft": {
     "enabled": true,
@@ -439,7 +452,10 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "lightcraft-web-0.21.1/",
-    "source": "https://github.com/storytold/lightcraft/releases/tag/v0.21.1"
+    "source": "https://github.com/storytold/lightcraft/releases/tag/v0.21.1",
+    "tools": [
+      "colors"
+    ]
   },
   "effectcraft": {
     "enabled": true,
@@ -658,7 +674,10 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "filmcraft-web-0.20.1/",
-    "source": "https://github.com/storytold/filmcraft/releases/tag/v0.20.1"
+    "source": "https://github.com/storytold/filmcraft/releases/tag/v0.20.1",
+    "tools": [
+      "colors"
+    ]
   },
   "mailcraft": {
     "enabled": true,
@@ -751,7 +770,8 @@
     },
     "tools": [
       "calculator",
-      "converter"
+      "converter",
+      "colors"
     ]
   }
 }

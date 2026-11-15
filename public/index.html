@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mes fichiers · Crafty</title>
+  <title data-i18n>Mes fichiers · Crafty</title>
   <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="icon" href="/brand/favicon-16.png" sizes="16x16" type="image/png">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -18,67 +18,67 @@
   <header class="topbar">
     <a class="brand" href="/"><img class="brand-logo" src="/brand/crafty-64.png" alt="" width="28" height="28"><span>Crafty</span></a>
     <label class="search" id="searchBox">
-      <span class="visually-hidden">Rechercher dans ce dossier</span>
-      <input type="search" id="search" placeholder="Rechercher dans ce dossier" autocomplete="off">
+      <span class="visually-hidden" data-i18n>Rechercher dans ce dossier</span>
+      <input type="search" id="search" placeholder="Rechercher dans ce dossier" autocomplete="off" data-i18n-attr="placeholder">
     </label>
     <div class="spacer"></div>
     <div id="usage" class="usage" hidden></div>
-    <button type="button" class="btn agent-btn" id="agentBtn" title="Assistant IA" hidden></button>
+    <button type="button" class="btn agent-btn" id="agentBtn" title="Assistant IA" data-i18n-attr="title" hidden></button>
     <div id="account"></div>
   </header>
 
   <main class="page">
     <section aria-labelledby="h-apps" class="apps-section">
       <div class="section-head">
-        <h2 id="h-apps">Applications</h2>
-        <span class="mut" id="appsHint">Ouvrir une application avec un nouveau document</span>
+        <h2 id="h-apps" data-i18n>Applications</h2>
+        <span class="mut" id="appsHint" data-i18n>Ouvrir une application avec un nouveau document</span>
       </div>
       <ul id="apps" class="apps-row"></ul>
     </section>
 
     <section id="guestSection" class="guest" hidden>
-      <h2>Mode invité</h2>
-      <p>Rien n'est conservé sur le serveur. Dans une application, ouvrez un fichier de votre ordinateur ; « Enregistrer » le télécharge.</p>
-      <a class="btn" href="/login.html" id="guestLogin">Se connecter avec un compte</a>
+      <h2 data-i18n>Mode invité</h2>
+      <p data-i18n>Rien n'est conservé sur le serveur. Dans une application, ouvrez un fichier de votre ordinateur ; « Enregistrer » le télécharge.</p>
+      <a class="btn" href="/login.html" id="guestLogin" data-i18n>Se connecter avec un compte</a>
     </section>
 
-    <section id="quick" class="quick" aria-label="Accès rapide" hidden></section>
+    <section id="quick" class="quick" aria-label="Accès rapide" data-i18n-attr="aria-label" hidden></section>
 
     <section id="filesSection" class="files-section" aria-labelledby="h-files">
-      <h2 id="h-files" class="visually-hidden">Mes fichiers</h2>
+      <h2 id="h-files" class="visually-hidden" data-i18n>Mes fichiers</h2>
       <div class="files-bar">
-        <nav id="crumbs" class="crumbs" aria-label="Emplacement"></nav>
+        <nav id="crumbs" class="crumbs" aria-label="Emplacement" data-i18n-attr="aria-label"></nav>
         <button type="button" class="btn ghost sm trash-btn" id="trashBtn" aria-pressed="false" hidden></button>
         <div class="spacer"></div>
-        <select id="sort" aria-label="Trier par" class="sort">
-          <option value="name">Nom</option>
-          <option value="date">Modifié</option>
-          <option value="size">Taille</option>
+        <select id="sort" aria-label="Trier par" class="sort" data-i18n-attr="aria-label">
+          <option value="name" data-i18n>Nom</option>
+          <option value="date" data-i18n>Modifié</option>
+          <option value="size" data-i18n>Taille</option>
         </select>
-        <div class="seg" role="group" aria-label="Affichage">
-          <button type="button" class="btn icon" id="viewGrid" aria-pressed="true" title="Grille"></button>
-          <button type="button" class="btn icon" id="viewList" aria-pressed="false" title="Liste"></button>
+        <div class="seg" role="group" aria-label="Affichage" data-i18n-attr="aria-label">
+          <button type="button" class="btn icon" id="viewGrid" aria-pressed="true" title="Grille" data-i18n-attr="title"></button>
+          <button type="button" class="btn icon" id="viewList" aria-pressed="false" title="Liste" data-i18n-attr="title"></button>
         </div>
         <button type="button" class="btn" id="newFolder"></button>
         <label class="btn primary" id="uploadBtn"><input type="file" id="upload" multiple hidden></label>
       </div>
       <div id="area" class="area">
-        <div id="listHead" class="list-head" hidden><span id="selectAll" class="check" role="checkbox" aria-checked="false" aria-label="Tout sélectionner" title="Tout sélectionner"></span><span>Nom</span><span>Modifié</span><span>Taille</span><span></span></div>
-        <div id="items" class="items grid" role="listbox" aria-label="Fichiers et dossiers" tabindex="-1"></div>
+        <div id="listHead" class="list-head" hidden><span id="selectAll" class="check" role="checkbox" aria-checked="false" aria-label="Tout sélectionner" title="Tout sélectionner" data-i18n-attr="aria-label,title"></span><span data-i18n>Nom</span><span data-i18n>Modifié</span><span data-i18n>Taille</span><span></span></div>
+        <div id="items" class="items grid" role="listbox" aria-label="Fichiers et dossiers" data-i18n-attr="aria-label" tabindex="-1"></div>
         <div id="empty" class="empty" hidden>
-          <p><strong>Ce dossier est vide.</strong></p>
-          <p class="mut">Glissez des fichiers ici, ou utilisez « Importer ».</p>
+          <p><strong data-i18n>Ce dossier est vide.</strong></p>
+          <p class="mut" data-i18n>Glissez des fichiers ici, ou utilisez « Importer ».</p>
         </div>
         <div id="dropHint" class="drop-hint" hidden></div>
       </div>
-      <div id="selBar" class="sel-bar" role="toolbar" aria-label="Actions sur la sélection" hidden>
+      <div id="selBar" class="sel-bar" role="toolbar" aria-label="Actions sur la sélection" data-i18n-attr="aria-label" hidden>
         <span id="selCount" class="sel-count" aria-live="polite"></span>
-        <button type="button" class="btn sm ghost" id="selAll">Tout sélectionner</button>
+        <button type="button" class="btn sm ghost" id="selAll" data-i18n>Tout sélectionner</button>
         <span class="sel-sep"></span>
-        <button type="button" class="btn sm" id="selDownload">Télécharger</button>
-        <button type="button" class="btn sm" id="selMove">Déplacer…</button>
-        <button type="button" class="btn sm danger" id="selDelete">Supprimer</button>
-        <button type="button" class="btn icon sm ghost" id="selClear" aria-label="Désélectionner (Échap)" title="Désélectionner (Échap)"></button>
+        <button type="button" class="btn sm" id="selDownload" data-i18n>Télécharger</button>
+        <button type="button" class="btn sm" id="selMove" data-i18n>Déplacer…</button>
+        <button type="button" class="btn sm danger" id="selDelete" data-i18n>Supprimer</button>
+        <button type="button" class="btn icon sm ghost" id="selClear" aria-label="Désélectionner (Échap)" title="Désélectionner (Échap)" data-i18n-attr="aria-label,title"></button>
       </div>
     </section>
   </main>
