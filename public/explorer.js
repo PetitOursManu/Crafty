@@ -140,6 +140,7 @@ function sorted(list, isFolder) {
   return out;
 }
 function render() {
+  $('lassoHint').hidden = true;
   if (state.inTrash) return trash.render();
   const items = $('items');
   items.className = `items ${state.view}`;
@@ -150,6 +151,9 @@ function render() {
   items.replaceChildren(...folders.map((f) => itemEl('d', f)), ...files.map((f) => itemEl('f', f)));
   paintSelection();
   $('empty').hidden = folders.length + files.length > 0;
+  let lassoKnown = false;
+  try { lassoKnown = !!localStorage.getItem('craft-lasso-known'); } catch {}
+  $('lassoHint').hidden = lassoKnown || folders.length + files.length < 2;
   if (state.filter && !(folders.length + files.length)) $('empty').querySelector('strong').textContent = t('Aucun résultat dans ce dossier.');
   else $('empty').querySelector('strong').textContent = t('Ce dossier est vide.');
   $('empty').querySelector('.mut').textContent = t('Glissez des fichiers ici, ou utilisez « Importer ».'); // la corbeille le remplace
@@ -285,7 +289,10 @@ function showSelectionMenu(at) {
   ], at);
 }
 
-// Sélection au lasso (comme sur le bureau) : glisser depuis un endroit vide de la zone. Ctrl ou Maj : ajoute à la sélection.
+// Sélection au lasso (comme sur le bureau) : glisser depuis n'importe quel endroit vide de la page (marges, sous les
+// fichiers, entre les cartes), pas seulement depuis la zone des fichiers. Ctrl ou Maj : ajoute à la sélection.
+const NOT_EMPTY = '.item, button, input, select, textarea, a, label, [role=tab], .list-head, .app-card, .q-card, dialog, .sel-bar, .menu, #toasts, aside.agent, .guest, .topbar, .quick';
+const isEmptySpot = (t) => !t.closest(NOT_EMPTY);
 function installLasso(area) {
   let drag = null, justDragged = false;
   const pageRect = (a, b) => ({ left: Math.min(a.x, b.x), top: Math.min(a.y, b.y), right: Math.max(a.x, b.x), bottom: Math.max(a.y, b.y) });
@@ -309,7 +316,7 @@ function installLasso(area) {
     drag.raf = requestAnimationFrame(autoscroll);
   };
   area.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || e.pointerType === 'touch' || e.target.closest('.item, button, input, select, a, .list-head')) return;
+    if (e.button !== 0 || e.pointerType === 'touch' || !isEmptySpot(e.target) || !$('items').children.length) return;
     const start = { x: e.clientX + scrollX, y: e.clientY + scrollY };
     drag = { start, cur: start, clientX: e.clientX, clientY: e.clientY, active: false, box: null,
       base: e.ctrlKey || e.metaKey || e.shiftKey ? new Set(state.sel) : new Set() };
@@ -327,6 +334,8 @@ function installLasso(area) {
       document.body.append(drag.box);
       document.body.classList.add('lassoing');
       closeMenus();
+      try { localStorage.setItem('craft-lasso-known', '1'); } catch {}
+      $('lassoHint').hidden = true;
     }
     e.preventDefault();
     update();
@@ -583,8 +592,8 @@ async function main() {
   $('upload').onchange = (e) => { upload(e.target.files); e.target.value = ''; };
   $('search').oninput = () => { state.filter = $('search').value.trim(); render(); };
   $('area').addEventListener('contextmenu', (e) => { e.preventDefault(); showAreaMenu({ x: e.clientX, y: e.clientY }); });
-  const afterLasso = installLasso($('area'));
-  $('area').addEventListener('click', (e) => { if (afterLasso() || e.ctrlKey || e.metaKey || e.shiftKey) return; clearSelection(); closeMenus(); });
+  const afterLasso = installLasso(document.body); // toute la page, marges latérales comprises
+  document.body.addEventListener('click', (e) => { if (afterLasso() || e.ctrlKey || e.metaKey || e.shiftKey || !isEmptySpot(e.target)) return; clearSelection(); closeMenus(); });
   // Barre d'actions de la sélection, et case « tout sélectionner » de la vue en liste.
   $('selDownload').prepend(icon('download')); $('selMove').prepend(icon('move')); $('selDelete').prepend(icon('trash'));
   $('selClear').append(icon('close'));
