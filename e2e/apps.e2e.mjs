@@ -759,7 +759,9 @@ test('accueil : corbeille (annuler, restaurer), favoris, récents, partage sans 
 
     // Miniature de l'image, faite par le navigateur.
     await p.waitForSelector('#items .item:has-text("Logo.png") .thumb img', { timeout: 20_000 });
-    assert.ok(await item('Logo.png').locator('.thumb img').evaluate((i) => i.complete && i.naturalWidth > 0));
+    // L'élément peut être inséré avant la fin du chargement de l'image : attendre son « load ».
+    assert.ok(await item('Logo.png').locator('.thumb img').evaluate((i) => new Promise((r) => (i.complete ? r(i.naturalWidth > 0)
+      : (i.addEventListener('load', () => r(i.naturalWidth > 0)), i.addEventListener('error', () => r(false)))))));
 
     // Favori : étoile et accès rapide.
     await item('Doc.pdf').click({ button: 'right' });

@@ -1,7 +1,7 @@
 // Accueil : applications + explorateur de fichiers (dossiers, import, glisser-déposer, clic droit, versions).
 import {
   api, h, icon, toast, openMenu, menuAt, closeMenus, dialog, confirmDialog, promptDialog, validName,
-  appTile, extOf, extColor, formatSize, formatDate, formatDateTime, accountButton, syncTheme,
+  appTile, appColor, extOf, extColor, formatSize, formatDate, formatDateTime, accountButton, syncTheme,
 } from '/ui.js';
 import { t, locale, translateDom } from '/i18n.js';
 import { mountAgent } from '/agent.js';
@@ -64,10 +64,21 @@ function downloadFile(file, versionId) {
   document.body.append(a); a.click(); a.remove();
 }
 function renderApps() {
-  $('apps').replaceChildren(...state.apps.map((a) => h('li', {},
-    h('a', { class: 'app-card', href: hostUrl(a.slug, state.me.guest ? {} : { folder: state.folder?.id || '' }) },
-      appTile(a), h('div', {}, h('div', { class: 'name' }, a.name), h('div', { class: 'desc' }, t(a.description)))))));
+  $('apps').replaceChildren(...state.apps.map((a, i) => {
+    const card = h('a', { class: 'app-card', href: hostUrl(a.slug, state.me.guest ? {} : { folder: state.folder?.id || '' }) },
+      appTile(a), h('div', { class: 'app-txt' }, h('div', { class: 'name' }, a.name), h('div', { class: 'desc' }, t(a.description))));
+    card.style.setProperty('--app', appColor(a.slug)); // halo au survol
+    const li = h('li', {}, card);
+    li.style.setProperty('--i', i); // apparition décalée
+    return li;
+  }));
   if (!state.apps.length) $('apps').replaceChildren(h('li', { class: 'mut' }, t('Aucune application ne vous est attribuée. Contactez l\'administrateur.')));
+}
+
+// Apparition des éléments d'un dossier qu'on vient d'ouvrir (pas à chaque tri ou frappe dans la recherche).
+function enter(el) {
+  el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter');
+  clearTimeout(enter.t); enter.t = setTimeout(() => el.classList.remove('enter'), 1200);
 }
 
 // ---------- Chargement d'un dossier ----------
@@ -82,6 +93,7 @@ async function load(folderId = state.folder?.id ?? null, { push = false } = {}) 
   renderUsage(data.usage);
   renderCrumbs();
   render();
+  enter($('items'));
   const url = data.folder ? `/?folder=${data.folder.id}` : '/';
   if (push) history.pushState({ folder: data.folder?.id ?? null }, '', url);
   else history.replaceState({ folder: data.folder?.id ?? null }, '', url);
@@ -149,6 +161,7 @@ function render() {
   $('viewList').setAttribute('aria-pressed', String(state.view === 'list'));
   const folders = sorted(state.folders, true), files = sorted(state.files, false);
   items.replaceChildren(...folders.map((f) => itemEl('d', f)), ...files.map((f) => itemEl('f', f)));
+  [...items.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 24)));
   paintSelection();
   $('empty').hidden = folders.length + files.length > 0;
   let lassoKnown = false;

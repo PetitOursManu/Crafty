@@ -163,6 +163,11 @@ charge pas l'application et propose celles qui le lisent.
   (`control.thumb` : DeckCraft `file.render`, CadCraft `preview`, VectorCraft `document.serialize` png). La copie directe du canvas
   WebGPU donne une image vide (vérifié) et `screenshot()` capture toute l'interface : pas de miniature pour les autres.
 - Couleurs des applications : fond de leur icône officielle (getartcraft.com), mesuré ; jamais inventées.
+- Direction artistique (refonte du 16/11/2026, maquette Mocky « Crafty — refonte ») : jetons en tête de `public/ui.css` (violet
+  `#6D4AFF`, encre `#17142B`, fond lavande ; sombre indigo), barre du haut en verre dépoli, aurore animée (`body.aurora`), boutons
+  en pilule, tuiles d'application en dégradé de leur couleur (`--app`, posée par `appTile`), apparitions décalées (`--i`). Pas de
+  rebond (`--ease`). `prefers-reduced-motion` coupe toute animation. CSP : pas d'attribut `style` ni d'image `data:` (CSSOM et
+  fichiers de `public/img/`).
 - Langue (15/11/2026) : français ou anglais selon la langue du navigateur (`navigator.languages[0]` commence par `fr` →
   français, sinon anglais). Le français est la source : `t('texte français {x}', { x })` (`public/i18n.js`), dictionnaires
   `public/i18n/en-*.js` ; pages : `data-i18n` / `data-i18n-attr` traduits par `translateDom()` (`theme.js` masque la page

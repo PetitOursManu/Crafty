@@ -99,7 +99,7 @@ export function appColor(slug) {
 }
 export function appTile(app, cls = 'app-tile') {
   const tile = h('span', { class: cls, 'aria-hidden': 'true' }, app.name.slice(0, 1));
-  tile.style.background = appColor(app.slug);
+  tile.style.setProperty('--app', appColor(app.slug)); // dégradé et halo dans ui.css
   return tile;
 }
 // Couleur d'un type de fichier, pour l'icône.

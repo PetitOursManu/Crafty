@@ -255,4 +255,6 @@ export default {
   '{name} : {app} n\'ouvre pas les fichiers .{ext}': '{name}: {app} can’t open .{ext} files',
   '{n} fichier(s) importé(s) dans vos fichiers.': '{n} file(s) uploaded to your files.',
   'Astuce : cliquez et glissez dans un espace vide pour sélectionner plusieurs éléments (Ctrl ou Maj pour en ajouter).': 'Tip: click and drag on an empty spot to select several items (hold Ctrl or Shift to add to the selection).',
+  'Que créez-vous': 'What will you',
+  "aujourd'hui ?": 'create today?',
 };
