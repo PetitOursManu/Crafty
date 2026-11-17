@@ -1,21 +1,14 @@
 // Fichiers statiques : MIME, compression, cache, 404 strict, CSP par application (vérifié en phase 0).
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, resolve, sep } from 'node:path';
+import { extname, join, relative, resolve, sep } from 'node:path';
 import { brotliCompress, gzip, constants as Z } from 'node:zlib';
 import { promisify } from 'node:util';
+import { MIME, COMPRESSIBLE, etagOf } from './static-rules.js';
 
+export { COMPRESSIBLE, etagOf };
 const br = promisify(brotliCompress), gz = promisify(gzip);
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
-  '.wasm': 'application/wasm', '.json': 'application/json', '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
-  '.onnx': 'application/octet-stream', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
-  '.toml': 'text/plain; charset=utf-8', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json',
-};
-// .onnx (modèles OCR) : gain de compression nul (mesuré), donc servis tels quels.
-const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.wasm', '.json', '.css', '.svg', '.txt', '.md', '.toml', '.webmanifest']);
 // Noms produits par trunk : <nom>-<16 hex>[_bg|_loader].<ext>
 export const HASHED = /-[0-9a-f]{16}(_bg|_loader)?\.(wasm|js|ico|css)$/;
 // Politique la plus stricte vérifiée en phase 0 (FINDINGS.md § 7). Trusted Types casse l'OCR de PdfCraft.
@@ -52,13 +45,29 @@ export function safeFile(base, raw, index) {
 }
 
 // csp : 'auto' (politique stricte, empreintes du script et du style en ligne de chaque index.html), 'off', ou fixe.
-export function createStatic({ apps, vendorDir, csp }) {
+// precompressedDir : sortie de scripts/precompress.mjs (Brotli 11 + gzip au build), servie depuis le disque.
+// Sinon, compression à la volée (Brotli 9) gardée en mémoire dans la limite de cacheBytes (les plus anciens sortent).
+export function createStatic({ apps, vendorDir, csp, precompressedDir = null,
+  cacheBytes = Number(process.env.STATIC_CACHE_MB ?? 256) * 1024 ** 2 }) {
+  let pre = {};
+  try { if (precompressedDir && existsSync(join(precompressedDir, 'manifest.json'))) pre = JSON.parse(readFileSync(join(precompressedDir, 'manifest.json'), 'utf8')); }
+  catch (e) { console.warn(`precompressed/manifest.json illisible : ${e.message}`); }
   const appCsp = {};
   if (csp === 'auto') for (const [slug, a] of Object.entries(apps)) {
     try { const h = inlineHashes(readFileSync(join(vendorDir, slug, a.version, 'index.html'), 'utf8')); appCsp[slug] = STRICT(h.scripts, [...h.styles, ...RUNTIME_STYLES]); }
     catch { appCsp[slug] = STRICT([], RUNTIME_STYLES); }
   }
-  const cache = new Map();
+  const cache = new Map(); // fichier|encodage → { mtime, size, p: Promise<{ body, etag }> }, ordre = ancienneté d'usage
+  let cached = 0;
+  const etags = new Map(); // fichier → { mtime, size, etag } pour les fichiers servis tels quels
+  const remember = (key, entry) => {
+    cache.set(key, entry);
+    entry.p.then((c) => {
+      if (cache.get(key) !== entry) return;
+      entry.bytes = c.body.length; cached += entry.bytes;
+      for (const [k, v] of cache) { if (cached <= cacheBytes || k === key) break; cache.delete(k); cached -= v.bytes || 0; }
+    }, () => {});
+  };
 
   function headers(req, res, next) {
     res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN' });
@@ -74,23 +83,56 @@ export function createStatic({ apps, vendorDir, csp }) {
     if (!st?.isFile()) return notFound(res);
     const ext = extname(file).toLowerCase();
     const ae = String(req.headers['accept-encoding'] || '');
-    const enc = !COMPRESSIBLE.has(ext) ? null : /\bbr\b/.test(ae) ? 'br' : /\bgzip\b/.test(ae) ? 'gzip' : null;
+    const okBr = /\bbr\b/.test(ae), okGz = /\bgzip\b/.test(ae);
+    res.set({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cacheControl,
+      'Last-Modified': st.mtime.toUTCString(), Vary: 'Accept-Encoding' });
+    const send = (etag, enc, length, body, path) => {
+      res.set('ETag', etag);
+      if (enc) res.set('Content-Encoding', enc);
+      if (req.headers['if-none-match'] === etag) return res.status(304).end();
+      res.set('Content-Length', String(length));
+      if (req.method === 'HEAD') return res.end();
+      if (body) return res.end(body);
+      const s = createReadStream(path);
+      s.on('error', () => res.destroy());
+      s.pipe(res);
+    };
+
+    // 1. Précompressé au build : servi depuis le disque si le fichier d'origine a toujours la même taille.
+    const rel = file.startsWith(vendorDir + sep) ? relative(vendorDir, file).split(sep).join('/') : null;
+    const p = rel ? pre[rel] : null;
+    if (p && p.size === st.size) {
+      const enc = okBr && p.br ? 'br' : okGz && p.gz ? 'gzip' : null;
+      if (!enc) return send(`"${p.etag}"`, null, st.size, null, file);
+      return send(`"${p.etag}-${enc}"`, enc, enc === 'br' ? p.br : p.gz, null, join(precompressedDir, `${rel}.${enc === 'br' ? 'br' : 'gz'}`));
+    }
+
+    // 2. Tel quel : lu depuis le disque, seule l'empreinte reste en mémoire.
+    const enc = !COMPRESSIBLE.has(ext) ? null : okBr ? 'br' : okGz ? 'gzip' : null;
+    if (!enc) {
+      let t = etags.get(file);
+      if (!t || t.mtime !== st.mtimeMs || t.size !== st.size) {
+        t = { mtime: st.mtimeMs, size: st.size, etag: etagOf(await readFile(file)) };
+        etags.set(file, t);
+        if (etags.size > 20_000) etags.delete(etags.keys().next().value);
+      }
+      return send(`"${t.etag}"`, null, st.size, null, file);
+    }
+
+    // 3. Compressé à la volée. Promesse en cache : deux requêtes simultanées (preload + chargement) ne compressent qu'une fois.
     const key = `${file}|${enc}`;
-    // Promesse en cache : deux requêtes simultanées (preload + chargement) ne compressent qu'une fois.
-    if (cache.get(key)?.mtime !== st.mtimeMs) cache.set(key, { mtime: st.mtimeMs, p: (async () => {
+    let c = cache.get(key);
+    if (c && (c.mtime !== st.mtimeMs || c.size !== st.size)) { cache.delete(key); cached -= c.bytes || 0; c = null; }
+    if (c) { cache.delete(key); cache.set(key, c); } // plus récemment utilisé
+    else remember(key, c = { mtime: st.mtimeMs, size: st.size, p: (async () => {
       const raw = await readFile(file);
       const body = enc === 'br'
         ? await br(raw, { params: { [Z.BROTLI_PARAM_QUALITY]: 9, [Z.BROTLI_PARAM_SIZE_HINT]: raw.length } })
-        : enc === 'gzip' ? await gz(raw, { level: 9 }) : raw;
-      return { body, etag: `"${createHash('sha256').update(raw).digest('base64url').slice(0, 27)}${enc ? `-${enc}` : ''}"` };
+        : await gz(raw, { level: 9 });
+      return { body, etag: `"${etagOf(raw)}-${enc}"` };
     })() });
-    const c = await cache.get(key).p.catch((e) => { cache.delete(key); throw e; });
-    res.set({ 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cacheControl, ETag: c.etag,
-      'Last-Modified': st.mtime.toUTCString(), Vary: 'Accept-Encoding' });
-    if (enc) res.set('Content-Encoding', enc);
-    if (req.headers['if-none-match'] === c.etag) return res.status(304).end();
-    res.set('Content-Length', String(c.body.length));
-    return req.method === 'HEAD' ? res.end() : res.end(c.body);
+    const r = await c.p.catch((err) => { if (cache.get(key) === c) cache.delete(key); throw err; });
+    return send(r.etag, enc, r.body.length, r.body);
   }
 
   return { headers, sendStatic, immutable: (rel) => (HASHED.test(rel) ? 'public, max-age=31536000, immutable' : 'no-cache') };

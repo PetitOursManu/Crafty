@@ -1,12 +1,13 @@
 // Administration : comptes, droits d'applications, réglages, journal d'audit.
 import { checkCredentials } from './auth.js';
 import { DEFAULT_SETTINGS } from './db.js';
+import { listBackups } from './backup.js';
 
-export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) {
+export function adminRoutes(app, { db, auth, files, appData, log, apps, json, trustProxy, cookieSecure, twofa, sso, backupDir }) {
   const { requireAdmin } = auth;
   const q = {
     users: db.prepare(`SELECT u.id, u.username, u.role, u.disabled, u.must_change, u.all_apps, u.quota, u.created_at, u.last_login_at,
-        u.locked_until, (SELECT IFNULL(SUM(size), 0) FROM versions v WHERE v.user_id = u.id) used,
+        u.locked_until, u.totp_enabled, u.dashy_sub, u.pass_hash, (SELECT IFNULL(SUM(size), 0) FROM versions v WHERE v.user_id = u.id) used,
         (SELECT COUNT(*) FROM files f WHERE f.user_id = u.id) files
       FROM users u ORDER BY u.username COLLATE NOCASE`),
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -21,7 +22,8 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) 
   const validApps = (list) => Array.isArray(list) && list.every((s) => typeof s === 'string' && apps[s]);
   const userJson = (u) => ({ id: u.id, username: u.username, role: u.role, disabled: !!u.disabled, mustChange: !!u.must_change,
     allApps: !!u.all_apps, apps: q.userApps.all(u.id).map((r) => r.slug), quota: u.quota, used: u.used, files: u.files,
-    createdAt: u.created_at, lastLoginAt: u.last_login_at, locked: u.locked_until > Date.now() });
+    createdAt: u.created_at, lastLoginAt: u.last_login_at, locked: u.locked_until > Date.now(),
+    twoFactor: !!u.totp_enabled, dashy: !!u.dashy_sub, hasPassword: String(u.pass_hash).startsWith('scrypt$') });
   const setApps = (id, allApps, list) => {
     q.clearApps.run(id);
     if (!allApps) for (const s of list) q.addApp.run(id, s);
@@ -64,6 +66,8 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) 
       if (b.disabled !== undefined) db.prepare('UPDATE users SET disabled = ? WHERE id = ?').run(b.disabled ? 1 : 0, u.id);
       if (b.quota !== undefined) db.prepare('UPDATE users SET quota = ? WHERE id = ?').run(b.quota, u.id);
       if (b.unlock) db.prepare('UPDATE users SET failed_count = 0, locked_until = 0 WHERE id = ?').run(u.id);
+      if (b.reset2fa) twofa.reset(u.id); // téléphone perdu, plus de code de secours
+      if (b.unlinkDashy) db.prepare('UPDATE users SET dashy_sub = NULL WHERE id = ?').run(u.id);
       if (b.allApps !== undefined) {
         db.prepare('UPDATE users SET all_apps = ? WHERE id = ?').run(b.allApps ? 1 : 0, u.id);
         setApps(u.id, !!b.allApps, b.apps ?? []);
@@ -94,7 +98,7 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) 
   app.get('/api/admin/settings', requireAdmin, (req, res) => res.set('Cache-Control', 'no-store').json(db.settings()));
   app.patch('/api/admin/settings', requireAdmin, json, (req, res) => {
     const b = req.body || {}, patch = {};
-    for (const k of ['signup_open', 'guest_enabled', 'sharing_enabled']) if (b[k] !== undefined) patch[k] = !!b[k];
+    for (const k of ['signup_open', 'guest_enabled', 'sharing_enabled', 'sso_create_accounts']) if (b[k] !== undefined) patch[k] = !!b[k];
     if (b.guest_apps !== undefined) {
       if (b.guest_apps !== null && !validApps(b.guest_apps)) return bad(res, 'Liste d\'applications invalide.');
       patch.guest_apps = b.guest_apps;
@@ -107,6 +111,34 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json }) 
     db.setSettings(patch);
     log.audit(req, 'admin.settings', null, patch);
     res.json(db.settings());
+  });
+
+  // Vérification de TRUST_PROXY (correction 4) en conditions réelles : l'adresse retenue doit être celle du visiteur.
+  // Derrière Cloudflare, CF-Connecting-IP est l'adresse vue par Cloudflare ; sans proxy, la connexion directe.
+  app.get('/api/admin/network', requireAdmin, (req, res) => {
+    const hdr = (k) => (typeof req.headers[k] === 'string' ? req.headers[k].slice(0, 300) : null);
+    const cf = hdr('cf-connecting-ip'), xff = hdr('x-forwarded-for');
+    const norm = (ip) => String(ip || '').replace(/^::ffff:/, '');
+    const verdict = cf ? (norm(req.ip) === norm(cf) ? 'ok' : 'cloudflare-mismatch')
+      : xff ? (norm(req.ip) === norm(req.socket.remoteAddress) ? 'proxy-untrusted' : 'proxy')
+      : 'direct';
+    res.set('Cache-Control', 'no-store').json({
+      ip: req.ip, ips: req.ips, socket: req.socket.remoteAddress, protocol: req.protocol, secure: req.secure,
+      trustProxy: String(trustProxy ?? false), cookieSecure: !!cookieSecure,
+      headers: { 'cf-connecting-ip': cf, 'x-forwarded-for': xff, 'x-forwarded-proto': hdr('x-forwarded-proto'),
+        'x-forwarded-host': hdr('x-forwarded-host'), 'x-real-ip': hdr('x-real-ip') },
+      verdict,
+    });
+  });
+
+  // État de l'exploitation : SSO, chiffrement des secrets, sauvegardes de la base.
+  app.get('/api/admin/system', requireAdmin, async (req, res) => {
+    res.set('Cache-Control', 'no-store').json({
+      sso: { dashy: sso.enabled, dashyUrl: sso.dashyUrl, callback: sso.callback },
+      secretsEncrypted: twofa.encrypted,
+      backups: backupDir ? (await listBackups(backupDir)).slice(0, 20) : [],
+      backupEveryHours: Number(process.env.BACKUP_EVERY_HOURS || 0),
+    });
   });
 
   app.get('/api/admin/audit', requireAdmin, (req, res) => {

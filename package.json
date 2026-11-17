@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "qrcode-generator": "2.0.4"
   },
   "devDependencies": {
     "playwright-core": "^1.65.0"

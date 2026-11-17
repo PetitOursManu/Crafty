@@ -14,15 +14,22 @@ commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifi
 - `PLAN.md` : le plan détaillé (architecture, reprise de Mocky, API fichiers, sécurité, phases, risques, sources).
 - `PHASE0.md` : la mission du prototype (terminée).
 - `FINDINGS.md` : constats de la phase 0 (PdfCraft 0.21.1, WordCraft 0.18.1). Quand il contredit `PLAN.md` ou ce fichier, il a raison.
-- `README.md` : démarrage local.
+- `README.md` : démarrage local. `docs/DEPLOIEMENT.md` : Coolify, adresse IP réelle, sauvegarde, mise à jour, fail2ban, comptes,
+  double authentification, SSO (avec ce qui est vérifié et ce qui ne l'est pas).
+- Déploiement : `Dockerfile` (applications téléchargées au build à la version et au SHA-256 d'`apps.json`, précompressées),
+  `docker-compose.yml` (essai local, lié à 127.0.0.1), `.env.example`, `deploy/fail2ban/` (filtre et prison).
 - Serveur : `server.js` (point d'entrée) et `src/` : `app.js` (assemblage, pages, accès aux applications), `auth.js` (comptes,
   sessions, verrouillage), `files.js` (dossiers, fichiers, versions, quotas), `admin.js`, `static.js` (MIME, compression, CSP),
-  `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
+  `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit, rotation), `static-rules.js` (MIME, ETag, extensions compressibles),
+  `backup.js` (instantanés de la base), `secrets.js` (chiffrement par `CRAFTY_SECRET`), `totp.js` + `twofactor.js` (double authentification),
+  `sso.js` (Dashy). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
 - Logo : source `assets/crafty-logo-source.webp`, déclinaisons dans `public/brand/` (favicon, icônes, manifeste web).
 - Interface (`public/`) : `intercept.js` (interceptions dans l'iframe), `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
   `host.*` (page hôte de production ; journal et outils seulement pour un admin avec `?debug`), `admin.*`, `ui.*` (composants
   communs), `theme.js` (thème clair par défaut, avant le premier affichage).
-- Outils : `scripts/fetch-app.mjs` (+ `unzip.mjs`, `verify-vendor.mjs`), `make-samples.mjs`, `pw.mjs` (Playwright).
+- Outils : `scripts/fetch-app.mjs` (+ `unzip.mjs`, `vendor-lib.mjs`, `verify-vendor.mjs`), `vendor-install.mjs` (applications épinglées, build),
+  `precompress.mjs` (Brotli 11 + gzip → `precompressed/`), `update-app.mjs` (mise à jour testée d'une application), `accounts.mjs`
+  (comptes en ligne de commande), `backup.mjs` (instantané, liste, restauration), `scrypt-bench.mjs`, `make-samples.mjs`, `pw.mjs` (Playwright).
   Tests : `test/` (`npm test`, serveur sur fausses applications), `e2e/` (`npm run test:e2e`, vraies applications dans Chrome).
 
 Distingue toujours « vérifié » (exécuté) de « lu dans la doc ». Ce que la phase 0 a vérifié est marqué comme tel ;
@@ -175,6 +182,15 @@ charge pas l'application et propose celles qui le lisent.
   avec `*`, ce qu'envoie `fetch` de Node), textes exacts et motifs dans `src/i18n-en.js`. `test/i18n.test.js` vérifie que chaque
   texte a sa traduction avec les mêmes variables : jamais de `t(\`…${x}…\`)`. Restent en français : journal `?debug`, textes
   destinés au modèle d'IA (descriptions d'outils). Playwright : contexte `fr-FR` par défaut (`scripts/pw.mjs`).
+- Exploitation (17/11/2026) : sonde `/api/health` ; SIGTERM = arrêt propre ; keep-alive 95 s (> 90 s de Traefik) ; applications
+  précompressées au build et servies depuis le disque (`precompressed/manifest.json`, taille vérifiée), sinon compression à la
+  volée bornée par `STATIC_CACHE_MB` ; instantané de la base toutes les `BACKUP_EVERY_HOURS` h ; journal `auth.log` tourné à 5 Mo.
+- Double authentification (17/11/2026) : TOTP (RFC 6238) chiffré par `CRAFTY_SECRET`, ticket de 5 min / 5 essais entre mot de passe
+  et code, code faux = échec de connexion (verrouillage, fail2ban), compteur non remis à zéro par le mot de passe seul, codes de
+  secours hachés à usage unique ; l'admin (ou `accounts.mjs reset-2fa`) la retire. QR code : `qrcode-generator` (seule dépendance ajoutée).
+- SSO Dashy (17/11/2026) : protocole de Mocky (HS256, 60 s, `aud` = `PUBLIC_ORIGIN`, `jti` unique), `state` vérifié par le serveur
+  (cookie `__Host-`), création de compte réglable (`sso_create_accounts`), liaison d'un compte existant, rôle fixé à la création.
+  Exception assumée à « pas d'état modifié en GET » : `/sso/dashy/callback`.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.
@@ -186,7 +202,7 @@ charge pas l'application et propose celles qui le lisent.
 - Réponds-moi en français. Commits courts et cohérents.
 - Ne publie rien et n'expose aucun port en dehors de `localhost` sans me demander.
 
-## Feuille de route (phases 0 à 3 faites le 14/11/2026 ; phase 4 à venir)
+## Feuille de route (phases 0 à 3 faites le 14/11/2026 ; 4 préparée, 5 et 6 faites le 17/11/2026)
 
 0. Prototype jetable : PdfCraft puis WordCraft dans une page hôte, avec relevé des comportements réels (`PHASE0.md`, `FINDINGS.md`). **Fait.**
 1. Squelette serveur : comptes, sessions, verrouillage, limites, journaux. **Fait** (inscription ouvrable par l'admin, mode invité).
@@ -194,9 +210,13 @@ charge pas l'application et propose celles qui le lisent.
 3. Interface : connexion, explorateur de fichiers (accueil), page hôte, administration, thème clair/sombre. **Fait.**
    Sauvegarde automatique et thème des deux applications : **faits** (`?control` toujours actif). Reste ouvert :
    `TRUST_PROXY` vérifié en vrai (phase 4).
-4. Déploiement Coolify : Dockerfile, volume `/data`, domaine, sauvegarde, limites CPU/mémoire.
-5. Exploitation : script de mise à jour d'une application, fail2ban, comptes.
-6. Options : SSO avec Dashy, double authentification, partage.
+4. Déploiement Coolify : **préparé, pas installé** (installation à la fin du projet). Image construite et essayée en local :
+   santé, arrêt propre, redémarrage sans perte, instantané et restauration (vérifiés). Restent à faire sur le VPS : ressource
+   Coolify, domaine, `TRUST_PROXY` vérifié (outil : Administration → Système), `SCRYPT_N` mesuré, copie des sauvegardes hors du VPS.
+5. Exploitation : `update-app.mjs` (vérifié sur SolidCraft 0.44.0, version laissée à 0.41.0), fail2ban (filtre testé en Node, pas
+   avec `fail2ban-regex`), `accounts.mjs`. **Fait.**
+6. Options : partage **fait** ; double authentification (TOTP + 10 codes de secours) **faite** ; SSO Dashy **fait**, testé avec des jetons
+   signés comme Dashy, **pas avec une vraie instance**.
 
 Ajouter une application = `npm run fetch <slug>` (ou `<propriétaire>/<slug>` hors de `storytold` : MailCraft, SolidCraft), lire son `HOSTING.md`, sonder dans Chrome (`ready`, `accept` de sa boîte Ouvrir,
 `commands()`, clés `localStorage`, CSP), puis compléter son entrée dans `apps.json` : `name`, `description`, `extensions` (édités),

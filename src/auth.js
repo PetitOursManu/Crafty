@@ -137,9 +137,18 @@ export function createAuth({ db, log, cookieSecure }) {
       return { status: 401, error: 'Identifiant ou mot de passe incorrect.' };
     }
     if (u.disabled) { log.auth('AUTH_FAIL', { ip, user: username, reason: 'disabled' }); return { status: 401, error: 'Identifiant ou mot de passe incorrect.' }; }
+    // Double authentification : le compteur d'échecs n'est remis à zéro qu'après le code (sinon, chaque bon mot de passe
+    // rouvrirait une série d'essais de codes).
+    if (u.totp_enabled) { log.auth('AUTH_PASSWORD_OK', { ip, user: u.username }); return { user: u, secondFactor: true }; }
     q.ok.run(now, u.id);
     log.auth('AUTH_OK', { ip, user: u.username });
     return { user: u };
+  }
+  // Fin d'une connexion en deux étapes (code TOTP ou de secours) ; échec = un échec de connexion de plus (verrouillage à 10).
+  function secondFactorOk(req, u) { q.ok.run(Date.now(), u.id); log.auth('AUTH_OK', { ip: req.ip, user: u.username }); }
+  function secondFactorFail(req, u) {
+    q.fail.run(Date.now() + 15 * 60_000, u.id);
+    log.auth('AUTH_FAIL', { ip: req.ip, user: u.username, reason: 'totp' });
   }
 
   async function createUser({ username, password, role = 'user', mustChange = false, allApps = true }) {
@@ -153,7 +162,7 @@ export function createAuth({ db, log, cookieSecure }) {
   const userCount = () => q.count.get().n;
 
   return { openSession, closeSession, loadSession, originCheck, requireUser, requireAdmin, login, createUser,
-    changePassword, userCount, createLimit, userByName: (n) => q.userByName.get(n) };
+    changePassword, userCount, createLimit, ipLimit, secondFactorOk, secondFactorFail, userByName: (n) => q.userByName.get(n) };
 }
 
 export function checkCredentials(username, password) {

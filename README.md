@@ -31,9 +31,25 @@ Ouvrir http://localhost:8787/ : le premier compte créé devient administrateur.
 | `TRUST_PROXY` | désactivé | Nombre de mandataires de confiance (Cloudflare + Traefik : à régler et vérifier) |
 | `COOKIE_SECURE` | `0` | `1` derrière HTTPS terminé par le mandataire |
 | `SCRYPT_N` | `32768` | Coût du hachage des mots de passe (viser environ 100 ms sur le VPS) |
-| `CRAFTY_SECRET` | aucun | Chiffre les clés des fournisseurs d'IA (AES-256-GCM). Sans lui, elles sont gardées en clair dans la base. |
+| `CRAFTY_SECRET` | aucun | Chiffre les clés des fournisseurs d'IA et les secrets de double authentification (AES-256-GCM). Sans lui, ils sont gardés en clair dans la base. |
 | `APPS_FILE` | `./apps.json` | Registre des applications (essais : un registre qui en active d'autres) |
 | `CSP` | `auto` | `auto` (stricte, empreintes calculées), `off`, ou une politique fixe |
+| `PRECOMPRESSED_DIR` | `./precompressed` | Sortie de `scripts/precompress.mjs` (Brotli 11 + gzip), servie depuis le disque |
+| `STATIC_CACHE_MB` | `256` | Mémoire du cache de compression à la volée |
+| `BACKUP_EVERY_HOURS` | `0` | Instantané de la base dans `DATA_DIR/backups` (24 dans l'image Docker) ; `BACKUP_KEEP` : 14 |
+| `PUBLIC_ORIGIN`, `SSO_SHARED_SECRET`, `SSO_DASHY_URL` | aucun | Connexion unique avec Dashy (les trois sont nécessaires) |
+
+## Déploiement et exploitation
+
+Coolify, Docker, adresse IP réelle, sauvegarde et restauration, mise à jour d'une application, fail2ban, comptes de secours,
+double authentification, SSO : `docs/DEPLOIEMENT.md`. Essai local de l'image (liée à 127.0.0.1) :
+
+```bash
+docker compose up -d --build
+```
+
+Scripts : `node scripts/update-app.mjs [slug]`, `node scripts/accounts.mjs list`, `node scripts/backup.mjs [list | restore <nom>]`,
+`node scripts/scrypt-bench.mjs`, `node scripts/precompress.mjs`.
 
 ## Tests
 

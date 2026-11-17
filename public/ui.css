@@ -214,3 +214,19 @@ dialog.wide { width: min(640px, calc(100vw - 32px)); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Compte : double authentification (account.js) ---------- */
+.qr-box { display: grid; place-items: center; padding: 14px; margin: 4px 0; background: #fff; border: 1px solid var(--line); border-radius: 18px; }
+.qr-box .qr { width: 200px; height: 200px; image-rendering: pixelated; }
+.dlg-body details { font-size: 13px; color: var(--mut); }
+.dlg-body details summary { cursor: pointer; }
+code.secret { display: block; margin-top: 6px; font: 600 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .06em; color: var(--fg); user-select: all; }
+.code-input { font: 600 20px/1 ui-monospace, SFMono-Regular, Consolas, monospace !important; letter-spacing: .25em; text-align: center; }
+.recovery-codes { columns: 2; column-gap: 28px; margin: 4px 0; padding-left: 24px; font: 14px/1.9 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ---------- Listes clé / valeur (administration → Système) ---------- */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; margin: 4px 0 0; font-size: 13px; }
+.kv dt { color: var(--mut); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.kv code, .card p code { font: 12.5px ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }

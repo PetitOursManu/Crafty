@@ -1,6 +1,7 @@
 // Assemblage du service : en-têtes, sessions, API (connexion, fichiers, administration), pages et applications.
 import express from 'express';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, constants as fsConstants } from 'node:fs';
+import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
@@ -14,6 +15,8 @@ import { createAppData } from './appdata.js';
 import { createAi } from './ai.js';
 import { sharesRoutes } from './shares.js';
 import { i18nMiddleware } from './i18n.js';
+import { createTwoFactor } from './twofactor.js';
+import { createSso } from './sso.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -29,6 +32,7 @@ export function tuneServer(srv) {
 export function createApp({
   root = ROOT,
   vendorDir = join(root, 'vendor'),
+  precompressedDir = process.env.PRECOMPRESSED_DIR || join(root, 'precompressed'),
   appsFile = process.env.APPS_FILE || join(root, 'apps.json'),
   dataDir = process.env.DATA_DIR || join(root, 'data'),
   dbFile = join(dataDir, 'craft.db'),
@@ -37,6 +41,8 @@ export function createApp({
   cookieSecure = process.env.COOKIE_SECURE === '1',
   quiet = false,
   aiOptions = null, // essais : fetchImpl, secret (sinon CRAFTY_SECRET)
+  twoFactorOptions = null, // essais : secret (sinon CRAFTY_SECRET)
+  ssoOptions = null, // essais : secret, dashyUrl, origin (sinon SSO_SHARED_SECRET, SSO_DASHY_URL, PUBLIC_ORIGIN)
 } = {}) {
   const registry = JSON.parse(readFileSync(appsFile, 'utf8'));
   // Seules les applications activées et réellement présentes dans vendor/ sont proposées.
@@ -48,8 +54,10 @@ export function createApp({
   const files = createFiles({ db, dataDir, log, settings: db.settings });
   const appData = createAppData({ db, dataDir });
   const ai = createAi({ db, log, ...(aiOptions || {}) });
+  const twofa = createTwoFactor({ db, log, auth, ...(twoFactorOptions || {}) });
+  const sso = createSso({ db, log, auth, settings: db.settings, cookieSecure, ...(ssoOptions || {}) });
   files.cleanTmp();
-  const st = createStatic({ apps, vendorDir, csp });
+  const st = createStatic({ apps, vendorDir, csp, precompressedDir });
   const json = express.json({ limit: '64kb' });
 
   const app = express();
@@ -59,6 +67,7 @@ export function createApp({
   app.set('trust proxy', /^\d+$/.test(String(trustProxy)) ? Number(trustProxy) : trustProxy === 'true' ? true : trustProxy || false);
   app.locals.db = db;
   app.locals.files = files;
+  app.locals.dataDir = dataDir;
   app.use(st.headers);
   app.use(auth.loadSession);
   app.use(i18nMiddleware); // messages d'erreur en anglais selon Accept-Language (src/i18n.js)
@@ -78,14 +87,27 @@ export function createApp({
     prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {}, mode: apps[slug].mode || 'bridge',
     data: apps[slug].data || null, tools: apps[slug].tools || [] });
 
+  // --- Santé (sonde du conteneur) : base lisible, dossier de données accessible en écriture, au moins une application ---
+  app.get('/api/health', async (req, res) => {
+    const checks = {};
+    try { db.prepare('SELECT 1').get(); checks.db = true; } catch { checks.db = false; }
+    try { if (dataDir !== ':memory:') await access(dataDir, fsConstants.W_OK); checks.data = true; } catch { checks.data = false; }
+    checks.apps = Object.keys(apps).length;
+    const ok = checks.db && checks.data && checks.apps > 0;
+    res.status(ok ? 200 : 503).set('Cache-Control', 'no-store').json({ ok, ...checks });
+  });
+
   // --- Connexion ---
   app.get('/api/auth/config', (req, res) => {
     const s = db.settings();
-    res.set('Cache-Control', 'no-store').json({ setup: auth.userCount() === 0, signupOpen: !!s.signup_open, guestEnabled: !!s.guest_enabled });
+    res.set('Cache-Control', 'no-store').json({ setup: auth.userCount() === 0, signupOpen: !!s.signup_open, guestEnabled: !!s.guest_enabled,
+      sso: { dashy: sso.enabled } });
   });
   app.post('/api/auth/login', json, async (req, res) => {
     const r = await auth.login(req, req.body?.username, req.body?.password);
     if (r.error) return res.status(r.status).json({ error: r.error });
+    // Double authentification : pas encore de session, un ticket pour l'étape du code (src/twofactor.js).
+    if (r.secondFactor) return res.set('Cache-Control', 'no-store').json({ twoFactor: true, ticket: twofa.startTicket(r.user) });
     auth.openSession(req, res, { userId: r.user.id });
     req.user = { id: r.user.id, username: r.user.username };
     log.audit(req, 'auth.login');
@@ -143,7 +165,9 @@ export function createApp({
     if (req.guest) return res.json({ guest: true, apps: allowedApps(req).map(appJson) });
     if (!req.user) return res.status(401).json({ error: 'Connexion requise.' });
     const { id, username, role, mustChange, theme } = req.user;
-    res.json({ user: { id, username, role, mustChange, theme }, apps: mustChange ? [] : allowedApps(req).map(appJson),
+    const row = db.prepare('SELECT pass_hash, totp_enabled, dashy_sub FROM users WHERE id = ?').get(id);
+    const account = { hasPassword: String(row.pass_hash).startsWith('scrypt$'), twoFactor: !!row.totp_enabled, dashy: !!row.dashy_sub, ssoDashy: sso.enabled };
+    res.json({ user: { id, username, role, mustChange, theme, ...account }, apps: mustChange ? [] : allowedApps(req).map(appJson),
       usage: files.usage(req.user), autosave: db.settings().autosave_seconds });
   });
   app.patch('/api/me', auth.requireUser, json, (req, res) => {
@@ -157,7 +181,10 @@ export function createApp({
   appData.routes(app, { requireUser: auth.requireUser, allowedApps, apps, usage: files.usage });
   sharesRoutes(app, { db, files, log, settings: db.settings, requireUser: auth.requireUser, json });
   ai.routes(app, { requireUser: auth.requireUser, requireAdmin: auth.requireAdmin, json: express.json({ limit: '8mb' }) });
-  adminRoutes(app, { db, auth, files, appData, log, apps, json });
+  twofa.routes(app, { json, requireUser: auth.requireUser });
+  sso.routes(app, { json });
+  adminRoutes(app, { db, auth, files, appData, log, apps, json, trustProxy, cookieSecure, twofa, sso,
+    backupDir: dataDir === ':memory:' ? null : (process.env.BACKUP_DIR || join(dataDir, 'backups')) });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));
 
   // --- Applications : session obligatoire et application autorisée, sinon 404 ---

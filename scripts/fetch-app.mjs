@@ -4,11 +4,10 @@
 // release et empreinte de l'asset donnée par l'API GitHub), le décompresse dans
 // vendor/<slug>/<version>/ et met à jour apps.json. Écrit aussi vendor/<slug>/<version>.sha256
 // (format sha256sum) pour vérifier plus tard qu'aucun fichier n'a été modifié.
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile, stat } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listZip, readEntry, safeName } from './unzip.mjs';
+import { extractZip, sha256, UA } from './vendor-lib.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [arg, wantTag] = process.argv.slice(2);
@@ -18,9 +17,8 @@ if (!slug || !/^[a-z0-9-]+$/.test(slug) || !/^[a-z0-9][a-z0-9-]{0,38}$/i.test(ow
   process.exit(2);
 }
 
-const headers = { 'User-Agent': 'craft-host-fetch', Accept: 'application/vnd.github+json' };
+const headers = { 'User-Agent': UA, Accept: 'application/vnd.github+json' };
 if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-const sha256 = (b) => createHash('sha256').update(b).digest('hex');
 
 async function get(url, binary = false) {
   const r = await fetch(url, { headers: binary ? { 'User-Agent': headers['User-Agent'] } : headers });
@@ -61,33 +59,9 @@ if (sums) {
 console.log(`SHA-256 ${digest} ${checks.length ? `vérifié (${checks.join(' + ')})` : 'NON vérifié : la release ne publie aucune empreinte'}`);
 // Note : SHA256SUMS.txt.asc (signature GPG) existe mais n'est pas vérifiée ici.
 
-const entries = listZip(zip);
-for (const e of entries) if (!safeName(e.name)) throw new Error(`chemin refusé dans le zip : ${e.name}`);
-// Les zips Craft contiennent un dossier racine <slug>-web-<version>/ : on le retire.
-const files = entries.filter((e) => !e.name.endsWith('/'));
-const tops = new Set(files.map((e) => e.name.split('/')[0]));
-const strip = tops.size === 1 && files.every((e) => e.name.includes('/')) ? `${[...tops][0]}/` : '';
-
 const dest = join(ROOT, 'vendor', slug, version);
-if (await stat(dest).catch(() => null)) {
-  console.log(`${dest} existe déjà : pas de réécriture (vérifier avec scripts/verify-vendor.mjs).`);
-} else {
-  const tmp = `${dest}.tmp-${process.pid}`;
-  await rm(tmp, { recursive: true, force: true });
-  const manifest = [];
-  for (const e of files) {
-    const rel = e.name.slice(strip.length);
-    const data = readEntry(zip, e);
-    const out = join(tmp, ...rel.split('/'));
-    await mkdir(dirname(out), { recursive: true });
-    await writeFile(out, data, { flag: 'wx' });
-    manifest.push(`${sha256(data)}  ${rel}`);
-  }
-  await rename(tmp, dest);
-  manifest.sort((a, b) => a.slice(66).localeCompare(b.slice(66)));
-  await writeFile(`${dest}.sha256`, manifest.join('\n') + '\n');
-  console.log(`${files.length} fichiers dans ${dest}`);
-}
+const { strip, files, existed } = await extractZip(zip, dest);
+console.log(existed ? `${dest} existe déjà : pas de réécriture (vérifier avec scripts/verify-vendor.mjs).` : `${files} fichiers dans ${dest}`);
 
 const appsPath = join(ROOT, 'apps.json');
 const apps = JSON.parse(await readFile(appsPath, 'utf8').catch(() => '{}'));

@@ -6,8 +6,9 @@
 import explorer from '/i18n/en-explorer.js';
 import host from '/i18n/en-host.js';
 import common from '/i18n/en-common.js';
+import account from '/i18n/en-account.js';
 
-const EN = { ...common, ...explorer, ...host };
+const EN = { ...common, ...explorer, ...host, ...account };
 export const lang = (() => {
   try { return String(navigator.languages?.[0] || navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en'; } catch { return 'fr'; }
 })();

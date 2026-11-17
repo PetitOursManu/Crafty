@@ -2,6 +2,7 @@
 // changement de mot de passe obligatoire.
 import { api, h } from '/ui.js';
 import { t, translateDom } from '/i18n.js';
+import { codeInput, ssoMessage, startDashy } from '/account.js';
 
 translateDom();
 
@@ -40,9 +41,11 @@ function showLogin() {
     onSubmit: async () => {
       need([u.value, t('Indiquez votre identifiant.')], [p.value, t('Indiquez votre mot de passe.')]);
       const r = await api('/api/auth/login', { method: 'POST', body: { username: u.value.trim(), password: p.value } });
-      if (r.mustChange) showChange(p.value); else go();
+      if (r.twoFactor) showCode(r.ticket, p.value);
+      else if (r.mustChange) showChange(p.value); else go();
     },
     alt: [
+      config.sso?.dashy && h('button', { class: 'btn', type: 'button', onclick: dashy }, t('Se connecter avec Dashy')),
       config.signupOpen && h('button', { class: 'btn', type: 'button', onclick: showRegister }, t('Créer un compte')),
       config.guestEnabled && h('button', { class: 'btn ghost', type: 'button', onclick: guest }, t('Continuer en invité (sans enregistrement)')),
     ].filter(Boolean),
@@ -78,6 +81,32 @@ function showChange(current = '') {
     alt: [h('button', { class: 'btn ghost', type: 'button', onclick: async () => { await api('/api/auth/logout', { method: 'POST' }); location.href = '/login.html'; } }, t('Se déconnecter'))],
   });
 }
+// Deuxième étape : code de l'application d'authentification, ou code de secours.
+function showCode(ticket, password) {
+  const c = codeInput(true);
+  form({
+    title: t('Code de vérification'), lead: t('Saisissez le code à 6 chiffres affiché par votre application d\'authentification.'),
+    fields: [field(t('Code'), c, t('Téléphone perdu ? Saisissez un de vos codes de secours (xxxxx-xxxxx).'))],
+    submit: t('Vérifier'),
+    onSubmit: async () => {
+      need([c.value.trim(), t('Indiquez le code.')]);
+      try {
+        const r = await api('/api/auth/2fa', { method: 'POST', body: { ticket, code: c.value.trim() } });
+        if (r.recoveryLeft !== undefined) sessionStorage.setItem('craft-recovery-left', String(r.recoveryLeft));
+        if (r.mustChange) showChange(password); else go();
+      } catch (e) {
+        if (e.data?.expired) { showLogin(); view.querySelector('.error-text').textContent = e.message; return; }
+        c.select();
+        throw e;
+      }
+    },
+    alt: [h('button', { class: 'btn ghost', type: 'button', onclick: showLogin }, t('Retour'))],
+  });
+}
+async function dashy() {
+  try { await startDashy({ next }); }
+  catch (e) { view.querySelector('.error-text').textContent = e.message; }
+}
 async function guest() {
   try { await api('/api/auth/guest', { method: 'POST' }); location.href = '/'; }
   catch (e) { view.querySelector('.error-text').textContent = e.message; }
@@ -87,3 +116,9 @@ config = await api('/api/auth/config').catch(() => config);
 if (q.has('change')) showChange();
 else if (config.setup) showRegister(true);
 else showLogin();
+// Retour de Dashy en échec (?sso=<raison>) : message sous le formulaire.
+if (q.get('sso') && !config.setup) {
+  view.querySelector('.error-text').textContent = ssoMessage(q.get('sso'));
+  q.delete('sso');
+  history.replaceState(null, '', `${location.pathname}${q.size ? `?${q}` : ''}`);
+}

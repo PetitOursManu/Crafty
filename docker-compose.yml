@@ -1,0 +1,40 @@
+# Crafty en Docker Compose : essai local, ou modèle des réglages à reporter dans Coolify (docs/DEPLOIEMENT.md).
+#   docker compose up -d --build        → http://127.0.0.1:8787 (lié à la boucle locale seulement)
+#   PRECOMPRESS_QUALITY=5 docker compose build   → build d'essai rapide (Brotli 5 au lieu de 11)
+services:
+  crafty:
+    build:
+      context: .
+      args:
+        PRECOMPRESS_QUALITY: ${PRECOMPRESS_QUALITY:-11}
+    image: crafty:latest
+    container_name: crafty
+    ports:
+      # Boucle locale par défaut : rien n'est exposé sans le décider. Dans Coolify, c'est Traefik qui publie.
+      - "${CRAFTY_BIND:-127.0.0.1}:8787:8787"
+    volumes:
+      - crafty-data:/data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      # Derrière Cloudflare + Traefik : à régler puis vérifier (docs/DEPLOIEMENT.md, « Adresse IP réelle »).
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1g
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  crafty-data:

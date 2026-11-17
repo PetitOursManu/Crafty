@@ -1,0 +1,22 @@
+# Contexte de build : le code seulement. Les applications sont téléchargées au build (Dockerfile, étape vendor) ;
+# les données (comptes, fichiers, sessions) ne doivent jamais entrer dans une image ni dans un cache de build.
+.git
+.gitignore
+.claude
+node_modules
+vendor
+precompressed
+data
+backups
+*.log
+test
+e2e
+test-results
+assets
+docs
+*.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.env
+.env.*

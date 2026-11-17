@@ -1,12 +1,13 @@
 // Administration : comptes, applications par compte, réglages (inscription, invités, versions, quotas), journal.
 import { renderAi } from '/admin-ai.js';
+import { renderSystem } from '/admin-system.js';
 import { api, h, icon, toast, dialog, confirmDialog, openMenu, menuAt, appTile, formatSize, formatDateTime, accountButton, syncTheme } from '/ui.js';
 import { t, translateDom } from '/i18n.js';
 
 translateDom();
 
 const $ = (id) => document.getElementById(id);
-let me, apps = [], users = [], settings = null;
+let me, apps = [], users = [], settings = null, ssoEnabled = false;
 const GIB = 1024 ** 3, MIB = 1024 ** 2;
 
 function tempPassword() {
@@ -17,7 +18,7 @@ function tempPassword() {
 const fail = (title) => (e) => toast({ type: 'error', title, detail: e.message });
 
 // ---------- Onglets ----------
-const TABS = ['users', 'settings', 'ai', 'audit'];
+const TABS = ['users', 'settings', 'ai', 'system', 'audit'];
 function selectTab(name) {
   for (const tb of TABS) {
     const on = tb === name;
@@ -28,6 +29,7 @@ function selectTab(name) {
   history.replaceState(null, '', `#${name}`);
   if (name === 'audit') loadAudit();
   if (name === 'ai') renderAi($('ai'), users);
+  if (name === 'system') renderSystem($('system')).catch(fail(t('Chargement impossible')));
 }
 for (const tb of TABS) {
   $(`tab-${tb}`).onclick = () => selectTab(tb);
@@ -73,6 +75,8 @@ function userRow(u) {
     { label: t('Modifier…'), icon: 'edit', onClick: () => editUser(u) },
     { label: t('Nouveau mot de passe provisoire…'), icon: 'key', onClick: () => resetPassword(u) },
     u.locked && { label: t('Déverrouiller'), icon: 'key', onClick: () => patch(u, { unlock: true }, t('Compte déverrouillé.')) },
+    u.twoFactor && { label: t('Retirer la double authentification…'), icon: 'shield', onClick: () => reset2fa(u) },
+    u.dashy && u.hasPassword && { label: t('Délier de Dashy'), icon: 'user', onClick: () => patch(u, { unlinkDashy: true }, t('Compte délié de Dashy.')) },
     u.id !== me.user.id && (u.disabled
       ? { label: t('Réactiver'), icon: 'check', onClick: () => patch(u, { disabled: false }, t('Compte réactivé.')) }
       : { label: t('Désactiver'), icon: 'logout', onClick: () => patch(u, { disabled: true }, t('Compte désactivé, ses sessions sont fermées.')) }),
@@ -86,7 +90,9 @@ function userRow(u) {
         u.role === 'admin' ? h('span', { class: 'badge accent' }, t('admin')) : null,
         u.disabled ? h('span', { class: 'badge danger' }, t('désactivé')) : null,
         u.locked ? h('span', { class: 'badge danger' }, t('verrouillé')) : null,
-        u.mustChange ? h('span', { class: 'badge warn' }, t('mot de passe provisoire')) : null)))),
+        u.mustChange ? h('span', { class: 'badge warn' }, t('mot de passe provisoire')) : null,
+        u.twoFactor ? h('span', { class: 'badge' }, t('double authentification')) : null,
+        u.dashy ? h('span', { class: 'badge' }, u.hasPassword ? t('lié à Dashy') : t('Dashy seulement')) : null)))),
     h('td', {}, u.role === 'admin' || u.allApps ? h('span', { class: 'badge' }, t('Toutes'))
       : h('div', { class: 'apps-cell' }, u.apps.length ? u.apps.map((s) => h('span', { class: 'badge' }, nameOf(s))) : h('span', { class: 'badge danger' }, t('Aucune')))),
     h('td', {}, h('div', { class: 'space' },
@@ -163,6 +169,11 @@ async function resetPassword(u) {
   try { await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: { password } }); await loadUsers(); showPassword(u.username, password); }
   catch (e) { fail(t('Réinitialisation impossible'))(e); }
 }
+async function reset2fa(u) {
+  if (!(await confirmDialog({ title: t('Retirer la double authentification de {name} ?', { name: u.username }), danger: true, confirm: t('Retirer'),
+    message: t('À faire seulement si la personne a perdu son téléphone et ses codes de secours, après avoir vérifié son identité. Elle pourra la réactiver depuis son compte.') }))) return;
+  await patch(u, { reset2fa: true }, t('Double authentification retirée.'));
+}
 async function deleteUser(u) {
   const size = formatSize(u.used);
   if (!(await confirmDialog({ title: t('Supprimer {name} ?', { name: u.username }), danger: true, confirm: t('Supprimer définitivement'),
@@ -191,11 +202,13 @@ function renderSettings() {
   const maxSize = h('input', { type: 'number', min: 1, max: 512, step: 1, value: String(Math.round(s.max_file_size / MIB)), required: true });
   const autosave = h('input', { type: 'number', min: 0, max: 3600, step: 5, value: String(s.autosave_seconds), required: true });
   const trashDays = h('input', { type: 'number', min: 0, max: 365, step: 1, value: String(s.trash_days), required: true });
+  const ssoCreate = switchRow(t('Comptes créés par Dashy'), t("Une identité Dashy inconnue obtient un compte Crafty à sa première connexion (administrateur si elle l'est dans Dashy). Sinon, seuls les comptes déjà liés peuvent se connecter avec Dashy."), s.sso_create_accounts);
+  ssoCreate.el.hidden = !ssoEnabled;
   const sharing = switchRow(t('Liens de partage'), t('Les comptes peuvent créer un lien public (avec expiration) vers un fichier. Désactiver coupe aussi les liens existants.'), s.sharing_enabled);
   const errEl = h('div', { class: 'error-text', role: 'alert' });
   const form = $('settings');
   form.replaceChildren(
-    h('div', { class: 'card' }, h('h3', {}, t('Accès')), signup.el, guest.el, guestBox, sharing.el),
+    h('div', { class: 'card' }, h('h3', {}, t('Accès')), signup.el, guest.el, guestBox, sharing.el, ssoCreate.el),
     h('div', { class: 'card' }, h('h3', {}, t('Fichiers')),
       h('div', { class: 'row' },
         h('label', { class: 'field' }, t('Versions conservées par fichier'), versions, h('span', { class: 'hint' }, t('Les plus anciennes sont effacées au prochain enregistrement.'))),
@@ -212,7 +225,7 @@ function renderSettings() {
     try {
       settings = await api('/api/admin/settings', { method: 'PATCH', body: {
         signup_open: signup.input.checked, guest_enabled: guest.input.checked, guest_apps: g.allApps ? null : g.apps,
-        max_versions: Number(versions.value), default_quota: Math.round(Number(quota.value) * GIB), max_file_size: Math.round(Number(maxSize.value) * MIB), autosave_seconds: Number(autosave.value), trash_days: Number(trashDays.value), sharing_enabled: sharing.input.checked } });
+        max_versions: Number(versions.value), default_quota: Math.round(Number(quota.value) * GIB), max_file_size: Math.round(Number(maxSize.value) * MIB), autosave_seconds: Number(autosave.value), trash_days: Number(trashDays.value), sharing_enabled: sharing.input.checked, sso_create_accounts: ssoCreate.input.checked } });
       errEl.textContent = '';
       toast({ title: t('Réglages enregistrés.') });
       await loadUsers();
@@ -225,7 +238,9 @@ const ACTIONS = { 'auth.login': t('Connexion'), 'auth.logout': t('Déconnexion')
   'auth.password': t('Mot de passe changé'), 'file.upload': t('Import'), 'file.save': t('Enregistrement'), 'file.autosave': t('Sauvegarde automatique'), 'file.update': t('Fichier modifié'),
   'file.delete': t('Fichier supprimé'), 'file.restore': t('Version restaurée'), 'folder.create': t('Dossier créé'), 'folder.update': t('Dossier modifié'),
   'folder.delete': t('Dossier supprimé'), 'admin.user.create': t('Compte créé'), 'admin.user.update': t('Compte modifié'),
-  'admin.user.delete': t('Compte supprimé'), 'file.trash': t('Mis à la corbeille'), 'folder.trash': t('Dossier à la corbeille'), 'file.untrash': t('Restauré de la corbeille'), 'folder.restore': t('Dossier restauré'), 'share.create': t('Lien de partage créé'), 'share.revoke': t('Lien révoqué'), 'share.access': t('Lien de partage ouvert'), 'admin.settings': t('Réglages modifiés'), 'admin.ai': t('Assistant IA modifié'), 'ai.error': t("Erreur de l'assistant") };
+  'admin.user.delete': t('Compte supprimé'), 'file.trash': t('Mis à la corbeille'), 'folder.trash': t('Dossier à la corbeille'), 'file.untrash': t('Restauré de la corbeille'), 'folder.restore': t('Dossier restauré'), 'share.create': t('Lien de partage créé'), 'share.revoke': t('Lien révoqué'), 'share.access': t('Lien de partage ouvert'), 'admin.settings': t('Réglages modifiés'), 'admin.ai': t('Assistant IA modifié'), 'ai.error': t("Erreur de l'assistant"),
+  'auth.2fa.enable': t('Double authentification activée'), 'auth.2fa.disable': t('Double authentification désactivée'), 'auth.2fa.recovery': t('Codes de secours renouvelés'),
+  'auth.sso': t('Connexion par Dashy'), 'auth.sso.create': t('Compte créé par Dashy'), 'auth.sso.link': t('Compte lié à Dashy') };
 async function loadAudit() {
   try {
     const rows = await api('/api/admin/audit?limit=200');
@@ -243,6 +258,7 @@ async function main() {
   $('newUser').onclick = newUser;
   $('refreshAudit').onclick = loadAudit;
   settings = await api('/api/admin/settings');
+  ssoEnabled = !!me.user.ssoDashy;
   renderSettings();
   await loadUsers();
   const tab = location.hash.slice(1);

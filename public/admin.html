@@ -27,6 +27,7 @@
       <button role="tab" id="tab-users" aria-controls="panel-users" aria-selected="true" data-i18n>Comptes</button>
       <button role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1" data-i18n>Réglages</button>
       <button role="tab" id="tab-ai" aria-controls="panel-ai" aria-selected="false" tabindex="-1" data-i18n>Assistant IA</button>
+      <button role="tab" id="tab-system" aria-controls="panel-system" aria-selected="false" tabindex="-1" data-i18n>Système</button>
       <button role="tab" id="tab-audit" aria-controls="panel-audit" aria-selected="false" tabindex="-1" data-i18n>Journal</button>
     </nav>
 
@@ -51,6 +52,11 @@
     <section role="tabpanel" id="panel-ai" aria-labelledby="tab-ai" hidden>
       <div class="panel-head"><div><h2 data-i18n>Assistant IA</h2><p class="mut" data-i18n>Fournisseurs, modèles et comptes autorisés. Les conversations ne sont pas conservées.</p></div></div>
       <div id="ai"></div>
+    </section>
+
+    <section role="tabpanel" id="panel-system" aria-labelledby="tab-system" hidden>
+      <div class="panel-head"><div><h2 data-i18n>Système</h2><p class="mut" data-i18n>Réseau, connexion unique, secrets et sauvegardes.</p></div></div>
+      <div id="system" class="settings"></div>
     </section>
 
     <section role="tabpanel" id="panel-audit" aria-labelledby="tab-audit" hidden>

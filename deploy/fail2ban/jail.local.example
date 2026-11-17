@@ -1,0 +1,33 @@
+# Prison fail2ban pour Crafty : à ajouter à /etc/fail2ban/jail.local (filtre : filter.d/crafty.conf).
+#
+# Le journal est dans le volume /data du conteneur. Chemin sur l'hôte :
+#   docker volume inspect <volume de Crafty> --format '{{ .Mountpoint }}'   → <point de montage>/logs/auth.log
+# (dans Coolify, le nom du volume est affiché dans « Persistent Storage » de la ressource).
+#
+# Crafty verrouille déjà le COMPTE (10 échecs → 15 min) et limite chaque IP (8 essais/min). La prison bannit l'ADRESSE :
+# c'est ce qui arrête quelqu'un qui essaie une liste d'identifiants.
+
+[crafty]
+enabled  = true
+filter   = crafty
+logpath  = /var/lib/docker/volumes/<volume>/_data/logs/auth.log
+backend  = auto
+maxretry = 10
+findtime = 10m
+bantime  = 1h
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Action : choisir UNE des deux, selon que le domaine passe ou non par le proxy de Cloudflare (nuage orange).
+# ---------------------------------------------------------------------------------------------------------------------
+# A. Derrière Cloudflare : un blocage iptables sur le VPS ne sert à rien (les connexions arrivent des adresses de
+#    Cloudflare, pas du visiteur). Le bannissement se fait chez Cloudflare par son API, avec un jeton limité à
+#    « Zone → Firewall Services → Edit » sur la zone concernée (action fournie avec fail2ban 1.0 et plus) :
+action = cloudflare-token[cftoken="<jeton API>", cfzone="<identifiant de zone>"]
+
+# B. Sans Cloudflare (DNS seul, nuage gris) : blocage local. Docker publie le port 443 de Traefik par la chaîne
+#    DOCKER-USER, pas INPUT : bloquer dans INPUT laisserait passer le trafic vers les conteneurs.
+# action = iptables-multiport[name=crafty, port="http,https", chain=DOCKER-USER]
+
+# Avant d'activer : l'adresse ip= des lignes AUTH_* doit être celle du visiteur, pas celle de Traefik ou de Cloudflare
+# (Administration → Système → « Vérifier », et docs/DEPLOIEMENT.md « Adresse IP réelle »). Sinon chaque bannissement
+# viserait le proxy et couperait le service pour tout le monde.

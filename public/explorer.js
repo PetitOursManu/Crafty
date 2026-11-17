@@ -639,6 +639,7 @@ async function main() {
   $('trashBtn').onclick = () => (state.inTrash ? load(null, { push: true }) : showTrash({ push: true }));
   quick.refresh();
   const qs = new URLSearchParams(location.search);
+  if (qs.has('sso')) import('/account.js').then((m) => m.ssoNotice()).catch(() => {}); // retour de Dashy (liaison du compte)
   await load(qs.get('folder'));
   if (qs.has('trash')) await showTrash();
   // Assistant IA (si l'admin l'a ouvert à ce compte) : outils de l'explorateur.

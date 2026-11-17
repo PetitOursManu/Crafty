@@ -52,7 +52,8 @@
     "source": "https://github.com/storytold/pdfcraft/releases/tag/v0.21.1",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/pdfcraft"
   },
   "wordcraft": {
     "enabled": true,
@@ -126,7 +127,8 @@
     },
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/wordcraft"
   },
   "gridcraft": {
     "enabled": true,
@@ -186,7 +188,8 @@
     "source": "https://github.com/storytold/gridcraft/releases/tag/v0.19.1",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/gridcraft"
   },
   "deckcraft": {
     "enabled": true,
@@ -241,7 +244,8 @@
     "source": "https://github.com/storytold/deckcraft/releases/tag/v0.18.1",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/deckcraft"
   },
   "cadcraft": {
     "enabled": true,
@@ -299,7 +303,8 @@
       "calculator",
       "converter",
       "colors"
-    ]
+    ],
+    "repo": "storytold/cadcraft"
   },
   "figcraft": {
     "enabled": true,
@@ -358,7 +363,8 @@
     "tools": [
       "colors",
       "converter"
-    ]
+    ],
+    "repo": "storytold/figcraft"
   },
   "photocraft": {
     "enabled": false,
@@ -375,7 +381,8 @@
     "source": "https://github.com/storytold/photocraft/releases/tag/v0.23.1",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/photocraft"
   },
   "vectorcraft": {
     "enabled": true,
@@ -438,7 +445,8 @@
     "tools": [
       "colors",
       "converter"
-    ]
+    ],
+    "repo": "storytold/vectorcraft"
   },
   "lightcraft": {
     "enabled": false,
@@ -455,7 +463,8 @@
     "source": "https://github.com/storytold/lightcraft/releases/tag/v0.21.1",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/lightcraft"
   },
   "effectcraft": {
     "enabled": true,
@@ -510,7 +519,8 @@
     },
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/effectcraft"
   },
   "designcraft": {
     "enabled": true,
@@ -541,7 +551,8 @@
     "tools": [
       "converter",
       "colors"
-    ]
+    ],
+    "repo": "storytold/designcraft"
   },
   "texturecraft": {
     "enabled": true,
@@ -581,7 +592,8 @@
     "description": "Peinture de textures sur modèles 3D (tcraft)",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/texturecraft"
   },
   "materialcraft": {
     "enabled": true,
@@ -610,7 +622,8 @@
     "description": "Matériaux procéduraux par nœuds (mcraft, sbs)",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/materialcraft"
   },
   "soundcraft": {
     "enabled": true,
@@ -639,7 +652,8 @@
       "SHA256SUMS.txt"
     ],
     "stripPrefix": "soundcraft-web-0.20.1/",
-    "source": "https://github.com/storytold/soundcraft/releases/tag/v0.20.1"
+    "source": "https://github.com/storytold/soundcraft/releases/tag/v0.20.1",
+    "repo": "storytold/soundcraft"
   },
   "craft-anything": {
     "enabled": true,
@@ -660,7 +674,8 @@
     ],
     "stripPrefix": "craft-anything-web-0.6.1/",
     "source": "https://github.com/storytold/craft-anything/releases/tag/v0.6.1",
-    "description": "Analyse de n'importe quel fichier (lecture seule)"
+    "description": "Analyse de n'importe quel fichier (lecture seule)",
+    "repo": "storytold/craft-anything"
   },
   "filmcraft": {
     "enabled": false,
@@ -677,7 +692,8 @@
     "source": "https://github.com/storytold/filmcraft/releases/tag/v0.20.1",
     "tools": [
       "colors"
-    ]
+    ],
+    "repo": "storytold/filmcraft"
   },
   "mailcraft": {
     "enabled": true,

@@ -18,6 +18,15 @@ export default {
   'Trop de comptes créés depuis cette adresse.': 'Too many accounts created from this address.',
   'Le mode invité est désactivé.': 'Guest mode is disabled.',
   'Trop de sessions invitées depuis cette adresse.': 'Too many guest sessions from this address.',
+
+  // Double authentification (twofactor.js)
+  'Code incorrect.': 'Incorrect code.',
+  'Délai dépassé : reconnectez-vous.': 'Time is up: please sign in again.',
+  'Trop de codes faux : reconnectez-vous.': 'Too many wrong codes: please sign in again.',
+  'Compte relié à Dashy : la double authentification se règle dans Dashy.': 'This account signs in with Dashy: two-factor authentication is set up in Dashy.',
+  'La double authentification est déjà active.': 'Two-factor authentication is already on.',
+  'La double authentification n\'est pas active.': 'Two-factor authentication is not on.',
+  'Recommencez la mise en place.': 'Please start the setup again.',
   'Mot de passe actuel incorrect.': 'Current password is incorrect.',
   'Choisissez un mot de passe différent.': 'Choose a different password.',
   'Thème invalide.': 'Invalid theme.',

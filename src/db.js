@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   autosave_seconds: 30,          // délai de la sauvegarde automatique après une modification (0 = désactivée)
   trash_days: 30,                // durée dans la corbeille avant effacement définitif (0 = pas de corbeille)
   sharing_enabled: true,         // liens de partage publics vers un fichier
+  sso_create_accounts: true,     // SSO Dashy : première connexion d'une identité Dashy inconnue = nouveau compte
 };
 
 const SCHEMA = `
@@ -135,6 +136,14 @@ export function openDb(file) {
       file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL,
       expires_at INTEGER, downloads INTEGER NOT NULL DEFAULT 0, last_access_at INTEGER, revoked INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX IF NOT EXISTS shares_file ON shares(file_id);`);
+  // Double authentification (TOTP, secret chiffré par CRAFTY_SECRET) et compte lié à une identité Dashy (SSO).
+  if (!cols('users').includes('totp_enabled')) db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT;
+    ALTER TABLE users ADD COLUMN totp_pending TEXT; ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0; ALTER TABLE users ADD COLUMN dashy_sub TEXT;`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_dashy ON users(dashy_sub) WHERE dashy_sub IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS recovery_codes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL, used_at INTEGER, PRIMARY KEY (user_id, code_hash));
+    CREATE TABLE IF NOT EXISTS sso_jti (jti TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);`);
   // Migration : colonne auto (sauvegarde automatique) ajoutée après la première version du schéma.
   if (!db.prepare('PRAGMA table_info(versions)').all().some((c) => c.name === 'auto')) db.exec('ALTER TABLE versions ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
 

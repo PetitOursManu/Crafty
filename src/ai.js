@@ -4,7 +4,7 @@
 // Fournisseurs repris de Mocky (server/text/config.js) : tous parlent le dialecte OpenAI /chat/completions, outils compris.
 // L'effort (réflexion) suit aussi Mocky (server/text/dialect.js) : « reasoning » chez OpenRouter, « reasoning_effort » pour
 // les modèles qui le connaissent ; ailleurs il n'est pas envoyé (un paramètre inconnu y vaut une erreur 400).
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { makeSealer } from './secrets.js';
 
 export const AI_PROVIDERS = [
   { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini' },
@@ -53,25 +53,7 @@ export function createAi({ db, log, secret = process.env.CRAFTY_SECRET || '', fe
   };
 
   // Clés chiffrées (AES-256-GCM) quand CRAFTY_SECRET est défini ; sinon gardées en clair dans la base (signalé dans l'admin).
-  const key = secret ? scryptSync(secret, 'crafty-ai-keys', 32) : null;
-  const seal = (plain) => {
-    if (!plain) return '';
-    if (!key) return `plain:${plain}`;
-    const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', key, iv);
-    const ct = Buffer.concat([c.update(plain, 'utf8'), c.final()]);
-    return `v1:${Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64')}`;
-  };
-  const open = (stored) => {
-    if (!stored) return '';
-    if (stored.startsWith('plain:')) return stored.slice(6);
-    if (!key) return ''; // chiffrée mais secret absent : inutilisable
-    try {
-      const b = Buffer.from(stored.slice(3), 'base64');
-      const d = createDecipheriv('aes-256-gcm', key, b.subarray(0, 12));
-      d.setAuthTag(b.subarray(12, 28));
-      return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8');
-    } catch { return ''; } // secret changé
-  };
+  const { seal, open, encrypted } = makeSealer(secret, 'crafty-ai-keys');
 
   const config = () => { const r = q.get.get(); return { ...DEFAULTS, ...(r ? JSON.parse(r.value) : {}) }; };
   const save = (c) => q.set.run(JSON.stringify(c));
@@ -144,7 +126,7 @@ export function createAi({ db, log, secret = process.env.CRAFTY_SECRET || '', fe
     // --- Administration ---
     const adminView = (c) => ({
       enabled: c.enabled, everyone: c.everyone, users: c.users, defaultProvider: c.defaultProvider, maxPerHour: c.maxPerHour, maxSteps: c.maxSteps,
-      encrypted: !!key, efforts: EFFORTS,
+      encrypted, efforts: EFFORTS,
       providers: AI_PROVIDERS.map((d) => {
         const p = c.providers[d.id] || {};
         return { id: d.id, label: d.label, defaultBaseUrl: d.baseUrl, suggestedModel: d.model, enabled: !!p.enabled, baseUrl: p.baseUrl || '', model: p.model || '',
