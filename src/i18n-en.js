@@ -20,6 +20,7 @@ export default {
   'Trop de sessions invitées depuis cette adresse.': 'Too many guest sessions from this address.',
 
   // Double authentification (twofactor.js)
+  'Nom invalide.': 'Invalid name.',
   'Code incorrect.': 'Incorrect code.',
   'Délai dépassé : reconnectez-vous.': 'Time is up: please sign in again.',
   'Trop de codes faux : reconnectez-vous.': 'Too many wrong codes: please sign in again.',

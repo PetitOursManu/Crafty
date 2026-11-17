@@ -265,6 +265,13 @@ export function createFiles({ db, dataDir, log, settings }) {
       });
     }));
     app.get('/api/usage', requireUser, (req, res) => res.set('Cache-Control', 'no-store').json(usage(req.user)));
+    // Fichiers du compte portant exactement ce nom (hors corbeille) : médias d'un projet qui ne les contient pas (FilmCraft).
+    app.get('/api/files', requireUser, wrap((req, res) => {
+      const name = typeof req.query.name === 'string' ? req.query.name : '';
+      if (!name || name.length > 255) throw err(400, 'Nom invalide.');
+      res.set('Cache-Control', 'no-store').json(db.prepare(`SELECT * FROM files WHERE user_id = ? AND name = ? COLLATE NOCASE
+        AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50`).all(req.user.id, name).map(fileJson));
+    }));
 
     app.post('/api/folders', requireUser, json, wrap((req, res) => {
       const parent = folderOf(req.user, req.body?.parentId);

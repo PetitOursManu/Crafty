@@ -71,6 +71,14 @@ test('404 pour tout fichier absent ou chemin douteux, sans repli vers index.html
   }
 });
 
+test("alias d'apps.json : un préfixe lu ailleurs dans le dossier de l'application, jamais au-dehors", async () => {
+  const a = await c.get('/apps/demo/pieces/models/m.onnx');
+  assert.equal(a.status, 200);
+  assert.deepEqual(a.buf, Buffer.alloc(5000, 1));
+  for (const p of ['/apps/demo/pieces/models/../../apps.json', '/apps/demo/pieces/models/%2e%2e/%2e%2e/apps.json', '/apps/demo/pieces/models/absent.js', '/apps/other/pieces/models/m.onnx'])
+    assert.equal((await c.get(p)).status, 404, p);
+});
+
 test('/apps/demo redirige vers /apps/demo/ en gardant la requête', async () => {
   const r = await c.get('/apps/demo?host=parent&webgl');
   assert.equal(r.status, 301);

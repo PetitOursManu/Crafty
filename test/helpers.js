@@ -19,7 +19,7 @@ export async function startServer(opts = {}) {
     writeFileSync(join(v, '.htaccess'), 'secret');
   }
   writeFileSync(join(root, 'apps.json'), JSON.stringify({
-    demo: { name: 'Demo', version: '1.0.0', extensions: ['pdf'], prefKeys: ['demo.ui', 'shared'], data: { local: ['demo.data'], opfs: ['demo/'] } },
+    demo: { name: 'Demo', version: '1.0.0', alias: { 'pieces/models/': 'models/' }, extensions: ['pdf'], prefKeys: ['demo.ui', 'shared'], data: { local: ['demo.data'], opfs: ['demo/'] } },
     other: { name: 'Other', version: '1.0.0', extensions: ['docx'], prefKeys: ['other.ui', 'shared'] },
     absent: { name: 'Absent', version: '9.9.9' },
   }));

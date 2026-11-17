@@ -504,6 +504,9 @@ const INTERCEPT_APPS = {
     // Sa boîte « Save package » au premier enregistrement : format .mcraft, puis Download.
     confirm: async (p, first) => { if (!first) return; await p.waitForTimeout(1500); await p.mouse.click(32, 193); await p.waitForTimeout(500); await p.mouse.click(58, 222); } },
   effectcraft: { name: 'document.ecproj', settle: 15_000, focus: [500, 700], ctrlO: false },
+  // PhotoCraft : « New file » de son accueil puis Entrée (document 1920 × 1080) ; enregistre en PSD.
+  photocraft: { name: 'Untitled-1.psd', focus: [700, 450],
+    prepare: async (p) => { await p.mouse.click(101, 162); await p.waitForTimeout(1500); await p.keyboard.press('Enter'); await p.waitForTimeout(2000); } },
 };
 for (const [slug, c] of Object.entries(INTERCEPT_APPS)) {
   test(`${slug} (interception) : enregistrer, réouverture, Ouvrir de l'application, état « peut-être modifié »`, { skip: missing(slug), timeout: 420_000 }, async () => {
@@ -624,7 +627,9 @@ test('accueil : Entrée crée le dossier ; sélection multiple (case, Ctrl, Maj,
 
     // Lasso depuis un endroit vide de la zone jusqu'au premier élément : tout est pris.
     const area = await p.locator('#area').boundingBox(), first = await p.locator('.item').first().boundingBox();
-    await p.mouse.move(area.x + area.width - 8, area.y + area.height - 8);
+    // Point de départ visible : avec 18 applications, le bas de la zone passe sous la fenêtre (900 px).
+    const bottom = Math.min(area.y + area.height, p.viewportSize().height) - 8;
+    await p.mouse.move(area.x + area.width - 8, bottom);
     await p.mouse.down();
     await p.mouse.move(area.x + area.width / 2, area.y + area.height / 2, { steps: 5 });
     await p.mouse.move(first.x + 6, first.y + 6, { steps: 5 });
@@ -922,6 +927,132 @@ test('interface en anglais selon la langue du navigateur', { skip: missing('cadc
     await p.waitForSelector('#settings .card');
     assert.deepEqual(await leftovers(), [], 'administration');
   } finally { await b.close(); }
+});
+
+// FilmCraft (pont) : un projet .fcproj ne contient pas ses médias (« path »: « /files/<nom> ») ; la page hôte envoie les
+// fichiers Crafty de ces noms avant le projet (control.projectMedia), et FilmCraft les retrouve à l'ouverture.
+test('filmcraft : médias importés depuis Crafty, projet enregistré, réouvert avec ses médias, sauvegarde automatique', { skip: missing('filmcraft'), timeout: 300_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  const ex = (cmd, params) => b.inApp('filmcraft', (a, [c, x]) => a.execute(c, x).then((r) => JSON.parse(JSON.stringify(r ?? null))), [cmd, params]);
+  try {
+    await loginE2e0(b);
+    await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 3 } });
+    const folder = (await b.api('POST', '/api/folders', { json: { name: 'Essais filmcraft' } })).body;
+    // Deux médias dans le dossier du projet : une image et un son de 2 s (déplacé ensuite à la racine).
+    await b.upload(join(ROOT, 'public', 'brand', 'crafty-512.png'), { name: 'Plan-e2e.png', folder: folder.id });
+    const sr = 48000, n = sr * 2, wav = Buffer.alloc(44 + n * 2);
+    wav.write('RIFF', 0); wav.writeUInt32LE(36 + n * 2, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(sr, 24); wav.writeUInt32LE(sr * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(n * 2, 40);
+    for (let i = 0; i < n; i++) wav.writeInt16LE(Math.round(Math.sin(2 * Math.PI * 440 * i / sr) * 8000), 44 + i * 2);
+    const wavPath = join(tmpdir(), 'e2e-son.wav');
+    writeFileSync(wavPath, wav);
+    const son = await b.upload(wavPath, { name: 'Son-e2e.wav', folder: folder.id });
+
+    await b.host({ app: 'filmcraft', folder: folder.id });
+    await b.waitFor(() => window.hostState.control === true, 60_000);
+    await p.waitForTimeout(1500);
+    // Import de FilmCraft (showOpenFilePicker) → sélecteur Crafty, les deux médias.
+    b.inApp('filmcraft', (a) => a.execute('file.import').catch(() => {}));
+    await p.waitForSelector('dialog[open].picker-dlg', { timeout: 15_000 });
+    await p.click('dialog[open] .pk-row:has-text("Plan-e2e")');
+    await p.click('dialog[open] .pk-row:has-text("Son-e2e")', { modifiers: ['Control'] });
+    await p.click('dialog[open] button[value=ok]');
+    await b.waitFor(() => (document.getElementById('app').contentWindow.filmcraft.files() || []).length >= 2, 20_000);
+    const imported = (await b.inApp('filmcraft', (a) => a.files())).map((f) => f.path);
+    assert.deepEqual(imported.sort(), ['/files/Plan-e2e.png', '/files/Son-e2e.wav']);
+    await ex('project.select', { items: [1] });
+    const seq = await ex('file.newSequenceFromClip', {});
+    assert.ok(seq.sequence, JSON.stringify(seq));
+    await b.clickApp(750, 330);
+    await p.keyboard.press('Control+s');
+    await p.waitForSelector('dialog[open] input', { timeout: 20_000 });
+    await p.fill('dialog[open] input', 'Montage e2e.fcproj');
+    await p.keyboard.press('Enter');
+    await b.waitFor(() => window.hostState.saves[0]?.status === 'ok', 30_000);
+    const proj = (await b.api('GET', `/api/fs?folder=${folder.id}`)).body.files.find((f) => f.name === 'Montage e2e.fcproj');
+    assert.ok(proj, 'projet rangé dans le dossier');
+
+    // Réouverture depuis Crafty : médias envoyés avant le projet (le son a été déplacé : trouvé hors du dossier), aucun ne manque.
+    await b.api('PATCH', `/api/files/${son.id}`, { json: { folderId: 'root' } });
+    await b.host({ app: 'filmcraft', file: proj.id });
+    await b.waitFor(() => window.hostState.control === true, 60_000);
+    await p.waitForTimeout(6000);
+    assert.deepEqual((await ex('media.findMissing', {})).missing.map((m) => m.fileName), [], (await b.log()).slice(0, 12).join(' | '));
+    assert.ok((await b.log()).some((l) => l.includes('médias du projet : 2 envoyé(s)')), 'médias envoyés par la page hôte');
+    assert.ok((await b.inApp('filmcraft', (a) => a.inspect())).activeSequence, 'séquence du projet ouverte');
+
+    // Sauvegarde automatique (file.save) après une modification.
+    await ex('file.newBin', {});
+    await b.waitFor(() => window.hostState.autosaves >= 1, 30_000);
+    const vs = (await b.api('GET', `/api/files/${proj.id}/versions`)).body;
+    assert.equal(vs[0].auto, true);
+    assert.deepEqual(b.consoleMsgs.filter((m) => /Content Security Policy|pageerror/.test(m)), [], 'console');
+  } finally {
+    await b.api('PATCH', '/api/admin/settings', { json: { autosave_seconds: 30 } }).catch(() => {});
+    await b.close();
+  }
+});
+
+// LightCraft (interception, API command()) : photothèque dans l'OPFS (library/, originals/, thumbs/) qui suit le compte.
+test('lightcraft (interception) : photo importée depuis Crafty, export capté, bibliothèque par compte', { skip: missing('lightcraft'), timeout: 420_000 }, async () => {
+  const originals = (p) => p.frame({ url: /\/apps\/lightcraft\// }).evaluate(async () => {
+    let total = 0;
+    async function walk(d) { for await (const [, h] of d.entries()) { if (h.kind === 'directory') await walk(h); else total += (await h.getFile()).size; } }
+    try { await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('originals')); } catch {}
+    return total;
+  });
+  const cmd = (p, c, args) => p.frame({ url: /\/apps\/lightcraft\// }).evaluate(([c, a]) => window.lightcraft.command(c, JSON.stringify(a)), [c, args]);
+  const photo = readFileSync(join(ROOT, 'public', 'brand', 'crafty-512.png'));
+  const shared = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = shared.page;
+  try {
+    await loginE2e0(shared);
+    await shared.api('DELETE', '/api/appdata/lightcraft');
+    await shared.upload(join(ROOT, 'public', 'brand', 'crafty-512.png'), { name: 'Poulpe-e2e.png' });
+    const t0 = Date.now();
+    await shared.host({ app: 'lightcraft' }, 150_000);
+    assert.ok(Date.now() - t0 < 60_000, 'prête par son API (command), sans attendre le repli de 90 s');
+    await p.waitForTimeout(4000);
+    // Accueil : « Ignorer », puis Fichier › Importer des photos (Ctrl+Maj+I) → sélecteur Crafty.
+    await p.mouse.click(781, 566); await p.waitForTimeout(800);
+    await shared.clickApp(500, 300);
+    await p.keyboard.press('Control+Shift+I');
+    await p.waitForSelector('dialog[open].picker-dlg', { timeout: 15_000 });
+    await p.click('dialog[open] .pk-row:has-text("Poulpe-e2e")');
+    await p.click('dialog[open] button[value=ok]');
+    for (let i = 0; i < 30 && (await originals(p)) < photo.length; i++) await p.waitForTimeout(1000);
+    assert.equal(await originals(p), photo.length, 'original gardé dans la bibliothèque');
+    // Export : la version web exige un « dossier » (un nom), puis télécharge ; Crafty capte et range.
+    const ex = JSON.parse(await cmd(p, 'app.export', { dir: 'Exports' }));
+    assert.equal(ex.files[0].path, 'Exports/Poulpe-e2e.jpg');
+    await shared.waitFor(() => window.hostState.saves.some((s) => s.name === 'Poulpe-e2e.jpg' && s.status === 'ok'), 30_000);
+    // Bibliothèque envoyée au serveur ; déconnexion : elle quitte ce navigateur.
+    await p.waitForTimeout(3000);
+    await p.evaluate(() => window.craftDataFlush());
+    assert.equal((await shared.api('GET', '/api/appdata/lightcraft')).status, 200, 'instantané envoyé');
+    await p.click('.avatar');
+    await p.click('.menu [role=menuitem]:has-text("Se déconnecter")');
+    await p.waitForURL(/login\.html/);
+    // B sur le même navigateur : pas la photo de A.
+    const admin = await pw.browserFor(base);
+    await loginE2e0(admin);
+    await admin.api('POST', '/api/admin/users', { json: { username: 'lightb', password: 'provisoire1' } });
+    await admin.close();
+    await shared.api('POST', '/api/auth/login', { json: { username: 'lightb', password: 'provisoire1' } });
+    await shared.api('POST', '/api/auth/password', { json: { current: 'provisoire1', password: 'motdepasse2' } });
+    await shared.host({ app: 'lightcraft' }, 150_000);
+    await p.waitForTimeout(5000);
+    assert.equal(await originals(p), 0, 'B voit la photo de A');
+    // A sur un autre navigateur : sa photo revient.
+    const other = await pw.browserFor(base, { headless: !process.env.HEADED });
+    try {
+      await loginE2e0(other);
+      await other.host({ app: 'lightcraft' }, 150_000);
+      await other.page.waitForTimeout(5000);
+      assert.equal(await originals(other.page), photo.length, 'photo de A non retrouvée');
+    } finally { await other.close(); }
+  } finally { await shared.close(); }
 });
 
 // MailCraft (interception, sans API) : la 0.12.0 paniquait au démarrage ; la boîte vit dans localStorage (mailcraft.mailbox.v1).

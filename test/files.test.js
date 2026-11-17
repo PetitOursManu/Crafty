@@ -153,6 +153,19 @@ test('dossiers : arborescence, déplacement, pas de cycle, suppression récursiv
   assert.equal(blobCount(), n - 1);
 });
 
+test('recherche par nom exact : tous les dossiers du compte, jamais ceux d\'un autre, ni la corbeille', async () => {
+  const png = (t) => Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from(t)]);
+  const d = (await a.post('/api/folders', { name: 'Médias' })).data;
+  const one = (await a.upload('Plan.png', png('p1'), d.id)).data;
+  const two = (await a.upload('plan.PNG', png('p2'))).data; // autre casse, à la racine
+  await b.upload('Plan.png', png('autre compte'));
+  const found = (await a.get('/api/files?name=Plan.png')).data;
+  assert.deepEqual(found.map((f) => f.id).sort(), [one.id, two.id].sort());
+  await a.del(`/api/files/${two.id}`); // corbeille
+  assert.deepEqual((await a.get('/api/files?name=Plan.png')).data.map((f) => f.id), [one.id]);
+  assert.equal((await a.get('/api/files?name=')).status, 400);
+});
+
 test('dernière application utilisée, mémorisée par fichier', async () => {
   const f = (await a.upload('Lettre.pdf', PDF())).data;
   assert.equal(f.lastApp, null);

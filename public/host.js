@@ -153,10 +153,42 @@ function showBlocked(file) {
 }
 
 // ---------- Ouverture ----------
+// Projet qui référence ses médias sans les contenir (apps.json → control.projectMedia : expression dont le groupe 1 est le
+// nom du média, en chaîne JSON). Les fichiers Crafty de ce nom (dossier du projet d'abord) partent avant lui par le pont ;
+// l'application les range sous ce nom et les trouve en ouvrant le projet (FilmCraft : /files/<nom>, vérifié le 17/11/2026).
+// Un média absent de Crafty reste à relier dans l'application (sa boîte « Lier les médias »).
+async function sendProjectMedia(file, bytes) {
+  const re = app.control?.projectMedia;
+  if (!re || !edits(app, file.name)) return;
+  let names;
+  try { names = [...new Set([...new TextDecoder().decode(bytes).matchAll(new RegExp(re, 'g'))].map((m) => JSON.parse(`"${m[1]}"`)))]; }
+  catch (e) { log('info', `control.projectMedia : ${e.message}`, 'err'); return; }
+  const missing = [];
+  let sent = 0;
+  for (const name of names.slice(0, 500)) {
+    const found = await api(`/api/files?name=${encodeURIComponent(name)}`).catch(() => []);
+    const f = found.find((x) => x.folderId === file.folderId) || found[0];
+    if (!f) { missing.push(name); continue; }
+    const media = await (await api(`/api/files/${encodeURIComponent(f.id)}/content`, { raw: true })).arrayBuffer();
+    send('open', { name, bytes: media }, [media]);
+    sent++;
+  }
+  log('info', `médias du projet : ${sent} envoyé(s) avant lui${missing.length ? `, absents de Crafty : ${missing.join(', ')}` : ''}`, 'out');
+  // L'application range les fichiers reçus avant d'ouvrir le projet : on attend qu'elle les liste (API), 10 s au plus.
+  const list = () => { try { return iframe.contentWindow?.[slug]?.files?.() || null; } catch { return null; } };
+  for (let i = 0; sent && i < 50; i++) {
+    const l = list();
+    if (!l || names.filter((n) => !missing.includes(n)).every((n) => l.some((x) => String(x.path).endsWith(`/${n}`)))) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (missing.length) toast({ type: 'error', title: missing.length === 1 ? t('1 média du projet est introuvable dans vos fichiers') : t('{n} médias du projet sont introuvables dans vos fichiers', { n: missing.length }),
+    detail: t('{names} : reliez-les dans {app} (Fichier › Lier les médias).', { names: missing.slice(0, 5).join(', '), app: app.name }) });
+}
 async function openStoredFile(file) {
   try {
     const r = await api(`/api/files/${encodeURIComponent(file.id)}/content`, { raw: true });
     const bytes = await r.arrayBuffer();
+    await sendProjectMedia(file, bytes);
     send('open', { name: file.name, bytes }, [bytes]);
     track(file.name, file);
     await showFile(file);
@@ -204,6 +236,7 @@ async function pickHandles(opts = {}) {
   }
   const exts = [...new Set((opts.types || []).flatMap((t) => Object.values(t.accept || {}).flat())
     .map((e) => String(e).replace(/^./, '').toLowerCase()).filter((e) => /^[a-z0-9]+$/.test(e)))];
+  log('info', `showOpenFilePicker de l'application : ${exts.join(',') || '(tous)'} multiple=${!!opts.multiple}`, 'out');
   state.picks++;
   const files = await pickFiles({ title: t('Ouvrir'), exts, multiple: !!opts.multiple, folderId: state.folderId, appName: app.name });
   if (!files?.length) return null;
@@ -458,7 +491,8 @@ const intercept = () => app?.mode === 'intercept';
 async function waitInterceptReady() {
   for (let i = 0; i < 1800; i++) { // 3 min : premier chargement sur un réseau lent
     const w = iframe.contentWindow, d = iframe.contentDocument;
-    const started = w && (w.wasmBindings || typeof w[slug]?.request === 'function');
+    // API : request() (EffectCraft) ou command() (LightCraft : posée une fois le wasm initialisé, vérifié).
+    const started = w && (w.wasmBindings || typeof w[slug]?.request === 'function' || typeof w[slug]?.command === 'function');
     if (started || (i > 900 && d?.querySelector('canvas'))) {
       await new Promise((r) => setTimeout(r, 2000));
       state.ready = { mode: 'intercept', signal: started ? 'wasm' : 'canvas' };

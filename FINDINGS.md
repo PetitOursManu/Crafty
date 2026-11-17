@@ -411,6 +411,39 @@ Limites : jusqu'à 30 s de changements perdus si l'onglet est tué ; deux appare
 - **Instable, cause non établie** : DesignCraft n'a pas démarré (aucun signal en 60 puis 150 s) dans 2 batteries complètes
   sur 6 (les deux dernières, après relèvement des délais, sont entièrement vertes) ; il démarre à chaque essai isolé. Diagnostic automatique ajouté au test (capture + état).
 
+## PhotoCraft, FilmCraft, LightCraft activées (17/11/2026)
+
+Toutes vérifiées dans Chrome (page hôte réelle, CSP stricte, tests e2e dédiés qui passent).
+
+**PhotoCraft 0.23.1** (interception, pas de pont ni d'API ; `window.wasmBindings` du module de démarrage) :
+- **Pourquoi elle ne démarrait pas** : défaut de son zip. `app/photocraft-web.js` importe `./snippets/eframe-…/inline0.js`, donc
+  `app/snippets/…`, alors que le zip ne livre `snippets/` qu'à la racine (404). Corrigé sans toucher à `vendor/` : `alias`
+  `{"app/snippets/": "snippets/"}` dans `apps.json`. Seul autre 404 : `fonts/manifest.txt`, facultatif d'après sa doc.
+- Démarre en 2 à 3 s. Ctrl+S enregistre en **PSD** (`Untitled-1.psd`, 209 Ko pour 1920 × 1080 vide) : `extensions: ["psd", "pcraft"]`.
+  Sa boîte Ouvrir (`multiple`) accepte 69 formats (relevés dans `imports`). Réouverture par dépôt, Ouvrir → sélecteur Crafty,
+  état « peut-être modifié » : **vérifiés** (test d'interception commun). Réglages : `photocraft.preferences`.
+
+**FilmCraft 0.20.1** (pont `?host=parent`, API `window.filmcraft` : `execute`, `files`, `inspect`, `importFiles`…) :
+- Prête en 14 s. Son Importer passe par `showOpenFilePicker` **sans filtre de format** → sélecteur Crafty (tous les fichiers).
+- Un projet `.fcproj` ne contient **pas** ses médias : il les référence par `"path": "/files/<nom>"` (nom du fichier reçu).
+  Réouvert seul : boîte « Lier les médias », médias « Introuvable ». **Médias envoyés par le pont avant le projet** (comme un dépôt) :
+  FilmCraft les range à `/files/<nom>` et les trouve à l'ouverture (`media.findMissing` vide, séquence du projet active) :
+  **vérifié**, y compris un média déplacé hors du dossier du projet. `control.projectMedia` + `GET /api/files?name=`.
+- Sauvegarde automatique par `file.save` : **vérifiée**. Thème : aucune commande (`view.theme` absent) → non suivi.
+- Commandes : `project.select {items}` puis `file.newSequenceFromClip` ; `request()` ne connaît pas les noms de commandes.
+
+**LightCraft 0.21.1** (interception ; son pont n'a pas de sens sans document : `dirty:true` permanent) :
+- API `window.lightcraft.command(nom, json)` posée après l'init du wasm : la page hôte la reconnaît (prête en 7 à 10 s au lieu
+  du repli de 90 s sur le canvas). Pas de `engine.commands` dans la version web.
+- Import (Ctrl+Maj+I, champ fichier, 36 formats dont RAW) → sélecteur Crafty : **vérifié**.
+- **Export** : la version web exige un « dossier » (un simple nom : « Choose an export folder first. » sinon), puis télécharge →
+  capté et rangé dans Crafty : **vérifié** (`app.export {dir}` ; le bouton de sa boîte marche une fois « Dossier » rempli).
+- Bibliothèque dans l'OPFS de l'origine : `library/` (catalogue), `originals/` (photos importées), `thumbs/` (aperçus).
+  `data` : les deux premiers suivent le compte, `thumbs/` est effacé. **Vérifié** : envoyée au serveur, effacée à la déconnexion,
+  invisible pour B, retrouvée par A sur un autre navigateur. Limite : instantané entier (512 Mio au plus), renvoyé à chaque
+  changement ; les originaux importés depuis Crafty y sont comptés une seconde fois dans le quota.
+- `<link rel="icon" href="data:,">` de son `index.html` : refusé par la CSP (`img-src 'self'`), sans effet.
+
 ## Non vérifié
 
 - Firefox et Safari.

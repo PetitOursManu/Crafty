@@ -196,7 +196,11 @@ export function createApp({
     try {
       const slug = req.path.split('/')[2], a = apps[slug];
       if (!a || (req.user?.mustChange) || !allowedApps(req).includes(slug)) return notFound(res);
-      const f = safeFile(resolve(vendorDir, slug, a.version), req.path.slice(`/apps/${slug}/`.length), 'index.html');
+      let rel = req.path.slice(`/apps/${slug}/`.length);
+      // Défaut d'emballage d'une application (apps.json → alias, ex. PhotoCraft 0.23.1) : un préfixe de chemin est lu ailleurs
+      // dans son propre dossier, comme un alias nginx. vendor/ n'est pas modifié ; safeFile refuse toujours toute sortie du dossier.
+      for (const [from, to] of Object.entries(a.alias || {})) if (rel.startsWith(from)) { rel = to + rel.slice(from.length); break; }
+      const f = safeFile(resolve(vendorDir, slug, a.version), rel, 'index.html');
       if (!f) return notFound(res);
       return await st.sendStatic(req, res, f.file, st.immutable(f.rel));
     } catch (e) { next(e); }

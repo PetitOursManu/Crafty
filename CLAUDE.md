@@ -226,7 +226,15 @@ cas dans `e2e/apps.e2e.mjs` et faire passer `npm run test:e2e`.
 Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridCraft 0.19.1, DeckCraft 0.18.1, CadCraft 0.20.1 et
 FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`) ; en interception DesignCraft 0.20.1, SoundCraft 0.20.1, VectorCraft 0.24.1,
 TextureCraft 0.6.1, MaterialCraft 0.4.1, EffectCraft 0.24.1, Craft Anything 0.6.1 (14/11/2026), SolidCraft 0.44.1 (17/11/2026, test e2e repassé). Non vérifiées :
-PhotoCraft, FilmCraft, LightCraft (à voir plus tard). MailCraft 0.13.0 : vérifiée le 17/11/2026 (test e2e : démarrage, import, export).
+aucune. MailCraft 0.13.0, PhotoCraft 0.23.1, FilmCraft 0.20.1 et LightCraft 0.21.1 : vérifiées le 17/11/2026 (tests e2e).
+**Toutes les applications du catalogue ayant une version web sont actives** (17/11/2026). Trois mécanismes ajoutés ce jour-là :
+- `alias` (apps.json) : un préfixe de chemin lu ailleurs dans le dossier de l'application, comme un alias nginx (PhotoCraft 0.23.1 :
+  `app/snippets/` → `snippets/`, défaut de son emballage) ; `vendor/` intact, `safeFile` refuse toute sortie du dossier.
+- `control.projectMedia` (expression, groupe 1 = nom en chaîne JSON) : projet qui référence ses médias sans les contenir (FilmCraft :
+  `"path": "/files/<nom>"`). À l'ouverture, les fichiers Crafty de ces noms (dossier du projet d'abord, `GET /api/files?name=`)
+  partent avant le projet par le pont ; absents → avertissement, à relier dans l'application.
+- Interception prête aussi quand l'API expose `command()` (LightCraft) ; sa bibliothèque OPFS (`library/`, `originals/`) suit le
+  compte (`data`), `thumbs/` est seulement effacé. Limite : instantané entier, 512 Mio au plus, renvoyé à chaque changement.
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
 **Mode interception (décision du 14/11/2026)** pour les applications sans pont (`mode: "intercept"` dans `apps.json`) : pas de
 `?host=parent` ; prête quand `window.wasmBindings` (ou son API) existe ; Ouvrir = sélecteur Crafty remis à son champ fichier ;
@@ -239,7 +247,8 @@ vérifie `instanceof`). Pas d'état « modifié » : une frappe ou un clic depui
 possible (« Pensez à enregistrer »). Pas de sauvegarde automatique ni de thème. `imports: ["*"]` = tout fichier (Craft Anything, lecture
 seule). La capture des téléchargements vaut aussi en mode pont (exports PdfCraft rangés dans Crafty).
 Actives : DesignCraft, SoundCraft, VectorCraft, TextureCraft, MaterialCraft, EffectCraft, Craft Anything, SolidCraft (14/11/2026),
-MailCraft 0.13.0 (17/11/2026, boîte par compte ; 0.12.0 plantait). Désactivées : FilmCraft et LightCraft (pont, mais limites), PhotoCraft.
+MailCraft 0.13.0 (17/11/2026, boîte par compte ; 0.12.0 plantait), PhotoCraft et LightCraft (17/11/2026). En pont : FilmCraft
+(17/11/2026, sans thème : aucune commande). Désactivées : aucune.
 
 Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Voir `FINDINGS.md` pour chaque
-application ; PhotoCraft s'emballe autrement et ne démarre pas tel que servi.
+application.

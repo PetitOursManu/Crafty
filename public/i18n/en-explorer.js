@@ -45,6 +45,9 @@ export default {
   'Matériaux procéduraux par nœuds (mcraft, sbs)': 'Node-based procedural materials (mcraft, sbs)',
   'Station audio : pistes, clips, mixage (scraftz).': 'Audio workstation: tracks, clips, mixing (scraftz).',
   'Analyse de n\'importe quel fichier (lecture seule)': 'Analyze any file (read-only)',
+  'Photothèque et développement RAW (bibliothèque gardée par compte)': 'Photo library and RAW development (library kept per account)',
+  'Montage vidéo (projets fcproj ; médias pris dans vos fichiers)': 'Video editing (fcproj projects; media taken from your files)',
+  'Retouche photo et calques (PSD, TIFF, ORA, XCF, Krita, RAW, HEIC…)': 'Photo editing and layers (PSD, TIFF, ORA, XCF, Krita, RAW, HEIC…)',
   'Messagerie : boîte gardée par compte, import eml, mbox, pst, ics, vcf ; export eml, mbox, ics, vcf': 'Email: mailbox kept per account, import eml, mbox, pst, ics, vcf; export eml, mbox, ics, vcf',
   'CAO paramétrique 3D': '3D parametric CAD',
 

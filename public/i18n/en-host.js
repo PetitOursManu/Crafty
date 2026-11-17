@@ -199,4 +199,8 @@ export default {
   'Insérer ce résultat': 'Insert this result',
   'Calculatrice': 'Calculator',
   'Unités : 2in, 3cm… → mm ; fonctions : sqrt, sin, atan, ln, round(x;2)…': 'Units: 2in, 3cm… → mm; functions: sqrt, sin, atan, ln, round(x;2)…',
+  // Médias d'un projet qui ne les contient pas (FilmCraft)
+  '1 média du projet est introuvable dans vos fichiers': '1 media file of the project is missing from your files',
+  '{n} médias du projet sont introuvables dans vos fichiers': '{n} media files of the project are missing from your files',
+  '{names} : reliez-les dans {app} (Fichier › Lier les médias).': '{names}: link them in {app} (File › Link Media).',
 };
