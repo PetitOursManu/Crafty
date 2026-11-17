@@ -137,7 +137,7 @@ Ce que fait le script :
 3. Il passe les tests e2e de l'application.
 4. Si un test échoue, ou s'il n'y a aucun test pour elle, `apps.json` revient à l'ancienne version.
 
-Vérifié sur SolidCraft 0.44.0 (test réussi ; version remise à 0.41.0 en attendant ta décision), et en échec sur un tag
+Vérifié : SolidCraft 0.41.0 → 0.44.1 le 17/11/2026 (test réussi, version épinglée), et en échec sur un tag
 inexistant (`apps.json` intact).
 
 Ensuite : committer `apps.json`, puis redéployer. Sessions et fichiers sont dans `/data`, donc personne n'est déconnecté.

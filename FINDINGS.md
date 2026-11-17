@@ -347,7 +347,7 @@ FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **
 | MaterialCraft 0.4.1 | 4 s | `.sbs .mcraft .zip` | 1er : sa boîte « Save package » (format `.mcraft`, Download) ; ensuite téléchargement direct au nom du fichier | Ctrl+O simulé : **oui** (« Opened Mat.mcraft ») |
 | EffectCraft 0.24.1 | API avant l'interface (~15 s) | `.ecproj` | **Ctrl+S tenu par Crafty** : `file.saveAs {path}` dans son système de fichiers en mémoire puis `readFile` (son propre téléchargement est ignoré) | `addFile(url, nom)` + `file.open {path}` : **oui** |
 | Craft Anything 0.6.1 | 3 s | tout fichier (`accept` vide) | rien (lecture seule) | dépôt : **oui** (type, taille, SHA-256 affichés) |
-| SolidCraft 0.41.0 (tangency-labs) | 25 s, 2–3 s ensuite (service worker) | `.sc` + STEP, 3MF, STL, OBJ, glTF, DXF, SVG… | `showSaveFilePicker` capté | Ctrl+O simulé → `showOpenFilePicker` : **oui** (cube retrouvé, 2ᵉ version au Ctrl+S) |
+| SolidCraft 0.41.0 (tangency-labs ; 0.44.1 depuis le 17/11/2026, test e2e repassé : enregistrer, rouvrir, Ouvrir de l'application) | 25 s, 2–3 s ensuite (service worker) | `.sc` + STEP, 3MF, STL, OBJ, glTF, DXF, SVG… | `showSaveFilePicker` capté | Ctrl+O simulé → `showOpenFilePicker` : **oui** (cube retrouvé, 2ᵉ version au Ctrl+S) |
 
 **Corrigé le 14/11/2026 (vérifié)** :
 

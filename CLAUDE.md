@@ -213,7 +213,7 @@ charge pas l'application et propose celles qui le lisent.
 4. Déploiement Coolify : **préparé, pas installé** (installation à la fin du projet). Image construite et essayée en local :
    santé, arrêt propre, redémarrage sans perte, instantané et restauration (vérifiés). Restent à faire sur le VPS : ressource
    Coolify, domaine, `TRUST_PROXY` vérifié (outil : Administration → Système), `SCRYPT_N` mesuré, copie des sauvegardes hors du VPS.
-5. Exploitation : `update-app.mjs` (vérifié sur SolidCraft 0.44.0, version laissée à 0.41.0), fail2ban (filtre testé en Node, pas
+5. Exploitation : `update-app.mjs` (SolidCraft passée de 0.41.0 à 0.44.1 avec, le 17/11/2026), fail2ban (filtre testé en Node, pas
    avec `fail2ban-regex`), `accounts.mjs`. **Fait.**
 6. Options : partage **fait** ; double authentification (TOTP + 10 codes de secours) **faite** ; SSO Dashy **fait**, testé avec des jetons
    signés comme Dashy, **pas avec une vraie instance**.
@@ -225,7 +225,7 @@ Ajouter une application = `npm run fetch <slug>` (ou `<propriétaire>/<slug>` ho
 cas dans `e2e/apps.e2e.mjs` et faire passer `npm run test:e2e`.
 Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridCraft 0.19.1, DeckCraft 0.18.1, CadCraft 0.20.1 et
 FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`) ; en interception DesignCraft 0.20.1, SoundCraft 0.20.1, VectorCraft 0.24.1,
-TextureCraft 0.6.1, MaterialCraft 0.4.1, EffectCraft 0.24.1, Craft Anything 0.6.1, SolidCraft 0.41.0 (14/11/2026). Non vérifiées :
+TextureCraft 0.6.1, MaterialCraft 0.4.1, EffectCraft 0.24.1, Craft Anything 0.6.1 (14/11/2026), SolidCraft 0.44.1 (17/11/2026, test e2e repassé). Non vérifiées :
 PhotoCraft, FilmCraft, LightCraft (à voir plus tard), MailCraft 0.11.1 (partiellement, désactivée).
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
 **Mode interception (décision du 14/11/2026)** pour les applications sans pont (`mode: "intercept"` dans `apps.json`) : pas de
