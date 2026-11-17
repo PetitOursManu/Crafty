@@ -697,20 +697,20 @@
   },
   "mailcraft": {
     "enabled": true,
-    "version": "0.11.1",
-    "tag": "v0.11.1",
-    "zip": "mailcraft-web-0.11.1.zip",
-    "zipSize": 10797888,
-    "sha256": "9f06c0052ae5c3d4fa1ac218e2bbef8173bfe9d89ca86468ba6e5b531c428931",
+    "version": "0.13.0",
+    "tag": "v0.13.0",
+    "zip": "mailcraft-web-0.13.0.zip",
+    "zipSize": 12455221,
+    "sha256": "9d52701cd064808ff1829d5e7852d6b984554073d4b956d419b045a028f17adc",
     "sha256Source": [
       "digest API GitHub",
       "SHA256SUMS.txt"
     ],
-    "stripPrefix": "mailcraft-web-0.11.1/",
+    "stripPrefix": "mailcraft-web-0.13.0/",
     "repo": "ucs-care-group/mailcraft",
-    "source": "https://github.com/ucs-care-group/mailcraft/releases/tag/v0.11.1",
+    "source": "https://github.com/ucs-care-group/mailcraft/releases/tag/v0.13.0",
     "name": "MailCraft",
-    "description": "Messagerie : boîte gardée par compte, import et export eml, mbox, ics, vcf",
+    "description": "Messagerie : boîte gardée par compte, import eml, mbox, pst, ics, vcf ; export eml, mbox, ics, vcf",
     "mode": "intercept",
     "extensions": [],
     "imports": [
@@ -721,6 +721,7 @@
       "ical",
       "vcf",
       "vcard",
+      "pst",
       "mailcraft",
       "json"
     ],

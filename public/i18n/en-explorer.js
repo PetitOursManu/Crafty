@@ -45,7 +45,7 @@ export default {
   'Matériaux procéduraux par nœuds (mcraft, sbs)': 'Node-based procedural materials (mcraft, sbs)',
   'Station audio : pistes, clips, mixage (scraftz).': 'Audio workstation: tracks, clips, mixing (scraftz).',
   'Analyse de n\'importe quel fichier (lecture seule)': 'Analyze any file (read-only)',
-  'Messagerie : boîte gardée par compte, import et export eml, mbox, ics, vcf': 'Email: mailbox kept per account, import and export eml, mbox, ics, vcf',
+  'Messagerie : boîte gardée par compte, import eml, mbox, pst, ics, vcf ; export eml, mbox, ics, vcf': 'Email: mailbox kept per account, import eml, mbox, pst, ics, vcf; export eml, mbox, ics, vcf',
   'CAO paramétrique 3D': '3D parametric CAD',
 
   // ---------- explorer.js ----------
@@ -255,6 +255,6 @@ export default {
   '{name} : {app} n\'ouvre pas les fichiers .{ext}': '{name}: {app} can’t open .{ext} files',
   '{n} fichier(s) importé(s) dans vos fichiers.': '{n} file(s) uploaded to your files.',
   'Astuce : cliquez et glissez dans un espace vide pour sélectionner plusieurs éléments (Ctrl ou Maj pour en ajouter).': 'Tip: click and drag on an empty spot to select several items (hold Ctrl or Shift to add to the selection).',
-  'Que créez-vous': 'What will you',
-  "aujourd'hui ?": 'create today?',
+  'Bienvenue dans votre': 'Welcome to your',
+  'atelier': 'workshop',
 };

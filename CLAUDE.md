@@ -226,7 +226,7 @@ cas dans `e2e/apps.e2e.mjs` et faire passer `npm run test:e2e`.
 Applications vérifiées : PdfCraft 0.21.1 et WordCraft 0.18.1 (phase 0) ; GridCraft 0.19.1, DeckCraft 0.18.1, CadCraft 0.20.1 et
 FigCraft 0.18.1 (14/11/2026, `FINDINGS.md`) ; en interception DesignCraft 0.20.1, SoundCraft 0.20.1, VectorCraft 0.24.1,
 TextureCraft 0.6.1, MaterialCraft 0.4.1, EffectCraft 0.24.1, Craft Anything 0.6.1 (14/11/2026), SolidCraft 0.44.1 (17/11/2026, test e2e repassé). Non vérifiées :
-PhotoCraft, FilmCraft, LightCraft (à voir plus tard), MailCraft 0.11.1 (partiellement, désactivée).
+PhotoCraft, FilmCraft, LightCraft (à voir plus tard). MailCraft 0.13.0 : vérifiée le 17/11/2026 (test e2e : démarrage, import, export).
 Une nouvelle version d'une application vérifiée doit repasser `npm run test:e2e` avant d'être épinglée.
 **Mode interception (décision du 14/11/2026)** pour les applications sans pont (`mode: "intercept"` dans `apps.json`) : pas de
 `?host=parent` ; prête quand `window.wasmBindings` (ou son API) existe ; Ouvrir = sélecteur Crafty remis à son champ fichier ;
@@ -239,7 +239,7 @@ vérifie `instanceof`). Pas d'état « modifié » : une frappe ou un clic depui
 possible (« Pensez à enregistrer »). Pas de sauvegarde automatique ni de thème. `imports: ["*"]` = tout fichier (Craft Anything, lecture
 seule). La capture des téléchargements vaut aussi en mode pont (exports PdfCraft rangés dans Crafty).
 Actives : DesignCraft, SoundCraft, VectorCraft, TextureCraft, MaterialCraft, EffectCraft, Craft Anything, SolidCraft (14/11/2026),
-MailCraft 0.11.1 (15/11/2026, boîte par compte ; 0.12.0 plante). Désactivées : FilmCraft et LightCraft (pont, mais limites), PhotoCraft.
+MailCraft 0.13.0 (17/11/2026, boîte par compte ; 0.12.0 plantait). Désactivées : FilmCraft et LightCraft (pont, mais limites), PhotoCraft.
 
 Une application n'est proposée que si `enabled: true` dans `apps.json` (`fetch-app` met `false`). Voir `FINDINGS.md` pour chaque
 application ; PhotoCraft s'emballe autrement et ne démarre pas tel que servi.

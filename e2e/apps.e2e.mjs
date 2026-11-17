@@ -5,7 +5,7 @@
 // Ignoré si vendor/ ou le navigateur manquent.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -921,6 +921,36 @@ test('interface en anglais selon la langue du navigateur', { skip: missing('cadc
     await p.goto(`${base}/admin.html#settings`);
     await p.waitForSelector('#settings .card');
     assert.deepEqual(await leftovers(), [], 'administration');
+  } finally { await b.close(); }
+});
+
+// MailCraft (interception, sans API) : la 0.12.0 paniquait au démarrage ; la boîte vit dans localStorage (mailcraft.mailbox.v1).
+test('mailcraft (interception) : démarrage, import d\'un e-mail depuis Crafty, boîte dans le navigateur, export capté', { skip: missing('mailcraft'), timeout: 240_000 }, async () => {
+  const b = await pw.browserFor(base, { headless: !process.env.HEADED });
+  const p = b.page;
+  try {
+    await loginE2e0(b);
+    const eml = join(tmpdir(), 'e2e-mailcraft.eml');
+    writeFileSync(eml, 'From: Test <test@example.org>\r\nTo: avery@lumen.example\r\nSubject: Sujet-E2E-5821\r\n'
+      + 'Date: Sun, 15 Nov 2026 10:00:00 +0000\r\nMessage-ID: <e2e-5821@example.org>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nBonjour, ceci est un essai.\r\n');
+    await b.upload(eml, { name: 'e2e-mailcraft.eml' });
+    const st = await b.host({ app: 'mailcraft' });
+    assert.ok(st.ready && !st.failed.length, JSON.stringify(st.failed));
+    await p.waitForTimeout(8000);
+    const frame = p.frame({ url: /\/apps\/mailcraft\// });
+    const has = () => frame.evaluate(() => (localStorage.getItem('mailcraft.mailbox.v1') || '').includes('Sujet-E2E-5821'));
+    // Rappels de la boîte d'exemple (« Ignorer tout ») → Fichier → Ouvrir et exporter → Importer → sélecteur Crafty.
+    for (const [x, y] of [[362, 260], [85, 103], [101, 170], [408, 177]]) { await p.mouse.click(x, y); await p.waitForTimeout(1200); }
+    await p.waitForSelector('dialog[open].picker-dlg', { timeout: 15_000 });
+    await p.click('dialog[open] .pk-row:has-text("e2e-mailcraft")');
+    await p.click('dialog[open] button[value=ok]');
+    for (let i = 0; i < 60 && !(await has()); i++) await p.waitForTimeout(1000);
+    assert.ok(await has(), 'e-mail importé et gardé dans la boîte du navigateur');
+    // Fichier → Ouvrir et exporter → Exporter les contacts : capté et rangé dans Crafty, pas de téléchargement.
+    for (const [x, y] of [[85, 103], [101, 170], [408, 691]]) { await p.mouse.click(x, y); await p.waitForTimeout(1200); }
+    await b.waitFor(() => window.hostState.saves.some((s) => s.name === 'contacts.vcf' && s.status === 'ok'), 30_000);
+    assert.ok(!b.consoleMsgs.some((m) => m.startsWith('[download]')), 'aucun téléchargement du navigateur');
+    assert.deepEqual(b.consoleMsgs.filter((m) => /panicked|RuntimeError|Content Security/.test(m)), []);
   } finally { await b.close(); }
 });
 

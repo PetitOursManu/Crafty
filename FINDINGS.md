@@ -360,7 +360,13 @@ FilmCraft récupérés et vérifiés (SHA-256) ; AniCraft n'a pas de zip web. **
   d'un coup (six fenêtres empilées) : chaque essai attend que ses images s'enchaînent (≥ 7 images/s).
 - Fichier remis à un champ : 300 ms de délai (SolidCraft branche son écouteur juste après `click()`).
 
-**MailCraft** (`UCS-Care-Group/mailcraft`, **désactivé**) :
+**MailCraft** (`UCS-Care-Group/mailcraft`, active ; **0.13.0 depuis le 17/11/2026**) :
+
+- **0.13.0 démarre** (plus de panique) ; même interface, même clé `mailcraft.mailbox.v1` (écrite au premier changement, pas pour
+  la boîte d'exemple intacte) ; import d'un `.eml` depuis le sélecteur Crafty et export des contacts capté : **vérifiés** (test e2e,
+  qui échoue bien sur la 0.12.0). Nouveaux : import d'un `.pst` (déclaré dans `imports`, **non essayé** faute de fichier) et d'un
+  dossier de boîtes mbox (sélection de dossier : le sélecteur Crafty ne le remplace pas, boîte du navigateur). « Enregistrer la
+  boîte aux lettres sous » ne télécharge toujours rien. JMAP : `window.mailcraftJmap` permettrait à l'hôte de fournir les comptes.
 
 - **0.12.0 panique au démarrage** (« time not implemented on this platform », `std::time` en WebAssembly), avec ou sans CSP,
   2 s après le lancement : défaut de l'application. **0.11.1 épinglée**, démarre (boîte d'exemple).
