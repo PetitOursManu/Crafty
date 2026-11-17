@@ -18,6 +18,14 @@ import { i18nMiddleware } from './i18n.js';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
 
+// Connexions persistantes gardées plus longtemps que celles du proxy (Traefik : 90 s par défaut) : avec les 5 s de Node,
+// le serveur ferme parfois une connexion au moment où le client la réutilise (ECONNRESET, ou 502 derrière un proxy).
+export function tuneServer(srv) {
+  srv.keepAliveTimeout = 95_000;
+  srv.headersTimeout = 96_000;
+  return srv;
+}
+
 export function createApp({
   root = ROOT,
   vendorDir = join(root, 'vendor'),

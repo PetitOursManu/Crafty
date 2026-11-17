@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp } from '../src/app.js';
+import { createApp, tuneServer } from '../src/app.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const apps = JSON.parse(readFileSync(ROOT + 'apps.json', 'utf8'));
@@ -33,7 +33,7 @@ before(async () => {
   dataDir = mkdtempSync(join(tmpdir(), 'craft-e2e-'));
   const app = createApp({ dataDir, quiet: true });
   db = app.locals.db;
-  srv = app.listen(0, '127.0.0.1');
+  srv = tuneServer(app.listen(0, '127.0.0.1'));
   await new Promise((r) => srv.once('listening', r));
   base = `http://localhost:${srv.address().port}`;
 });
@@ -41,11 +41,23 @@ after(() => { srv?.close(); db?.close(); rmSync(dataDir, { recursive: true, forc
 
 let user = 0;
 // Compte e2e0 (créé par le premier test ; créé ici s'il manque, pour lancer un test seul avec --test-name-pattern).
+// La session est réutilisée d'un navigateur à l'autre : la suite ouvre plus de 8 sessions par minute, la limite par IP.
+let e2e0Cookies;
 async function loginE2e0(b) {
   const creds = { username: 'e2e0', password: 'motdepasse1' };
-  if ((await b.api('POST', '/api/auth/login', { json: creds })).status === 200) return;
-  await b.api('POST', '/api/auth/register', { json: creds });
-  if (user === 0) user = 1;
+  if (e2e0Cookies) {
+    await b.context.addCookies(e2e0Cookies);
+    if ((await b.api('GET', '/api/me')).status === 200) return;
+    await b.context.clearCookies();
+  }
+  let r = await b.api('POST', '/api/auth/login', { json: creds });
+  for (let i = 0; r.status === 429 && i < 13; i++) { await b.page.waitForTimeout(5000); r = await b.api('POST', '/api/auth/login', { json: creds }); }
+  if (r.status !== 200) {
+    r = await b.api('POST', '/api/auth/register', { json: creds });
+    assert.ok(r.status < 300, `connexion e2e0 impossible : ${r.status} ${JSON.stringify(r.body)}`);
+    if (user === 0) user = 1;
+  }
+  e2e0Cookies = await b.context.cookies();
 }
 for (const [slug, c] of Object.entries(CASES)) {
   test(`${slug} : explorateur → ouvrir → modifier → Ctrl+S → version → recharger ; échec de stockage`, { skip: missing(slug), timeout: 180_000 }, async () => {

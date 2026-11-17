@@ -126,6 +126,7 @@ async function showTrash({ push = false } = {}) {
   nav.replaceChildren(h('button', { type: 'button', onclick: () => load(null, { push: true }) }, t('Mes fichiers')), icon('chevron', 'sep'),
     h('button', { type: 'button', 'aria-current': 'location' }, t('Corbeille')));
   $('listHead').hidden = true;
+  $('lassoHint').hidden = true; // pas de lasso dans la corbeille
   renderTrashBtn();
   if (push) history.pushState({ trash: true }, '', '/?trash=1'); else history.replaceState({ trash: true }, '', '/?trash=1');
   document.title = `${t('Corbeille')} · Crafty`;
