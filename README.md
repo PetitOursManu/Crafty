@@ -37,7 +37,29 @@ Ouvrir http://localhost:8787/ : le premier compte créé devient administrateur.
 | `PRECOMPRESSED_DIR` | `./precompressed` | Sortie de `scripts/precompress.mjs` (Brotli 11 + gzip), servie depuis le disque |
 | `STATIC_CACHE_MB` | `256` | Mémoire du cache de compression à la volée |
 | `BACKUP_EVERY_HOURS` | `0` | Instantané de la base dans `DATA_DIR/backups` (24 dans l'image Docker) ; `BACKUP_KEEP` : 14 |
-| `PUBLIC_ORIGIN`, `SSO_SHARED_SECRET`, `SSO_DASHY_URL` | aucun | Connexion unique avec Dashy (les trois sont nécessaires) |
+| `PUBLIC_ORIGIN`, `SSO_SHARED_SECRET`, `SSO_DASHY_URL` | aucun | Connexion unique avec Dashy (les trois sont nécessaires) ; `PUBLIC_ORIGIN` fixe aussi les adresses données à Kosmy Board |
+
+## Se connecter avec Kosmy Board
+
+Crafty accepte la connexion par [Kosmy Board](https://github.com/PetitOursManu/Kosmy-Board) (OpenID Connect), selon la convention
+des applis Kosmy :
+
+| Rôle | Adresse |
+|---|---|
+| Lancement | `{adresse de Crafty}/auth/kosmy-board/login` |
+| Retour | `{adresse de Crafty}/auth/kosmy-board/callback` |
+
+1. Dans le Board, ajoutez l'instance Crafty, puis **Modifier → Connexion unique** et activez-la (`client_secret_basic`).
+2. Dans Crafty, **Administration → Système → Connexion avec Kosmy Board** : collez l'émetteur, l'identifiant client et le secret
+   (en écriture seule, chiffré par `CRAFTY_SECRET`). La carte affiche aussi les deux adresses à donner au Board ; derrière un proxy,
+   réglez `PUBLIC_ORIGIN` pour qu'elles soient exactes.
+3. Chaque personne relie son compte une fois : connectée avec son mot de passe, menu du compte → **Relier à Kosmy Board**.
+   Ensuite, « Se connecter avec Kosmy Board » sur la page de connexion, ou « Ouvrir » dans le Board, ouvre ce compte.
+
+Les comptes se relient par l'identifiant du Board (`sub`), jamais par l'e-mail, que le Board ne vérifie pas. Défaire le lien demande
+le mot de passe Crafty (l'admin peut aussi le faire depuis la liste des comptes). La création automatique d'un compte à la première
+connexion est désactivée par défaut ; un compte créé ainsi est toujours un simple utilisateur, sans mot de passe. Se déconnecter de
+Crafty ne ferme pas la session du Board.
 
 ## Déploiement et exploitation
 

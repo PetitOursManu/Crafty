@@ -1,4 +1,5 @@
-// Compte : double authentification (mise en place, codes de secours, désactivation) et connexion unique avec Dashy.
+// Compte : double authentification (mise en place, codes de secours, désactivation), connexion unique avec Dashy,
+// liaison avec Kosmy Board (relier, délier avec le mot de passe, messages de retour).
 import { api, h, dialog, toast } from '/ui.js';
 import { t } from '/i18n.js';
 
@@ -38,6 +39,60 @@ const field = (label, input, hint) => h('label', { class: 'field' }, label, inpu
 const pwInput = () => h('input', { type: 'password', autocomplete: 'current-password', required: true });
 export const codeInput = (recovery = false) => h('input', { type: 'text', inputmode: recovery ? 'text' : 'numeric', autocomplete: 'one-time-code',
   required: true, maxlength: 12, spellcheck: false, autocapitalize: 'none', class: 'code-input' });
+
+// ---------- Kosmy Board (OpenID Connect) ----------
+const KOSMY_MESSAGES = {
+  linked: () => t('Compte relié à Kosmy Board : vous pouvez maintenant vous connecter avec Kosmy Board.'),
+  'not-configured': () => t('La connexion avec Kosmy Board n\'est pas réglée : voir Administration → Système.'),
+  issuer: () => t('Ce Kosmy Board n\'est pas celui réglé dans Crafty.'),
+  unreachable: () => t('Kosmy Board ne répond pas : réessayez plus tard.'),
+  state: () => t('La connexion avec Kosmy Board a expiré ou vient d\'un autre onglet : recommencez.'),
+  denied: () => t('Kosmy Board a refusé l\'accès : cet espace Crafty n\'est pas dans votre Board.'),
+  client: () => t('Kosmy Board a refusé l\'identifiant ou le secret client : la configuration est à vérifier.'),
+  token: () => t('Réponse de Kosmy Board refusée (jeton invalide) : la configuration est à vérifier.'),
+  'no-account': () => t('Ce compte Kosmy Board n\'est relié à aucun compte Crafty. Connectez-vous avec votre mot de passe, puis « Relier à Kosmy Board » dans le menu du compte.'),
+  disabled: () => t('Ce compte est désactivé.'),
+  ratelimit: () => t('Trop de tentatives, réessayez dans une minute.'),
+  'linked-elsewhere': () => t('Ce compte Kosmy Board est déjà relié à un autre compte Crafty.'),
+  'already-linked': () => t('Votre compte est déjà relié à un compte Kosmy Board.'),
+  session: () => t('Session expirée : reconnectez-vous puis recommencez.'),
+};
+export const kosmyMessage = (code) => (KOSMY_MESSAGES[code] || (() => t('La connexion avec Kosmy Board a échoué : recommencez.')))();
+
+export async function startKosmyLink() {
+  const { url } = await api('/api/auth/kosmy-board/link', { method: 'POST' });
+  location.assign(url);
+}
+// Retour de Kosmy Board sur l'accueil (?kosmy=…) après « Relier » : message, puis paramètre retiré de l'adresse.
+export function kosmyNotice() {
+  const qs = new URLSearchParams(location.search);
+  const code = qs.get('kosmy');
+  if (!code) return;
+  if (code === 'linked') toast({ title: kosmyMessage(code) });
+  else toast({ type: 'error', title: t('Liaison avec Kosmy Board impossible'), detail: kosmyMessage(code) });
+  qs.delete('kosmy');
+  history.replaceState(null, '', `${location.pathname}${qs.size ? `?${qs}` : ''}${location.hash}`);
+}
+// Défaire le lien : le mot de passe Crafty est demandé.
+export function kosmyUnlinkDialog() {
+  const pw = pwInput();
+  const errEl = h('div', { class: 'error-text', role: 'alert' });
+  const dlg = dialog({ title: t('Délier de Kosmy Board'),
+    body: h('div', { class: 'form' }, h('p', {}, t('La connexion par Kosmy Board ne mènera plus à ce compte. Vous pourrez le relier à nouveau plus tard.')),
+      field(t('Mot de passe actuel'), pw), errEl),
+    actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, t('Annuler')), h('button', { class: 'btn danger', value: 'ok' }, t('Délier'))] });
+  dlg.querySelector('form').addEventListener('submit', async (e) => {
+    if (e.submitter?.value !== 'ok') return;
+    e.preventDefault();
+    try {
+      await api('/api/auth/kosmy-board/unlink', { method: 'POST', body: { password: pw.value } });
+      dlg.close('done');
+      toast({ title: t('Compte délié de Kosmy Board.') });
+      setTimeout(() => location.reload(), 800);
+    } catch (err) { errEl.textContent = err.message; pw.select(); }
+  });
+  pw.focus();
+}
 
 // Fenêtre en plusieurs étapes : le corps et les boutons changent, la fenêtre reste.
 function stepper(title) {

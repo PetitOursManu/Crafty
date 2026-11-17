@@ -77,6 +77,7 @@ function userRow(u) {
     u.locked && { label: t('Déverrouiller'), icon: 'key', onClick: () => patch(u, { unlock: true }, t('Compte déverrouillé.')) },
     u.twoFactor && { label: t('Retirer la double authentification…'), icon: 'shield', onClick: () => reset2fa(u) },
     u.dashy && u.hasPassword && { label: t('Délier de Dashy'), icon: 'user', onClick: () => patch(u, { unlinkDashy: true }, t('Compte délié de Dashy.')) },
+    u.kosmy && u.hasPassword && { label: t('Délier de Kosmy Board'), icon: 'grid', onClick: () => patch(u, { unlinkKosmy: true }, t('Compte délié de Kosmy Board.')) },
     u.id !== me.user.id && (u.disabled
       ? { label: t('Réactiver'), icon: 'check', onClick: () => patch(u, { disabled: false }, t('Compte réactivé.')) }
       : { label: t('Désactiver'), icon: 'logout', onClick: () => patch(u, { disabled: true }, t('Compte désactivé, ses sessions sont fermées.')) }),
@@ -92,7 +93,8 @@ function userRow(u) {
         u.locked ? h('span', { class: 'badge danger' }, t('verrouillé')) : null,
         u.mustChange ? h('span', { class: 'badge warn' }, t('mot de passe provisoire')) : null,
         u.twoFactor ? h('span', { class: 'badge' }, t('double authentification')) : null,
-        u.dashy ? h('span', { class: 'badge' }, u.hasPassword ? t('lié à Dashy') : t('Dashy seulement')) : null)))),
+        u.dashy ? h('span', { class: 'badge' }, u.hasPassword ? t('lié à Dashy') : t('Dashy seulement')) : null,
+        u.kosmy ? h('span', { class: 'badge' }, u.hasPassword ? t('relié à Kosmy Board') : t('Kosmy Board seulement')) : null)))),
     h('td', {}, u.role === 'admin' || u.allApps ? h('span', { class: 'badge' }, t('Toutes'))
       : h('div', { class: 'apps-cell' }, u.apps.length ? u.apps.map((s) => h('span', { class: 'badge' }, nameOf(s))) : h('span', { class: 'badge danger' }, t('Aucune')))),
     h('td', {}, h('div', { class: 'space' },
@@ -240,7 +242,9 @@ const ACTIONS = { 'auth.login': t('Connexion'), 'auth.logout': t('Déconnexion')
   'folder.delete': t('Dossier supprimé'), 'admin.user.create': t('Compte créé'), 'admin.user.update': t('Compte modifié'),
   'admin.user.delete': t('Compte supprimé'), 'file.trash': t('Mis à la corbeille'), 'folder.trash': t('Dossier à la corbeille'), 'file.untrash': t('Restauré de la corbeille'), 'folder.restore': t('Dossier restauré'), 'share.create': t('Lien de partage créé'), 'share.revoke': t('Lien révoqué'), 'share.access': t('Lien de partage ouvert'), 'admin.settings': t('Réglages modifiés'), 'admin.ai': t('Assistant IA modifié'), 'ai.error': t("Erreur de l'assistant"),
   'auth.2fa.enable': t('Double authentification activée'), 'auth.2fa.disable': t('Double authentification désactivée'), 'auth.2fa.recovery': t('Codes de secours renouvelés'),
-  'auth.sso': t('Connexion par Dashy'), 'auth.sso.create': t('Compte créé par Dashy'), 'auth.sso.link': t('Compte lié à Dashy') };
+  'auth.sso': t('Connexion par Dashy'), 'auth.sso.create': t('Compte créé par Dashy'), 'auth.sso.link': t('Compte lié à Dashy'),
+  'auth.kosmy': t('Connexion par Kosmy Board'), 'auth.kosmy.create': t('Compte créé par Kosmy Board'), 'auth.kosmy.link': t('Compte relié à Kosmy Board'),
+  'auth.kosmy.unlink': t('Compte délié de Kosmy Board'), 'admin.kosmy': t('Réglages Kosmy Board modifiés') };
 async function loadAudit() {
   try {
     const rows = await api('/api/admin/audit?limit=200');

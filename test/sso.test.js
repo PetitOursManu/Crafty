@@ -37,7 +37,7 @@ async function callback(c, { tok, state, cookie }) {
 
 test('config publique et adresse d\'autorisation de Dashy', async () => {
   const c = s.client();
-  assert.deepEqual((await c.get('/api/auth/config')).data.sso, { dashy: true });
+  assert.deepEqual((await c.get('/api/auth/config')).data.sso, { dashy: true, kosmyBoard: false });
   const { url, state } = await start(c);
   assert.equal(url.origin + url.pathname, `${DASHY}/api/sso/authorize`);
   assert.equal(url.searchParams.get('redirect_uri'), `${ORIGIN}/sso/dashy/callback`);
@@ -120,7 +120,7 @@ test('SSO non configuré : routes en 404', async () => {
   const s2 = await startServer();
   try {
     const c = s2.client();
-    assert.deepEqual((await c.get('/api/auth/config')).data.sso, { dashy: false });
+    assert.deepEqual((await c.get('/api/auth/config')).data.sso, { dashy: false, kosmyBoard: false });
     assert.equal((await c.post('/api/auth/sso/dashy/start', {})).status, 404);
     assert.equal((await c.get('/sso/dashy/callback?token=x&state=y')).status, 404);
   } finally { s2.close(); }

@@ -7,7 +7,7 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json, tr
   const { requireAdmin } = auth;
   const q = {
     users: db.prepare(`SELECT u.id, u.username, u.role, u.disabled, u.must_change, u.all_apps, u.quota, u.created_at, u.last_login_at,
-        u.locked_until, u.totp_enabled, u.dashy_sub, u.pass_hash, (SELECT IFNULL(SUM(size), 0) FROM versions v WHERE v.user_id = u.id) used,
+        u.locked_until, u.totp_enabled, u.dashy_sub, u.kosmy_sub, u.pass_hash, (SELECT IFNULL(SUM(size), 0) FROM versions v WHERE v.user_id = u.id) used,
         (SELECT COUNT(*) FROM files f WHERE f.user_id = u.id) files
       FROM users u ORDER BY u.username COLLATE NOCASE`),
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -23,7 +23,7 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json, tr
   const userJson = (u) => ({ id: u.id, username: u.username, role: u.role, disabled: !!u.disabled, mustChange: !!u.must_change,
     allApps: !!u.all_apps, apps: q.userApps.all(u.id).map((r) => r.slug), quota: u.quota, used: u.used, files: u.files,
     createdAt: u.created_at, lastLoginAt: u.last_login_at, locked: u.locked_until > Date.now(),
-    twoFactor: !!u.totp_enabled, dashy: !!u.dashy_sub, hasPassword: String(u.pass_hash).startsWith('scrypt$') });
+    twoFactor: !!u.totp_enabled, dashy: !!u.dashy_sub, kosmy: !!u.kosmy_sub, hasPassword: String(u.pass_hash).startsWith('scrypt$') });
   const setApps = (id, allApps, list) => {
     q.clearApps.run(id);
     if (!allApps) for (const s of list) q.addApp.run(id, s);
@@ -68,6 +68,7 @@ export function adminRoutes(app, { db, auth, files, appData, log, apps, json, tr
       if (b.unlock) db.prepare('UPDATE users SET failed_count = 0, locked_until = 0 WHERE id = ?').run(u.id);
       if (b.reset2fa) twofa.reset(u.id); // téléphone perdu, plus de code de secours
       if (b.unlinkDashy) db.prepare('UPDATE users SET dashy_sub = NULL WHERE id = ?').run(u.id);
+      if (b.unlinkKosmy) db.prepare('UPDATE users SET kosmy_sub = NULL WHERE id = ?').run(u.id);
       if (b.allApps !== undefined) {
         db.prepare('UPDATE users SET all_apps = ? WHERE id = ?').run(b.allApps ? 1 : 0, u.id);
         setApps(u.id, !!b.allApps, b.apps ?? []);
