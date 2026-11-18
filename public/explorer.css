@@ -33,6 +33,14 @@
 .app-txt { min-width: 0; }
 .app-card .name { font-weight: 750; font-size: 15px; letter-spacing: -.01em; }
 .app-card .desc { font-size: 12px; color: var(--mut); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+/* Téléphone : deux colonnes compactes (18 applications sur une colonne repoussaient « Mes fichiers » de 1 300 px). */
+@media (max-width: 520px) {
+  .apps-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .app-card { gap: 9px; padding: 8px 10px 8px 8px; border-radius: 14px; }
+  .app-card .app-tile { width: 34px; height: 34px; border-radius: 11px; font-size: 15px; flex: none; }
+  .app-card .name { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-card .desc { display: none; }
+}
 .guest { padding: 20px 22px; border-radius: 20px; background: var(--accent-soft); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .guest p { margin: 0; }
 

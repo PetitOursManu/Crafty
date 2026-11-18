@@ -1060,6 +1060,9 @@ test('mailcraft (interception) : démarrage, import d\'un e-mail depuis Crafty, 
   const b = await pw.browserFor(base, { headless: !process.env.HEADED });
   const p = b.page;
   try {
+    // La boîte d'exemple et sa fenêtre de rappels dépendent de l'heure (2 rappels le matin du 18/11, plus la veille au soir) :
+    // horloge figée pour que les clics ci-dessous tombent toujours au même endroit. Les minuteries, elles, tournent.
+    await p.clock.setFixedTime(new Date('2026-11-17T22:00:00+01:00'));
     await loginE2e0(b);
     const eml = join(tmpdir(), 'e2e-mailcraft.eml');
     writeFileSync(eml, 'From: Test <test@example.org>\r\nTo: avery@lumen.example\r\nSubject: Sujet-E2E-5821\r\n'
