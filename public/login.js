@@ -1,8 +1,8 @@
 // Connexion, création du premier compte (admin), inscription (si ouverte), invité (si activé),
 // changement de mot de passe obligatoire.
-import { api, h } from '/ui.js';
+import { api, h, icon } from '/ui.js';
 import { t, translateDom } from '/i18n.js';
-import { codeInput, ssoMessage, startDashy } from '/account.js';
+import { codeInput, kosmyMessage, ssoMessage, startDashy } from '/account.js';
 
 translateDom();
 
@@ -45,6 +45,8 @@ function showLogin() {
       else if (r.mustChange) showChange(p.value); else go();
     },
     alt: [
+      config.sso?.kosmyBoard && h('a', { class: 'btn kosmy', href: `/auth/kosmy-board/login?target_link_uri=${encodeURIComponent(next)}` },
+        icon('grid'), t('Se connecter avec Kosmy Board')),
       config.sso?.dashy && h('button', { class: 'btn', type: 'button', onclick: dashy }, t('Se connecter avec Dashy')),
       config.signupOpen && h('button', { class: 'btn', type: 'button', onclick: showRegister }, t('Créer un compte')),
       config.guestEnabled && h('button', { class: 'btn ghost', type: 'button', onclick: guest }, t('Continuer en invité (sans enregistrement)')),
@@ -116,9 +118,10 @@ config = await api('/api/auth/config').catch(() => config);
 if (q.has('change')) showChange();
 else if (config.setup) showRegister(true);
 else showLogin();
-// Retour de Dashy en échec (?sso=<raison>) : message sous le formulaire.
-if (q.get('sso') && !config.setup) {
-  view.querySelector('.error-text').textContent = ssoMessage(q.get('sso'));
-  q.delete('sso');
+// Retour de Dashy ou de Kosmy Board en échec (?sso=<raison>, ?kosmy=<raison>) : message sous le formulaire.
+for (const [key, message] of [['sso', ssoMessage], ['kosmy', kosmyMessage]]) {
+  if (!q.get(key) || config.setup) continue;
+  view.querySelector('.error-text').textContent = message(q.get(key));
+  q.delete(key);
   history.replaceState(null, '', `${location.pathname}${q.size ? `?${q}` : ''}`);
 }

@@ -17,6 +17,7 @@ import { sharesRoutes } from './shares.js';
 import { i18nMiddleware } from './i18n.js';
 import { createTwoFactor } from './twofactor.js';
 import { createSso } from './sso.js';
+import { createKosmyBoard } from './kosmy-board.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -43,6 +44,7 @@ export function createApp({
   aiOptions = null, // essais : fetchImpl, secret (sinon CRAFTY_SECRET)
   twoFactorOptions = null, // essais : secret (sinon CRAFTY_SECRET)
   ssoOptions = null, // essais : secret, dashyUrl, origin (sinon SSO_SHARED_SECRET, SSO_DASHY_URL, PUBLIC_ORIGIN)
+  kosmyOptions = null, // essais : fetchImpl, secret, origin (sinon fetch, CRAFTY_SECRET, PUBLIC_ORIGIN)
 } = {}) {
   const registry = JSON.parse(readFileSync(appsFile, 'utf8'));
   // Seules les applications activées et réellement présentes dans vendor/ sont proposées.
@@ -56,6 +58,7 @@ export function createApp({
   const ai = createAi({ db, log, ...(aiOptions || {}) });
   const twofa = createTwoFactor({ db, log, auth, ...(twoFactorOptions || {}) });
   const sso = createSso({ db, log, auth, settings: db.settings, cookieSecure, ...(ssoOptions || {}) });
+  const kosmy = createKosmyBoard({ db, log, auth, cookieSecure, ...(kosmyOptions || {}) });
   files.cleanTmp();
   const st = createStatic({ apps, vendorDir, csp, precompressedDir });
   const json = express.json({ limit: '64kb' });
@@ -101,7 +104,7 @@ export function createApp({
   app.get('/api/auth/config', (req, res) => {
     const s = db.settings();
     res.set('Cache-Control', 'no-store').json({ setup: auth.userCount() === 0, signupOpen: !!s.signup_open, guestEnabled: !!s.guest_enabled,
-      sso: { dashy: sso.enabled } });
+      sso: { dashy: sso.enabled, kosmyBoard: kosmy.enabled() } });
   });
   app.post('/api/auth/login', json, async (req, res) => {
     const r = await auth.login(req, req.body?.username, req.body?.password);
@@ -165,8 +168,9 @@ export function createApp({
     if (req.guest) return res.json({ guest: true, apps: allowedApps(req).map(appJson) });
     if (!req.user) return res.status(401).json({ error: 'Connexion requise.' });
     const { id, username, role, mustChange, theme } = req.user;
-    const row = db.prepare('SELECT pass_hash, totp_enabled, dashy_sub FROM users WHERE id = ?').get(id);
-    const account = { hasPassword: String(row.pass_hash).startsWith('scrypt$'), twoFactor: !!row.totp_enabled, dashy: !!row.dashy_sub, ssoDashy: sso.enabled };
+    const row = db.prepare('SELECT pass_hash, totp_enabled, dashy_sub, kosmy_sub FROM users WHERE id = ?').get(id);
+    const account = { hasPassword: String(row.pass_hash).startsWith('scrypt$'), twoFactor: !!row.totp_enabled, dashy: !!row.dashy_sub, ssoDashy: sso.enabled,
+      kosmy: !!row.kosmy_sub, kosmyBoard: kosmy.enabled() };
     res.json({ user: { id, username, role, mustChange, theme, ...account }, apps: mustChange ? [] : allowedApps(req).map(appJson),
       usage: files.usage(req.user), autosave: db.settings().autosave_seconds });
   });
@@ -183,6 +187,7 @@ export function createApp({
   ai.routes(app, { requireUser: auth.requireUser, requireAdmin: auth.requireAdmin, json: express.json({ limit: '8mb' }) });
   twofa.routes(app, { json, requireUser: auth.requireUser });
   sso.routes(app, { json });
+  kosmy.routes(app, { json, requireUser: auth.requireUser, requireAdmin: auth.requireAdmin });
   adminRoutes(app, { db, auth, files, appData, log, apps, json, trustProxy, cookieSecure, twofa, sso,
     backupDir: dataDir === ':memory:' ? null : (process.env.BACKUP_DIR || join(dataDir, 'backups')) });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));

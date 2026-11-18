@@ -88,6 +88,15 @@ export default {
   'Fournisseur incomplet : activé, adresse, modèle et clé.': 'Incomplete provider: it must be enabled and have a URL, a model and a key.',
   'Aucun fournisseur d\'IA n\'est configuré.': 'No AI provider is configured.',
   'Conversation invalide.': 'Invalid conversation.',
+
+  // Connexion avec Kosmy Board (kosmy-board.js)
+  'Kosmy Board ne répond pas : réessayez plus tard.': 'Kosmy Board is not responding: try again later.',
+  'Ce compte n\'est pas relié à Kosmy Board.': 'This account is not linked to Kosmy Board.',
+  'Ce compte n\'a pas de mot de passe : demandez à l\'administrateur.': 'This account has no password: ask your administrator.',
+  'Mot de passe incorrect.': 'Incorrect password.',
+  'Émetteur invalide : adresse http(s) attendue.': 'Invalid issuer: an http(s) URL is expected.',
+  'Identifiant client invalide.': 'Invalid client ID.',
+  'Secret client invalide.': 'Invalid client secret.',
 };
 
 // Du plus précis au plus général : le premier motif qui correspond l'emporte. Le libellé du fournisseur « Compatible

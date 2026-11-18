@@ -22,7 +22,7 @@ commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifi
   sessions, verrouillage), `files.js` (dossiers, fichiers, versions, quotas), `admin.js`, `static.js` (MIME, compression, CSP),
   `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit, rotation), `static-rules.js` (MIME, ETag, extensions compressibles),
   `backup.js` (instantanés de la base), `secrets.js` (chiffrement par `CRAFTY_SECRET`), `totp.js` + `twofactor.js` (double authentification),
-  `sso.js` (Dashy). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
+  `sso.js` (Dashy), `kosmy-board.js` (connexion avec Kosmy Board, OpenID Connect). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
 - Logo : source `assets/crafty-logo-source.webp`, déclinaisons dans `public/brand/` (favicon, icônes, manifeste web).
 - Interface (`public/`) : `intercept.js` (interceptions dans l'iframe), `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
   `host.*` (page hôte de production ; journal et outils seulement pour un admin avec `?debug`), `admin.*`, `ui.*` (composants
@@ -191,6 +191,14 @@ charge pas l'application et propose celles qui le lisent.
 - SSO Dashy (17/11/2026) : protocole de Mocky (HS256, 60 s, `aud` = `PUBLIC_ORIGIN`, `jti` unique), `state` vérifié par le serveur
   (cookie `__Host-`), création de compte réglable (`sso_create_accounts`), liaison d'un compte existant, rôle fixé à la création.
   Exception assumée à « pas d'état modifié en GET » : `/sso/dashy/callback`.
+- Connexion avec Kosmy Board (17/11/2026, `src/kosmy-board.js`, `public/admin-kosmy.js`) : client OpenID Connect du Board, convention
+  Kosmy `/auth/kosmy-board/login` (accepte `iss` et `target_link_uri` de même origine) et `/auth/kosmy-board/callback` (`iss` vérifié,
+  `client_secret_basic`). state, nonce et PKCE S256 gardés côté serveur (usage unique, 10 min) et liés au navigateur par un cookie ;
+  ID token vérifié sans dépendance (RS256 via `jwks_uri`, `iss`, `aud`, `exp`, `nonce`). Comptes reliés par `sub` (colonne
+  `users.kosmy_sub`), jamais par l'e-mail ; « Relier » en POST depuis le compte connecté, « Délier » avec le mot de passe ; création
+  automatique désactivée par défaut et toujours en simple utilisateur. Réglages en base (clé `kosmy_board`, secret scellé par
+  `CRAFTY_SECRET`, jamais renvoyé). Adresses publiques : `PUBLIC_ORIGIN`, sinon celle de la requête. Comme Dashy, la connexion par le
+  Board ne demande pas la double authentification de Crafty (le Board a la sienne). Exception GET : `/auth/kosmy-board/callback`.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.

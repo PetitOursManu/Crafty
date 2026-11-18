@@ -1,7 +1,9 @@
-// Administration → Système : adresse IP vue par le serveur (vérification de TRUST_PROXY), connexion unique Dashy,
+// Administration → Système : adresse IP vue par le serveur (vérification de TRUST_PROXY), connexion avec Kosmy Board
+// (admin-kosmy.js), connexion unique Dashy,
 // chiffrement des secrets, sauvegardes de la base.
 import { api, h, toast, formatSize, formatDateTime } from '/ui.js';
 import { t } from '/i18n.js';
+import { kosmyBoardCard } from '/admin-kosmy.js';
 
 const VERDICTS = {
   ok: () => [t('Correct'), 'ok', t('L\'adresse retenue est celle que Cloudflare a reçue du visiteur.')],
@@ -45,6 +47,7 @@ export async function renderSystem(el) {
     : h('p', { class: 'mut' }, t('Aucun instantané pour l\'instant.'));
   el.replaceChildren(
     await networkCard(),
+    await kosmyBoardCard(),
     h('div', { class: 'card' }, h('h3', {}, t('Connexion unique (Dashy)')), sso),
     h('div', { class: 'card' }, h('h3', {}, t('Secrets')),
       h('p', {}, s.secretsEncrypted

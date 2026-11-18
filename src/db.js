@@ -144,6 +144,9 @@ export function openDb(file) {
     CREATE TABLE IF NOT EXISTS recovery_codes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       code_hash TEXT NOT NULL, used_at INTEGER, PRIMARY KEY (user_id, code_hash));
     CREATE TABLE IF NOT EXISTS sso_jti (jti TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);`);
+  // Compte relié à Kosmy Board (OpenID Connect) : identifiant `sub` du Board, jamais l'e-mail.
+  if (!cols('users').includes('kosmy_sub')) db.exec('ALTER TABLE users ADD COLUMN kosmy_sub TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_kosmy ON users(kosmy_sub) WHERE kosmy_sub IS NOT NULL');
   // Migration : colonne auto (sauvegarde automatique) ajoutée après la première version du schéma.
   if (!db.prepare('PRAGMA table_info(versions)').all().some((c) => c.name === 'auto')) db.exec('ALTER TABLE versions ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
 

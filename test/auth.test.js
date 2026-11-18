@@ -13,7 +13,7 @@ before(async () => {
 after(() => s.close());
 
 test('premier compte = admin, puis inscription fermée par défaut', async () => {
-  assert.deepEqual((await s.client().get('/api/auth/config')).data, { setup: true, signupOpen: false, guestEnabled: false, sso: { dashy: false } });
+  assert.deepEqual((await s.client().get('/api/auth/config')).data, { setup: true, signupOpen: false, guestEnabled: false, sso: { dashy: false, kosmyBoard: false } });
   const r = await admin.post('/api/auth/register', { username: 'admin', password: 'motdepasse1' });
   assert.equal(r.status, 201);
   assert.equal((await admin.get('/api/me')).data.user.role, 'admin');
