@@ -4,8 +4,8 @@
 
 Un service Node/Express qui sert plusieurs applications web du catalogue Craft
 (https://getartcraft.com/apps) avec une connexion par utilisateur et un stockage
-des fichiers sur le serveur. Déploiement : VPS Coolify + Traefik, domaine sous
-`*.emanuelvigreux.fr`. Je suis administrateur systèmes et réseaux : je lis le code et les
+des fichiers sur le serveur. Déploiement : VPS Coolify + Traefik, sur mon domaine personnel
+(jamais écrit dans le dépôt, qui est public : `crafty.example.com` dans la doc). Je suis administrateur systèmes et réseaux : je lis le code et les
 commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifié et ce qui ne l'est pas.
 
 ## Fichiers du dossier
