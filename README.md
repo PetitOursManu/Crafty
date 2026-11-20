@@ -61,6 +61,46 @@ le mot de passe Crafty (l'admin peut aussi le faire depuis la liste des comptes)
 connexion est désactivée par défaut ; un compte créé ainsi est toujours un simple utilisateur, sans mot de passe. Se déconnecter de
 Crafty ne ferme pas la session du Board.
 
+## Installer sur Coolify
+
+L'image est prête et essayée en local (santé, arrêt propre, redémarrage sans perte, sauvegarde et restauration). Les
+réglages Coolify ci-dessous viennent de sa documentation : ils n'ont pas encore été essayés sur un vrai serveur.
+Détail de chaque point : `docs/DEPLOIEMENT.md`.
+
+1. **Créer la ressource** : *New Resource* → dépôt GitHub `PetitOursManu/Crafty`, branche `main`, *Build Pack*
+   **Dockerfile**.
+2. **Réseau** : port exposé `8787`. Domaine, par exemple `https://crafty.emanuelvigreux.fr` (Traefik fait le TLS).
+   Ne publiez pas le port sur l'hôte : c'est Traefik qui expose le service.
+3. **Stockage** : *Persistent Storage* → un volume monté sur **`/data`**. Tout l'état y vit : base, fichiers, journaux et
+   instantanés. Sans ce volume, un redéploiement efface tout.
+4. **Variables d'environnement** (modèle : `.env.example`) :
+
+   | Variable | Valeur |
+   |---|---|
+   | `CRAFTY_SECRET` | `openssl rand -base64 48`, à générer une fois et à **garder avec les sauvegardes** |
+   | `COOKIE_SECURE` | `1` |
+   | `TRUST_PROXY` | `2` derrière Cloudflare + Traefik, `1` avec Traefik seul (à vérifier à l'étape 7) |
+   | `PUBLIC_ORIGIN` | `https://crafty.emanuelvigreux.fr`, nécessaire à Dashy et à Kosmy Board |
+   | `SCRYPT_N` | `32768` pour commencer, à mesurer à l'étape 8 |
+
+5. **Limites** : CPU 2, mémoire 1 Gio, c'est suffisant. La sonde de santé (`/api/health`) vient du `Dockerfile`.
+6. **Déployer.** Le premier build télécharge les 18 applications, vérifie leur SHA-256 et les précompresse en Brotli 11.
+   Il a pris 13 min sur 12 cœurs ; sur un VPS de 2 à 4 cœurs, comptez 30 à 60 min (estimation). Les builds suivants
+   réutilisent le cache : 37 s quand seul le code change, environ 7 min avec trois nouvelles applications. L'image fait
+   2,7 Go.
+7. **Créer tout de suite le compte administrateur.** Le premier compte inscrit devient administrateur, puis l'inscription
+   publique se ferme. Ensuite, *Administration → Système → Adresse IP réelle*, ouvert depuis l'extérieur par le
+   domaine : réglez `TRUST_PROXY` jusqu'au verdict « Correct ». Derrière Cloudflare, Traefik doit faire confiance à
+   ses plages d'adresses (`forwardedHeaders.trustedIPs`, voir § 3 de `docs/DEPLOIEMENT.md`).
+8. **Mesurer le hachage des mots de passe**, puis ajuster `SCRYPT_N` pour viser environ 100 ms :
+
+   ```bash
+   docker exec <conteneur> node scripts/scrypt-bench.mjs
+   ```
+
+9. **Finir** : double authentification sur le compte administrateur, fail2ban (`deploy/fail2ban/`), copie des
+   instantanés de `/data/backups` hors du VPS avec un essai de restauration, puis Dashy ou Kosmy Board si souhaité.
+
 ## Déploiement et exploitation
 
 Coolify, Docker, adresse IP réelle, sauvegarde et restauration, mise à jour d'une application, fail2ban, comptes de secours,
