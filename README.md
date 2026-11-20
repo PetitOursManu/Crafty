@@ -69,7 +69,7 @@ Détail de chaque point : `docs/DEPLOIEMENT.md`.
 
 1. **Créer la ressource** : *New Resource* → dépôt GitHub `PetitOursManu/Crafty`, branche `main`, *Build Pack*
    **Dockerfile**.
-2. **Réseau** : port exposé `8787`. Domaine, par exemple `https://crafty.emanuelvigreux.fr` (Traefik fait le TLS).
+2. **Réseau** : port exposé `8787`. Domaine, par exemple `https://crafty.example.com` (Traefik fait le TLS).
    Ne publiez pas le port sur l'hôte : c'est Traefik qui expose le service.
 3. **Stockage** : *Persistent Storage* → un volume monté sur **`/data`**. Tout l'état y vit : base, fichiers, journaux et
    instantanés. Sans ce volume, un redéploiement efface tout.
@@ -80,7 +80,7 @@ Détail de chaque point : `docs/DEPLOIEMENT.md`.
    | `CRAFTY_SECRET` | `openssl rand -base64 48`, à générer une fois et à **garder avec les sauvegardes** |
    | `COOKIE_SECURE` | `1` |
    | `TRUST_PROXY` | `2` derrière Cloudflare + Traefik, `1` avec Traefik seul (à vérifier à l'étape 7) |
-   | `PUBLIC_ORIGIN` | `https://crafty.emanuelvigreux.fr`, nécessaire à Dashy et à Kosmy Board |
+   | `PUBLIC_ORIGIN` | `https://crafty.example.com`, nécessaire à Dashy et à Kosmy Board |
    | `SCRYPT_N` | `32768` pour commencer, à mesurer à l'étape 8 |
 
 5. **Limites** : CPU 2, mémoire 1 Gio, c'est suffisant. La sonde de santé (`/api/health`) vient du `Dockerfile`.

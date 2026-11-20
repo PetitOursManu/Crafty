@@ -42,7 +42,7 @@ docker compose up -d --build
 Lu dans la doc de Coolify, à confirmer à l'installation :
 
 - **Nouvelle ressource** → dépôt GitHub `PetitOursManu/Crafty`, branche `main`, *Build Pack* **Dockerfile**.
-- **Port exposé** : `8787`. **Domaine** : `https://crafty.emanuelvigreux.fr` (ou autre), Traefik fait le TLS.
+- **Port exposé** : `8787`. **Domaine** : `https://crafty.example.com` (ou autre), Traefik fait le TLS.
 - **Persistent Storage** : un volume monté sur `/data`. Tout l'état y est : base, fichiers, journaux, instantanés.
 - **Variables d'environnement** : voir `.env.example`. Au minimum `CRAFTY_SECRET`, `COOKIE_SECURE=1`,
   `TRUST_PROXY` (§ 3), `PUBLIC_ORIGIN` si SSO.
