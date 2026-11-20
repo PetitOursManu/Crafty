@@ -227,7 +227,8 @@ charge pas l'application et propose celles qui le lisent.
    signés comme Dashy, **pas avec une vraie instance**.
 
 Ajouter une application = `npm run fetch <slug>` (ou `<propriétaire>/<slug>` hors de `storytold` : MailCraft, SolidCraft), lire son `HOSTING.md`, sonder dans Chrome (`ready`, `accept` de sa boîte Ouvrir,
-`commands()`, clés `localStorage`, CSP), puis compléter son entrée dans `apps.json` : `name`, `description`, `extensions` (édités),
+`commands()`, clés `localStorage`, CSP), puis compléter son entrée dans `apps.json` : `name`, `description`, `category` (genre sur l'accueil : `office`, `image`, `design`,
+`3d`, `media`, `tools` ; libellés et ordre dans `public/explorer.js`, autre valeur → « Autres »), `extensions` (édités),
 `imports` (seulement ouverts), `prefKeys` (clés de réglages relevées), `control.save` (commande d'enregistrement : id, ou
 `{command|request, params}` avec `{name}` = nom du document) et `control.theme` (`light`/`dark`/`system` → commande). Ajouter son
 cas dans `e2e/apps.e2e.mjs` et faire passer `npm run test:e2e`.

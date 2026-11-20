@@ -63,16 +63,38 @@ function downloadFile(file, versionId) {
   const a = h('a', { href: `/api/files/${file.id}/content${versionId ? `?version=${versionId}` : ''}`, download: file.name });
   document.body.append(a); a.click(); a.remove();
 }
+// Genres (apps.json → category), dans l'ordre d'affichage ; une catégorie inconnue ou absente va dans « Autres ».
+const APP_CATEGORIES = [
+  ['office', () => t('Bureautique')],
+  ['image', () => t('Photo et image')],
+  ['design', () => t('Design et illustration')],
+  ['3d', () => t('3D et CAO')],
+  ['media', () => t('Audio et vidéo')],
+  ['tools', () => t('Outils')],
+];
 function renderApps() {
-  $('apps').replaceChildren(...state.apps.map((a, i) => {
-    const card = h('a', { class: 'app-card', href: hostUrl(a.slug, state.me.guest ? {} : { folder: state.folder?.id || '' }) },
-      appTile(a), h('div', { class: 'app-txt' }, h('div', { class: 'name' }, a.name), h('div', { class: 'desc' }, t(a.description))));
-    card.style.setProperty('--app', appColor(a.slug)); // halo au survol
-    const li = h('li', {}, card);
-    li.style.setProperty('--i', i); // apparition décalée
-    return li;
+  if (!state.apps.length) {
+    $('apps').replaceChildren(h('p', { class: 'mut' }, t('Aucune application ne vous est attribuée. Contactez l\'administrateur.')));
+    return;
+  }
+  const known = new Set(APP_CATEGORIES.map(([k]) => k));
+  const groups = [...APP_CATEGORIES, ['', () => t('Autres')]]
+    .map(([key, label]) => [label, state.apps.filter((a) => (known.has(a.category) ? a.category : '') === key)])
+    .filter(([, list]) => list.length);
+  let i = 0;
+  $('apps').replaceChildren(...groups.map(([label, list]) => {
+    const head = h('h2', { class: 'app-group-h' }, label());
+    const ul = h('ul', { class: 'apps-row' }, list.map((a) => {
+      const card = h('a', { class: 'app-card', href: hostUrl(a.slug, state.me.guest ? {} : { folder: state.folder?.id || '' }) },
+        appTile(a), h('div', { class: 'app-txt' }, h('div', { class: 'name' }, a.name), h('div', { class: 'desc' }, t(a.description))));
+      card.style.setProperty('--app', appColor(a.slug)); // halo au survol
+      const li = h('li', {}, card);
+      li.style.setProperty('--i', i++); // apparition décalée, continue d'un groupe à l'autre
+      return li;
+    }));
+    // Un seul groupe : pas d'intertitre (compte limité à quelques applications du même genre).
+    return h('div', { class: 'app-group' }, groups.length > 1 ? head : null, ul);
   }));
-  if (!state.apps.length) $('apps').replaceChildren(h('li', { class: 'mut' }, t('Aucune application ne vous est attribuée. Contactez l\'administrateur.')));
 }
 
 // Apparition des éléments d'un dossier qu'on vient d'ouvrir (pas à chaque tri ou frappe dans la recherche).

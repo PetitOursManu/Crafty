@@ -3,6 +3,7 @@
     "enabled": true,
     "name": "PdfCraft",
     "description": "Lire, annoter, organiser et signer des PDF.",
+    "category": "office",
     "extensions": [
       "pdf"
     ],
@@ -59,6 +60,7 @@
     "enabled": true,
     "name": "WordCraft",
     "description": "Traitement de texte compatible Word (docx, odt, rtf).",
+    "category": "office",
     "extensions": [
       "docx",
       "docm",
@@ -134,6 +136,7 @@
     "enabled": true,
     "name": "GridCraft",
     "description": "Tableur compatible Excel (xlsx, ods, csv).",
+    "category": "office",
     "extensions": [
       "xlsx",
       "xlsm",
@@ -195,6 +198,7 @@
     "enabled": true,
     "name": "DeckCraft",
     "description": "Présentations compatibles PowerPoint (pptx).",
+    "category": "office",
     "extensions": [
       "pptx",
       "deckcraft"
@@ -251,6 +255,7 @@
     "enabled": true,
     "name": "CadCraft",
     "description": "Dessin technique 2D (DXF, DWG).",
+    "category": "3d",
     "extensions": [
       "dxf",
       "dwg"
@@ -310,6 +315,7 @@
     "enabled": true,
     "name": "FigCraft",
     "description": "Design d'interfaces et maquettes (figcraft, import Figma, Sketch, SVG).",
+    "category": "design",
     "extensions": [
       "figcraft"
     ],
@@ -371,6 +377,7 @@
     "mode": "intercept",
     "name": "PhotoCraft",
     "description": "Retouche photo et calques (PSD, TIFF, ORA, XCF, Krita, RAW, HEIC…)",
+    "category": "image",
     "extensions": [
       "psd",
       "pcraft"
@@ -521,6 +528,7 @@
       }
     },
     "description": "Illustration vectorielle (vectorcraft, import SVG, PDF, AI…)",
+    "category": "design",
     "tools": [
       "colors",
       "converter"
@@ -532,6 +540,7 @@
     "mode": "intercept",
     "name": "LightCraft",
     "description": "Photothèque et développement RAW (bibliothèque gardée par compte)",
+    "category": "image",
     "extensions": [],
     "imports": [
       "jpg",
@@ -636,6 +645,7 @@
       }
     },
     "description": "Animation et effets visuels (projets ecproj)",
+    "category": "media",
     "data": {
       "opfs": [
         "effectcraft/config%2Fsession.ecproj",
@@ -661,6 +671,7 @@
     "mode": "intercept",
     "name": "DesignCraft",
     "description": "Mise en page (designcraft, import InDesign IDML).",
+    "category": "design",
     "extensions": [
       "designcraft"
     ],
@@ -724,6 +735,7 @@
     "stripPrefix": "texturecraft-web-0.6.1/",
     "source": "https://github.com/storytold/texturecraft/releases/tag/v0.6.1",
     "description": "Peinture de textures sur modèles 3D (tcraft)",
+    "category": "3d",
     "tools": [
       "colors"
     ],
@@ -754,6 +766,7 @@
     "stripPrefix": "materialcraft-web-0.4.1/",
     "source": "https://github.com/storytold/materialcraft/releases/tag/v0.4.1",
     "description": "Matériaux procéduraux par nœuds (mcraft, sbs)",
+    "category": "3d",
     "tools": [
       "colors"
     ],
@@ -764,6 +777,7 @@
     "mode": "intercept",
     "name": "SoundCraft",
     "description": "Station audio : pistes, clips, mixage (scraftz).",
+    "category": "media",
     "extensions": [
       "scraftz",
       "scraft"
@@ -809,12 +823,14 @@
     "stripPrefix": "craft-anything-web-0.6.1/",
     "source": "https://github.com/storytold/craft-anything/releases/tag/v0.6.1",
     "description": "Analyse de n'importe quel fichier (lecture seule)",
+    "category": "tools",
     "repo": "storytold/craft-anything"
   },
   "filmcraft": {
     "enabled": true,
     "name": "FilmCraft",
     "description": "Montage vidéo (projets fcproj ; médias pris dans vos fichiers)",
+    "category": "media",
     "extensions": [
       "fcproj"
     ],
@@ -899,6 +915,7 @@
     "source": "https://github.com/ucs-care-group/mailcraft/releases/tag/v0.13.0",
     "name": "MailCraft",
     "description": "Messagerie : boîte gardée par compte, import eml, mbox, pst, ics, vcf ; export eml, mbox, ics, vcf",
+    "category": "office",
     "mode": "intercept",
     "extensions": [],
     "imports": [
@@ -938,6 +955,7 @@
     "source": "https://github.com/tangency-labs/solidcraft/releases/tag/v0.44.1",
     "name": "SolidCraft",
     "description": "CAO paramétrique 3D",
+    "category": "3d",
     "mode": "intercept",
     "extensions": [
       "sc"
