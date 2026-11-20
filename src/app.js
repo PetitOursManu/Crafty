@@ -2,12 +2,13 @@
 import express from 'express';
 import { existsSync, readFileSync, constants as fsConstants } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
 import { createLogger } from './log.js';
 import { createAuth, checkCredentials, verifyPassword } from './auth.js';
 import { createStatic, notFound, safeFile } from './static.js';
+import { createAssets, rewriteRefs, REWRITTEN } from './assets.js';
 import { createFiles } from './files.js';
 import { adminRoutes } from './admin.js';
 import { prefsRoutes } from './prefs.js';
@@ -61,6 +62,17 @@ export function createApp({
   const kosmy = createKosmyBoard({ db, log, auth, cookieSecure, ...(kosmyOptions || {}) });
   files.cleanTmp();
   const st = createStatic({ apps, vendorDir, csp, precompressedDir });
+  // Interface (public/) : scripts et feuilles de style cités avec ?v=<version> (src/assets.js).
+  const assets = createAssets(join(root, 'public'));
+  const sendPublic = async (req, res, file, cacheControl) => {
+    const ext = extname(file).toLowerCase();
+    if (!REWRITTEN.has(ext) && ext !== '.css') return st.sendStatic(req, res, file, cacheControl);
+    const v = await assets.version();
+    // Adresse à la version courante : immutable. Ancienne version ou sans version : revalidée à chaque fois.
+    if (cacheControl === 'no-cache' && req.query.v === v) cacheControl = 'public, max-age=31536000, immutable';
+    if (!REWRITTEN.has(ext)) return st.sendStatic(req, res, file, cacheControl);
+    return st.sendStatic(req, res, file, cacheControl, { transform: (text) => rewriteRefs(text, v), variant: v });
+  };
   const json = express.json({ limit: '64kb' });
 
   const app = express();
@@ -213,7 +225,7 @@ export function createApp({
 
   // --- Page publique d'un lien de partage (sans compte ; voir src/shares.js) ---
   app.get(/^\/s\/[A-Za-z0-9_-]{30,60}$/, async (req, res, next) => {
-    try { res.set({ 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' }); return await st.sendStatic(req, res, join(root, 'public', 'share.html'), 'no-store'); }
+    try { res.set({ 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' }); return await sendPublic(req, res, join(root, 'public', 'share.html'), 'no-store'); }
     catch (e) { next(e); }
   });
 
@@ -226,11 +238,11 @@ export function createApp({
         if (!req.user && !req.guest) return res.redirect(302, `/login.html?next=${back}`);
         if (req.user?.mustChange) return res.redirect(302, `/login.html?change=1&next=${back}`);
         if (page === 'admin.html' && req.user?.role !== 'admin') return res.redirect(302, '/');
-        return await st.sendStatic(req, res, join(root, 'public', page), 'no-store');
+        return await sendPublic(req, res, join(root, 'public', page), 'no-store');
       }
       const f = safeFile(resolve(root, 'public'), req.path.slice(1), 'index.html');
       if (!f || Object.values(PAGES).includes(f.rel)) return notFound(res);
-      return await st.sendStatic(req, res, f.file, 'no-cache');
+      return await sendPublic(req, res, f.file, 'no-cache');
     } catch (e) { next(e); }
   });
   return app;

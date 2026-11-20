@@ -78,7 +78,9 @@ export function createStatic({ apps, vendorDir, csp, precompressedDir = null,
     next();
   }
 
-  async function sendStatic(req, res, file, cacheControl) {
+  // transform(texte) → texte : contenu réécrit avant compression (adresses versionnées de public/), gardé en cache sous
+  // variant (la version) avec le fichier, sa date et sa taille.
+  async function sendStatic(req, res, file, cacheControl, { transform = null, variant = '' } = {}) {
     const st = await stat(file).catch(() => null);
     if (!st?.isFile()) return notFound(res);
     const ext = extname(file).toLowerCase();
@@ -109,7 +111,7 @@ export function createStatic({ apps, vendorDir, csp, precompressedDir = null,
 
     // 2. Tel quel : lu depuis le disque, seule l'empreinte reste en mémoire.
     const enc = !COMPRESSIBLE.has(ext) ? null : okBr ? 'br' : okGz ? 'gzip' : null;
-    if (!enc) {
+    if (!enc && !transform) {
       let t = etags.get(file);
       if (!t || t.mtime !== st.mtimeMs || t.size !== st.size) {
         t = { mtime: st.mtimeMs, size: st.size, etag: etagOf(await readFile(file)) };
@@ -119,17 +121,19 @@ export function createStatic({ apps, vendorDir, csp, precompressedDir = null,
       return send(`"${t.etag}"`, null, st.size, null, file);
     }
 
-    // 3. Compressé à la volée. Promesse en cache : deux requêtes simultanées (preload + chargement) ne compressent qu'une fois.
-    const key = `${file}|${enc}`;
+    // 3. Compressé à la volée (ou seulement réécrit). Promesse en cache : deux requêtes simultanées (preload + chargement)
+    // ne compressent qu'une fois.
+    const key = `${file}|${enc || 'identity'}|${transform ? variant : ''}`;
     let c = cache.get(key);
     if (c && (c.mtime !== st.mtimeMs || c.size !== st.size)) { cache.delete(key); cached -= c.bytes || 0; c = null; }
     if (c) { cache.delete(key); cache.set(key, c); } // plus récemment utilisé
     else remember(key, c = { mtime: st.mtimeMs, size: st.size, p: (async () => {
-      const raw = await readFile(file);
+      let raw = await readFile(file);
+      if (transform) raw = Buffer.from(transform(raw.toString('utf8')), 'utf8');
       const body = enc === 'br'
         ? await br(raw, { params: { [Z.BROTLI_PARAM_QUALITY]: 9, [Z.BROTLI_PARAM_SIZE_HINT]: raw.length } })
-        : await gz(raw, { level: 9 });
-      return { body, etag: `"${etagOf(raw)}-${enc}"` };
+        : enc === 'gzip' ? await gz(raw, { level: 9 }) : raw;
+      return { body, etag: `"${etagOf(raw)}${enc ? `-${enc}` : ''}"` };
     })() });
     const r = await c.p.catch((err) => { if (cache.get(key) === c) cache.delete(key); throw err; });
     return send(r.etag, enc, r.body.length, r.body);

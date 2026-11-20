@@ -185,6 +185,9 @@ charge pas l'application et propose celles qui le lisent.
 - Exploitation (17/11/2026) : sonde `/api/health` ; SIGTERM = arrêt propre ; keep-alive 95 s (> 90 s de Traefik) ; applications
   précompressées au build et servies depuis le disque (`precompressed/manifest.json`, taille vérifiée), sinon compression à la
   volée bornée par `STATIC_CACHE_MB` ; instantané de la base toutes les `BACKUP_EVERY_HOURS` h ; journal `auth.log` tourné à 5 Mo.
+- Interface versionnée (20/11/2026, `src/assets.js`) : derrière Cloudflare, une page neuve chargeait d'anciens `.js` (Cloudflare
+  les garde et impose 4 h au navigateur, pas au HTML). Le serveur ajoute `?v=<empreinte de public/>` aux `src`/`href` des pages et aux
+  `import` des modules ; à la version courante : `immutable`, sinon `no-cache`. Pas de `.js` chargé autrement dans `public/`.
 - Double authentification (17/11/2026) : TOTP (RFC 6238) chiffré par `CRAFTY_SECRET`, ticket de 5 min / 5 essais entre mot de passe
   et code, code faux = échec de connexion (verrouillage, fail2ban), compteur non remis à zéro par le mot de passe seul, codes de
   secours hachés à usage unique ; l'admin (ou `accounts.mjs reset-2fa`) la retire. QR code : `qrcode-generator` (seule dépendance ajoutée).

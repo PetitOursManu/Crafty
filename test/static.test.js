@@ -61,6 +61,42 @@ test('index.html : no-cache ; modèle OCR non haché : no-cache + ETag + 304', a
   assert.equal(r.status, 304);
 });
 
+test('interface : scripts et styles cités avec ?v=<version>, immutable à la version courante, version changée par une mise à jour', async () => {
+  const { writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const page = await c.get('/login.html');
+  assert.equal(page.status, 200);
+  const html = page.buf.toString();
+  const v = html.match(/src="\/login\.js\?v=([\w-]+)"/)?.[1];
+  assert.ok(v, html);
+  assert.match(html, new RegExp(`href="/ui\\.css\\?v=${v}"`));
+  assert.match(html, /href="\/manifest\.webmanifest"/); // ni .js ni .css : inchangé
+  // Modules : import … from et import() réécrits ; une simple chaîne ne l'est pas.
+  const js = await c.get(`/login.js?v=${v}`);
+  assert.equal(js.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.equal(js.headers.get('content-type'), 'text/javascript; charset=utf-8');
+  const body = js.buf.toString();
+  assert.match(body, new RegExp(`from '/ui\\.js\\?v=${v}'`));
+  assert.match(body, new RegExp(`import\\('/more\\.js\\?v=${v}'\\)`));
+  assert.match(body, /const page = '\/host\.js\?x';/);
+  // Compressé (fetch décompresse) et ETag qui revalide.
+  const br = await c.get(`/login.js?v=${v}`, { headers: { 'accept-encoding': 'br' } });
+  assert.equal(br.headers.get('content-encoding'), 'br');
+  assert.equal(br.buf.toString(), body);
+  assert.equal((await c.get('/login.js', { headers: { 'if-none-match': js.headers.get('etag') } })).status, 304);
+  // Sans version ou à une autre version : revalidé à chaque fois (jamais gardé un an sous une adresse périmée).
+  assert.equal((await c.get('/login.js')).headers.get('cache-control'), 'no-cache');
+  assert.equal((await c.get('/ui.css?v=ancienne')).headers.get('cache-control'), 'no-cache');
+  assert.equal((await c.get(`/ui.css?v=${v}`)).headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  // Une mise à jour de public/ change la version de toutes les adresses.
+  writeFileSync(join(s.root, 'public', 'ui.js'), 'export const t = (s) => s + "";');
+  await new Promise((r) => setTimeout(r, 1100));
+  const v2 = (await c.get('/login.html')).buf.toString().match(/src="\/login\.js\?v=([\w-]+)"/)?.[1];
+  assert.ok(v2 && v2 !== v);
+  assert.match((await c.get(`/login.js?v=${v2}`)).buf.toString(), new RegExp(`from '/ui\\.js\\?v=${v2}'`));
+  assert.equal((await c.get(`/login.js?v=${v}`)).headers.get('cache-control'), 'no-cache');
+});
+
 test('404 pour tout fichier absent ou chemin douteux, sans repli vers index.html', async () => {
   for (const p of ['/apps/demo/absent.wasm', '/apps/demo/x/y/z.js', '/apps/demo/models/', '/apps/inconnue/', '/apps/absent/',
     '/apps/demo/.htaccess', '/apps/demo/..%2f..%2fapps.json', '/apps/demo/%2e%2e/%2e%2e/apps.json', '/apps/demo/models%5c..%5c..%5capps.json',

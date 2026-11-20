@@ -24,7 +24,13 @@ export async function startServer(opts = {}) {
     absent: { name: 'Absent', version: '9.9.9' },
   }));
   mkdirSync(join(root, 'public'));
-  for (const p of ['index.html', 'host.html', 'admin.html', 'login.html', 'share.html', 'ui.js']) writeFileSync(join(root, 'public', p), `<!-- ${p} -->`);
+  for (const p of ['index.html', 'host.html', 'admin.html', 'share.html']) writeFileSync(join(root, 'public', p), `<!-- ${p} -->`);
+  // Références versionnées par le serveur (src/assets.js) : balises des pages et imports des modules.
+  writeFileSync(join(root, 'public', 'login.html'), '<!-- login.html --><link rel="stylesheet" href="/ui.css"><script type="module" src="/login.js"></script>'
+    + '<link rel="manifest" href="/manifest.webmanifest">');
+  writeFileSync(join(root, 'public', 'login.js'), "import { t } from '/ui.js';\nconst more = () => import('/more.js');\nconst page = '/host.js?x';\n" + '/* ' + 'x'.repeat(2000) + ' */');
+  writeFileSync(join(root, 'public', 'ui.js'), 'export const t = (s) => s;');
+  writeFileSync(join(root, 'public', 'ui.css'), 'body { margin: 0 }');
   const app = createApp({ root, dataDir: join(root, 'data'), quiet: true, trustProxy: 'true', ...opts });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
