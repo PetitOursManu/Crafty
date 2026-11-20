@@ -88,7 +88,7 @@ export function createApp({
   const appJson = (slug) => ({ slug, name: apps[slug].name || slug, description: apps[slug].description || '',
     version: apps[slug].version, extensions: apps[slug].extensions || [], imports: apps[slug].imports || [],
     prefKeys: apps[slug].prefKeys || [], control: apps[slug].control || {}, mode: apps[slug].mode || 'bridge',
-    data: apps[slug].data || null, tools: apps[slug].tools || [] });
+    data: apps[slug].data || null, tools: apps[slug].tools || [], category: apps[slug].category || null });
 
   // --- Santé (sonde du conteneur) : base lisible, dossier de données accessible en écriture, au moins une application ---
   app.get('/api/health', async (req, res) => {

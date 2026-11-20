@@ -19,7 +19,10 @@
 @keyframes grad-move { to { background-position: 100% 0; } }
 .hero .mut { margin: 6px 0 0; font-size: 15px; }
 
-/* Applications */
+/* Applications, par genre (apps.json → category) */
+.app-groups { display: flex; flex-direction: column; gap: 22px; }
+.app-group-h { margin: 0 0 10px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--mut);
+  animation: rise .55s var(--ease) both; }
 .apps-row { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .apps-row > li { animation: rise .55s var(--ease) both; animation-delay: calc(80ms + var(--i, 0) * 35ms); }
 .app-card { --app: var(--accent); position: relative; display: flex; align-items: center; gap: 13px; padding: 12px 16px 12px 12px; border-radius: 18px;
@@ -35,6 +38,8 @@
 .app-card .desc { font-size: 12px; color: var(--mut); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 /* Téléphone : deux colonnes compactes (18 applications sur une colonne repoussaient « Mes fichiers » de 1 300 px). */
 @media (max-width: 520px) {
+  .app-groups { gap: 16px; }
+  .app-group-h { margin-bottom: 7px; font-size: 12px; }
   .apps-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .app-card { gap: 9px; padding: 8px 10px 8px 8px; border-radius: 14px; }
   .app-card .app-tile { width: 34px; height: 34px; border-radius: 11px; font-size: 15px; flex: none; }

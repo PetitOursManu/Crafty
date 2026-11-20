@@ -52,6 +52,13 @@ export default {
   'CAO paramétrique 3D': '3D parametric CAD',
 
   // ---------- explorer.js ----------
+  'Bureautique': 'Office',
+  'Photo et image': 'Photo and image',
+  'Design et illustration': 'Design and illustration',
+  '3D et CAO': '3D and CAD',
+  'Audio et vidéo': 'Audio and video',
+  'Outils': 'Tools',
+  'Autres': 'Other',
   'Aucune application ne vous est attribuée. Contactez l\'administrateur.': 'No apps are assigned to you. Contact the administrator.',
   'Espace utilisé': 'Storage used',
   '{used} sur {quota}': '{used} of {quota}',
