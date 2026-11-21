@@ -6,7 +6,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { langOf, translate } from '../src/i18n.js';
-import SERVER_EN, { PATTERNS } from '../src/i18n-en.js';
+import SERVER_EN, { PATTERNS, BOARD_ADMIN } from '../src/i18n-en.js';
+import { SECTION_TITLES, EFFORT_LABELS, AUDIT_LABELS } from '../src/kosmy-admin.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const pub = join(ROOT, 'public');
@@ -79,6 +80,20 @@ test('serveur : chaque message d\'erreur a sa traduction (exacte ou motif)', () 
     }
   }
   assert.deepEqual(missing, [], 'messages du serveur sans traduction');
+});
+
+test('admin dans Kosmy Board : chaque texte a sa traduction (interface, serveur ou BOARD_ADMIN), avec les mêmes variables', async () => {
+  const UI = { ...(await import('../public/i18n/en-account.js')).default, ...(await import('../public/i18n/en-common.js')).default };
+  const { keys, bad } = tKeys(readFileSync(join(ROOT, 'src', 'kosmy-admin.js'), 'utf8'));
+  const all = [...keys, ...Object.values(SECTION_TITLES), ...Object.values(EFFORT_LABELS), ...Object.values(AUDIT_LABELS)];
+  const en = (k) => BOARD_ADMIN[k] ?? UI[k] ?? SERVER_EN[k] ?? (PATTERNS.some(([re]) => re.test(k)) ? k : undefined);
+  const missing = all.filter((k) => en(k) === undefined);
+  const wrongVars = all.filter((k) => en(k) !== undefined && vars(k).join() !== vars(en(k)).join());
+  assert.deepEqual(bad, [], 't(`…${x}…`) interdit');
+  assert.deepEqual([...new Set(missing)], [], 'traductions manquantes');
+  assert.deepEqual(wrongVars, [], 'variables différentes');
+  const unused = Object.keys(BOARD_ADMIN).filter((k) => !all.includes(k));
+  assert.deepEqual(unused, [], 'textes de BOARD_ADMIN inutilisés');
 });
 
 test('langue du serveur selon Accept-Language ; français sans en-tête', () => {

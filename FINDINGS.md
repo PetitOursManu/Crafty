@@ -431,6 +431,13 @@ Toutes vérifiées dans Chrome (page hôte réelle, CSP stricte, tests e2e dédi
   **vérifié**, y compris un média déplacé hors du dossier du projet. `control.projectMedia` + `GET /api/files?name=`.
 - Sauvegarde automatique par `file.save` : **vérifiée**. Thème : aucune commande (`view.theme` absent) → non suivi.
 - Commandes : `project.select {items}` puis `file.newSequenceFromClip` ; `request()` ne connaît pas les noms de commandes.
+- **Export H.264 (MP4) impossible dans la version web 0.20.1** (vérifié le 21/11/2026, aussi dans sa propre page, sans Crafty
+  ni CSP) : `export failed: encode: invalid configuration: cannot build the 1-thread pool: operation not supported on this
+  platform`, quel que soit le réglage (profil, débit, intra, audio, MXF H.264). C'est le préréglage par défaut (« Match Source »).
+  Défaut connu : storytold/filmcraft#4635 (ouvert, « in progress » ; 0.20.1 est la dernière version). HEVC et AV1 : indisponibles
+  sur le web. **Marchent** dans sa propre page : ProRes et Motion JPEG (`.mov`), GIF, séquences PNG (un fichier par image), WAV
+  (DNxHR et APV annoncés disponibles, non essayés). Dans Crafty : Motion JPEG essayé, arrivé par `filmcraft:save`
+  (`saveAs:false`) et rangé à côté du document. À revérifier à la prochaine version.
 
 **LightCraft 0.21.1** (interception ; son pont n'a pas de sens sans document : `dirty:true` permanent) :
 - API `window.lightcraft.command(nom, json)` posée après l'init du wasm : la page hôte la reconnaît (prête en 7 à 10 s au lieu

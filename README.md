@@ -61,6 +61,28 @@ le mot de passe Crafty (l'admin peut aussi le faire depuis la liste des comptes)
 connexion est désactivée par défaut ; un compte créé ainsi est toujours un simple utilisateur, sans mot de passe. Se déconnecter de
 Crafty ne ferme pas la session du Board.
 
+## Admin dans Kosmy Board
+
+Le bouton « Admin » du Board affiche l'administration de Crafty dans le Board lui-même, sans ouvrir Crafty
+([protocole `kosmy.board-admin.v1`](https://github.com/PetitOursManu/Kosmy-Board/blob/main/docs/admin-api.md)). Le serveur du Board
+appelle `/api/kosmy-board/admin` (sommaire) et `/api/kosmy-board/admin/{section}` (GET : contenu, POST : action) avec un jeton d'une
+seule requête signé par sa clé OpenID Connect.
+
+- **Prérequis** : la connexion avec Kosmy Board réglée (section précédente), et le compte Board de la personne **relié** à un compte
+  Crafty **administrateur**, actif et sans mot de passe provisoire en attente. Le Board ne donne aucun droit : sinon, refus
+  (`not_linked` ou `forbidden`, avec un message). Le serveur du Board doit joindre Crafty à l'adresse saisie dans le Board.
+- **Ce qui s'y trouve** : vue d'ensemble (comptes, sessions, fichiers, espace, liens de partage, version, applications) ; comptes
+  (création avec mot de passe provisoire montré une fois, rôle, applications, quota, nouveau mot de passe provisoire, déverrouillage,
+  retrait de la double authentification, déliaison Dashy / Kosmy Board, désactivation, suppression) ; réglages (accès, applications
+  des invités, fichiers) ; assistant IA (accès, limites, fournisseurs, clés en écriture seule, essai, consommation) ; système
+  (connexion avec Kosmy Board, création automatique de compte, Dashy, chiffrement des secrets, sauvegardes) ; journal.
+- **Mêmes règles que l'administration de Crafty** : chaque action passe par les mêmes fonctions (contrôles, effets, journal d'audit,
+  noté `via: kosmy-board`). Aucun secret existant n'est renvoyé. Depuis le Board, on ne change ni le rôle, ni l'état, ni le mot de
+  passe, ni le lien Kosmy Board de son propre compte, ni l'émetteur, l'identifiant ou le secret client (cela couperait l'accès du Board).
+- **Restent dans Crafty** : la vérification de l'adresse IP réelle (`TRUST_PROXY`, à faire depuis un navigateur) et le réglage de la
+  connexion avec Kosmy Board elle-même (émetteur, identifiant, secret, désactivation).
+- Textes en français ou en anglais selon la langue de la personne dans le Board (`Accept-Language`).
+
 ## Installer sur Coolify
 
 L'image est prête et essayée en local (santé, arrêt propre, redémarrage sans perte, sauvegarde et restauration). Les
