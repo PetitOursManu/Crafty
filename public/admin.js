@@ -26,6 +26,7 @@ function selectTab(name) {
     $(`tab-${tb}`).tabIndex = on ? 0 : -1;
     $(`panel-${tb}`).hidden = !on;
   }
+  $(`tab-${name}`).scrollIntoView({ block: 'nearest', inline: 'nearest' });
   history.replaceState(null, '', `#${name}`);
   if (name === 'audit') loadAudit();
   if (name === 'ai') renderAi($('ai'), users);
@@ -95,13 +96,13 @@ function userRow(u) {
         u.twoFactor ? h('span', { class: 'badge' }, t('double authentification')) : null,
         u.dashy ? h('span', { class: 'badge' }, u.hasPassword ? t('lié à Dashy') : t('Dashy seulement')) : null,
         u.kosmy ? h('span', { class: 'badge' }, u.hasPassword ? t('relié à Kosmy Board') : t('Kosmy Board seulement')) : null)))),
-    h('td', {}, u.role === 'admin' || u.allApps ? h('span', { class: 'badge' }, t('Toutes'))
+    h('td', { 'data-label': t('Applications') }, u.role === 'admin' || u.allApps ? h('span', { class: 'badge' }, t('Toutes'))
       : h('div', { class: 'apps-cell' }, u.apps.length ? u.apps.map((s) => h('span', { class: 'badge' }, nameOf(s))) : h('span', { class: 'badge danger' }, t('Aucune')))),
-    h('td', {}, h('div', { class: 'space' },
+    h('td', { 'data-label': t('Espace') }, h('div', { class: 'space' },
       u.quota == null ? `${formatSize(u.used)} / ${formatSize(quota)}` : t('{used} / {quota} (personnalisé)', { used: formatSize(u.used), quota: formatSize(quota) }),
       meter, u.files === 1 ? t('1 fichier(s)') : t('{n} fichier(s)', { n: u.files }))),
-    h('td', { class: 'mut' }, u.lastLoginAt ? formatDateTime(u.lastLoginAt) : t('jamais')),
-    h('td', {}, more));
+    h('td', { class: 'mut', 'data-label': t('Dernière connexion') }, u.lastLoginAt ? formatDateTime(u.lastLoginAt) : t('jamais')),
+    h('td', { class: 'actions' }, more));
 }
 async function patch(u, body, ok) {
   try { await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body }); toast({ title: ok }); await loadUsers(); }
