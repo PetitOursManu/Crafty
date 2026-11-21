@@ -96,6 +96,7 @@ label.field .hint { font-weight: 400; color: var(--mut); font-size: 12px; }
 .brand:hover .brand-logo { transform: rotate(-8deg) scale(1.06); }
 .brand-logo.lg { width: 56px; height: 56px; border-radius: 16px; }
 .topbar .spacer { flex: 1; }
+@media (max-width: 720px) { .topbar { padding: 0 16px; gap: 10px; } }
 .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft);
   color: var(--accent); border: 0; cursor: pointer; font: inherit; font-weight: 800; box-shadow: 0 0 0 2px var(--surface);
   transition: transform .2s var(--ease), box-shadow .2s; }
