@@ -10,7 +10,7 @@ import { createAuth, checkCredentials, verifyPassword } from './auth.js';
 import { createStatic, notFound, safeFile } from './static.js';
 import { createAssets, rewriteRefs, REWRITTEN } from './assets.js';
 import { createFiles } from './files.js';
-import { adminRoutes } from './admin.js';
+import { adminRoutes, createAdmin } from './admin.js';
 import { prefsRoutes } from './prefs.js';
 import { createAppData } from './appdata.js';
 import { createAi } from './ai.js';
@@ -19,6 +19,7 @@ import { i18nMiddleware } from './i18n.js';
 import { createTwoFactor } from './twofactor.js';
 import { createSso } from './sso.js';
 import { createKosmyBoard } from './kosmy-board.js';
+import { kosmyAdminRoutes } from './kosmy-admin.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -60,6 +61,8 @@ export function createApp({
   const twofa = createTwoFactor({ db, log, auth, ...(twoFactorOptions || {}) });
   const sso = createSso({ db, log, auth, settings: db.settings, cookieSecure, ...(ssoOptions || {}) });
   const kosmy = createKosmyBoard({ db, log, auth, cookieSecure, ...(kosmyOptions || {}) });
+  const admin = createAdmin({ db, auth, files, appData, log, apps, twofa, sso,
+    backupDir: dataDir === ':memory:' ? null : (process.env.BACKUP_DIR || join(dataDir, 'backups')) });
   files.cleanTmp();
   const st = createStatic({ apps, vendorDir, csp, precompressedDir });
   // Interface (public/) : scripts et feuilles de style cités avec ?v=<version> (src/assets.js).
@@ -84,6 +87,9 @@ export function createApp({
   app.locals.files = files;
   app.locals.dataDir = dataDir;
   app.use(st.headers);
+  // Admin dans Kosmy Board : appelée par le serveur du Board avec son propre jeton (src/kosmy-admin.js), avant les sessions,
+  // le contrôle d'origine et la traduction des erreurs (réponses JSON propres au protocole).
+  kosmyAdminRoutes(app, { kosmy, admin, ai, apps, db, sso });
   app.use(auth.loadSession);
   app.use(i18nMiddleware); // messages d'erreur en anglais selon Accept-Language (src/i18n.js)
   app.use('/api', auth.originCheck);
@@ -200,8 +206,7 @@ export function createApp({
   twofa.routes(app, { json, requireUser: auth.requireUser });
   sso.routes(app, { json });
   kosmy.routes(app, { json, requireUser: auth.requireUser, requireAdmin: auth.requireAdmin });
-  adminRoutes(app, { db, auth, files, appData, log, apps, json, trustProxy, cookieSecure, twofa, sso,
-    backupDir: dataDir === ':memory:' ? null : (process.env.BACKUP_DIR || join(dataDir, 'backups')) });
+  adminRoutes(app, { admin, auth, json, trustProxy, cookieSecure });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Introuvable.' }));
 
   // --- Applications : session obligatoire et application autorisée, sinon 404 ---

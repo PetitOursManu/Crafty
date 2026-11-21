@@ -121,54 +121,61 @@ export function createAi({ db, log, secret = process.env.CRAFTY_SECRET || '', fe
     && (x.content === null || x.content === undefined || typeof x.content === 'string' || Array.isArray(x.content)));
   const validTools = (t) => t === undefined || (Array.isArray(t) && t.length <= 60 && t.every((x) => x?.type === 'function' && /^[a-z_][a-z0-9_]{0,63}$/.test(x.function?.name || '')));
 
+  // --- Administration (page d'administration et admin dans Kosmy Board : mêmes règles, même journal) ---
+  const err = (status, error) => Object.assign(new Error(error), { status, expose: true });
+  const adminView = (c = config()) => ({
+    enabled: c.enabled, everyone: c.everyone, users: c.users, defaultProvider: c.defaultProvider, maxPerHour: c.maxPerHour, maxSteps: c.maxSteps,
+    encrypted, efforts: EFFORTS,
+    providers: AI_PROVIDERS.map((d) => {
+      const p = c.providers[d.id] || {};
+      return { id: d.id, label: d.label, defaultBaseUrl: d.baseUrl, suggestedModel: d.model, enabled: !!p.enabled, baseUrl: p.baseUrl || '', model: p.model || '',
+        effort: p.effort || 'auto', hasKey: !!open(p.key), keyUnreadable: !!p.key && !open(p.key), ready: !!ready(c, d.id) };
+    }),
+  });
+  function updateConfig(actor, b = {}) {
+    const c = config();
+    if ('enabled' in b) c.enabled = !!b.enabled;
+    if ('everyone' in b) c.everyone = !!b.everyone;
+    if ('users' in b) { if (!Array.isArray(b.users) || !b.users.every(Number.isInteger)) throw err(400, 'Liste de comptes invalide.'); c.users = [...new Set(b.users)]; }
+    if ('maxPerHour' in b) { if (!(Number.isInteger(b.maxPerHour) && b.maxPerHour >= 1 && b.maxPerHour <= 10_000)) throw err(400, 'Limite par heure invalide.'); c.maxPerHour = b.maxPerHour; }
+    if ('maxSteps' in b) { if (!(Number.isInteger(b.maxSteps) && b.maxSteps >= 1 && b.maxSteps <= 100)) throw err(400, 'Nombre d\'étapes invalide.'); c.maxSteps = b.maxSteps; }
+    if ('defaultProvider' in b) { if (b.defaultProvider !== null && !byId[b.defaultProvider]) throw err(400, 'Fournisseur inconnu.'); c.defaultProvider = b.defaultProvider; }
+    for (const [id, p] of Object.entries(b.providers || {})) {
+      if (!byId[id]) throw err(400, `Fournisseur inconnu : ${id}`);
+      const cur = c.providers[id] || {};
+      if ('enabled' in p) cur.enabled = !!p.enabled;
+      if ('baseUrl' in p) { const u = String(p.baseUrl || '').trim(); if (u && !/^https?:\/\/[^\s]+$/.test(u)) throw err(400, 'Adresse invalide (http ou https).'); cur.baseUrl = u; }
+      if ('model' in p) cur.model = String(p.model || '').trim().slice(0, 200);
+      if ('effort' in p) { if (!EFFORTS.includes(p.effort)) throw err(400, 'Effort invalide.'); cur.effort = p.effort; }
+      if ('apiKey' in p) cur.key = p.apiKey ? seal(String(p.apiKey).trim()) : ''; // absent : clé inchangée ; vide : retirée
+      c.providers[id] = cur;
+    }
+    save(c);
+    log.audit(actor, 'admin.ai', null, { enabled: c.enabled, defaultProvider: c.defaultProvider, providers: Object.keys(b.providers || {}) });
+    return adminView(c);
+  }
+  async function testProvider(id, timeoutMs = 60_000) {
+    const p = ready(config(), id);
+    if (!p) throw err(400, 'Fournisseur incomplet : activé, adresse, modèle et clé.');
+    const t0 = Date.now();
+    try {
+      const r = await complete(p, { messages: [{ role: 'user', content: 'Réponds seulement : OK' }] }, timeoutMs);
+      return { ok: true, ms: Date.now() - t0, answer: String(r.message.content || '').slice(0, 200), model: p.model };
+    } catch (e) { throw err(502, e.name === 'TimeoutError' ? `${p.label} : pas de réponse (délai dépassé).` : e.message); }
+  }
+  const usage = () => q.usage.all(new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10));
+
   function routes(app, { requireUser, requireAdmin, json }) {
     const bigJson = json; // express.json limité à 5 Mo dans app.js
+    const wrap = (fn) => async (req, res, next) => {
+      try { await fn(req, res); }
+      catch (e) { if (e.expose) return res.status(e.status).json({ error: e.message }); next(e); }
+    };
     // --- Administration ---
-    const adminView = (c) => ({
-      enabled: c.enabled, everyone: c.everyone, users: c.users, defaultProvider: c.defaultProvider, maxPerHour: c.maxPerHour, maxSteps: c.maxSteps,
-      encrypted, efforts: EFFORTS,
-      providers: AI_PROVIDERS.map((d) => {
-        const p = c.providers[d.id] || {};
-        return { id: d.id, label: d.label, defaultBaseUrl: d.baseUrl, suggestedModel: d.model, enabled: !!p.enabled, baseUrl: p.baseUrl || '', model: p.model || '',
-          effort: p.effort || 'auto', hasKey: !!open(p.key), keyUnreadable: !!p.key && !open(p.key), ready: !!ready(c, d.id) };
-      }),
-    });
-    app.get('/api/admin/ai', requireAdmin, (req, res) => res.set('Cache-Control', 'no-store').json(adminView(config())));
-    app.put('/api/admin/ai', requireAdmin, json, (req, res) => {
-      const b = req.body || {}, c = config();
-      if ('enabled' in b) c.enabled = !!b.enabled;
-      if ('everyone' in b) c.everyone = !!b.everyone;
-      if ('users' in b) { if (!Array.isArray(b.users) || !b.users.every(Number.isInteger)) return res.status(400).json({ error: 'Liste de comptes invalide.' }); c.users = [...new Set(b.users)]; }
-      if ('maxPerHour' in b) { if (!(Number.isInteger(b.maxPerHour) && b.maxPerHour >= 1 && b.maxPerHour <= 10_000)) return res.status(400).json({ error: 'Limite par heure invalide.' }); c.maxPerHour = b.maxPerHour; }
-      if ('maxSteps' in b) { if (!(Number.isInteger(b.maxSteps) && b.maxSteps >= 1 && b.maxSteps <= 100)) return res.status(400).json({ error: 'Nombre d\'étapes invalide.' }); c.maxSteps = b.maxSteps; }
-      if ('defaultProvider' in b) { if (b.defaultProvider !== null && !byId[b.defaultProvider]) return res.status(400).json({ error: 'Fournisseur inconnu.' }); c.defaultProvider = b.defaultProvider; }
-      for (const [id, p] of Object.entries(b.providers || {})) {
-        if (!byId[id]) return res.status(400).json({ error: `Fournisseur inconnu : ${id}` });
-        const cur = c.providers[id] || {};
-        if ('enabled' in p) cur.enabled = !!p.enabled;
-        if ('baseUrl' in p) { const u = String(p.baseUrl || '').trim(); if (u && !/^https?:\/\/[^\s]+$/.test(u)) return res.status(400).json({ error: 'Adresse invalide (http ou https).' }); cur.baseUrl = u; }
-        if ('model' in p) cur.model = String(p.model || '').trim().slice(0, 200);
-        if ('effort' in p) { if (!EFFORTS.includes(p.effort)) return res.status(400).json({ error: 'Effort invalide.' }); cur.effort = p.effort; }
-        if ('apiKey' in p) cur.key = p.apiKey ? seal(String(p.apiKey).trim()) : ''; // absent : clé inchangée ; vide : retirée
-        c.providers[id] = cur;
-      }
-      save(c);
-      log.audit(req, 'admin.ai', null, { enabled: c.enabled, defaultProvider: c.defaultProvider, providers: Object.keys(b.providers || {}) });
-      res.json(adminView(c));
-    });
-    app.post('/api/admin/ai/test', requireAdmin, json, async (req, res) => {
-      const p = ready(config(), req.body?.provider);
-      if (!p) return res.status(400).json({ error: 'Fournisseur incomplet : activé, adresse, modèle et clé.' });
-      const t0 = Date.now();
-      try {
-        const r = await complete(p, { messages: [{ role: 'user', content: 'Réponds seulement : OK' }] }, 60_000);
-        res.json({ ok: true, ms: Date.now() - t0, answer: String(r.message.content || '').slice(0, 200), model: p.model });
-      } catch (e) { res.status(502).json({ error: e.message }); }
-    });
-    app.get('/api/admin/ai/usage', requireAdmin, (req, res) => {
-      const since = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
-      res.set('Cache-Control', 'no-store').json(q.usage.all(since));
-    });
+    app.get('/api/admin/ai', requireAdmin, (req, res) => res.set('Cache-Control', 'no-store').json(adminView()));
+    app.put('/api/admin/ai', requireAdmin, json, wrap((req, res) => res.json(updateConfig(req, req.body || {}))));
+    app.post('/api/admin/ai/test', requireAdmin, json, wrap(async (req, res) => res.json(await testProvider(req.body?.provider))));
+    app.get('/api/admin/ai/usage', requireAdmin, (req, res) => res.set('Cache-Control', 'no-store').json(usage()));
 
     // --- Utilisateurs ---
     app.get('/api/ai', requireUser, (req, res) => {
@@ -199,5 +206,5 @@ export function createAi({ db, log, secret = process.env.CRAFTY_SECRET || '', fe
       }
     });
   }
-  return { routes, config, allowed: (user) => allowed(config(), user) };
+  return { routes, config, allowed: (user) => allowed(config(), user), adminView, updateConfig, testProvider, usage, providers: AI_PROVIDERS };
 }

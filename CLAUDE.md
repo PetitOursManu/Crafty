@@ -22,7 +22,7 @@ commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifi
   sessions, verrouillage), `files.js` (dossiers, fichiers, versions, quotas), `admin.js`, `static.js` (MIME, compression, CSP),
   `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit, rotation), `static-rules.js` (MIME, ETag, extensions compressibles),
   `backup.js` (instantanés de la base), `secrets.js` (chiffrement par `CRAFTY_SECRET`), `totp.js` + `twofactor.js` (double authentification),
-  `sso.js` (Dashy), `kosmy-board.js` (connexion avec Kosmy Board, OpenID Connect). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
+  `sso.js` (Dashy), `kosmy-board.js` (connexion avec Kosmy Board, OpenID Connect), `kosmy-admin.js` (admin dans Kosmy Board). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
 - Logo : source `assets/crafty-logo-source.webp`, déclinaisons dans `public/brand/` (favicon, icônes, manifeste web).
 - Interface (`public/`) : `intercept.js` (interceptions dans l'iframe), `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
   `host.*` (page hôte de production ; journal et outils seulement pour un admin avec `?debug`), `admin.*`, `ui.*` (composants
@@ -202,6 +202,13 @@ charge pas l'application et propose celles qui le lisent.
   automatique désactivée par défaut et toujours en simple utilisateur. Réglages en base (clé `kosmy_board`, secret scellé par
   `CRAFTY_SECRET`, jamais renvoyé). Adresses publiques : `PUBLIC_ORIGIN`, sinon celle de la requête. Comme Dashy, la connexion par le
   Board ne demande pas la double authentification de Crafty (le Board a la sienne). Exception GET : `/auth/kosmy-board/callback`.
+- Admin dans Kosmy Board (21/11/2026, `src/kosmy-admin.js`, protocole `kosmy.board-admin.v1`, docs/admin-api.md du Board) : le serveur
+  du Board appelle `/api/kosmy-board/admin[/{section}]` avec un jeton RS256 d'une requête (clés et réglages de la connexion unique ;
+  `typ` kb-admin+jwt, iss, aud, exp, htm, htu, jti à usage unique en mémoire), puis `sub` → compte relié, actif, administrateur.
+  Routes montées avant sessions, contrôle d'origine et traduction des erreurs ; pas de CORS. Les actions appellent les mêmes
+  fonctions que la page d'administration (`createAdmin` dans `admin.js`, `ai.js`, `kosmy-board.js`), journal noté `via: kosmy-board`.
+  Mot de passe provisoire tiré par le serveur et montré une fois (`reveal`). Depuis le Board : pas d'action sur son propre rôle, état,
+  mot de passe ou lien Kosmy, ni sur l'émetteur, l'identifiant ou le secret client. Textes : dictionnaires de `public/i18n/` + `BOARD_ADMIN`.
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.

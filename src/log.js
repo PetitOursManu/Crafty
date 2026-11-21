@@ -31,7 +31,9 @@ export function createLogger({ authLogFile, db, quiet = false, maxBytes = 5 * 10
       }
       if (!quiet) process.stdout.write(line);
     },
+    // req.via : action faite par une autre interface que celle de Crafty (« kosmy-board » : admin dans le Board), notée dans le détail.
     audit(req, action, target = null, detail = null) {
+      if (req.via) detail = { ...(detail == null ? {} : typeof detail === 'object' ? detail : { detail }), via: req.via };
       insert.run(Date.now(), req.user?.id ?? null, req.user?.username ?? null, req.ip ?? null, action,
         target, detail == null ? null : typeof detail === 'string' ? detail : JSON.stringify(detail));
     },

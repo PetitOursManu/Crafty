@@ -99,6 +99,65 @@ export default {
   'Secret client invalide.': 'Invalid client secret.',
 };
 
+// Admin dans Kosmy Board (src/kosmy-admin.js) : textes propres à cette API. Les autres viennent des dictionnaires de
+// l'interface (public/i18n/en-common.js, en-account.js) et des messages ci-dessus.
+export const BOARD_ADMIN = {
+  // Protocole : refus
+  "Ce compte Kosmy Board n'est relié à aucun compte Crafty. Connectez-vous à Crafty avec votre mot de passe, puis menu du compte → Relier à Kosmy Board.":
+    'This Kosmy Board account is not linked to any Crafty account. Sign in to Crafty with your password, then account menu → Link to Kosmy Board.',
+  'Votre compte Crafty est désactivé.': 'Your Crafty account is disabled.',
+  "Votre compte Crafty n'a pas les droits d'administration.": 'Your Crafty account does not have administrator rights.',
+  "Changez d'abord le mot de passe provisoire de votre compte Crafty.": 'First change the temporary password of your Crafty account.',
+  'Requête illisible.': 'Unreadable request.',
+  // Vue d'ensemble
+  "Vue d'ensemble": 'Overview',
+  'En bref': 'At a glance',
+  '{n} administrateur(s) actif(s)': '{n} active administrator(s)',
+  'Comptes désactivés': 'Disabled accounts',
+  'Sessions ouvertes': 'Open sessions',
+  'Espace utilisé': 'Space used',
+  'versions et corbeille comprises': 'including versions and trash',
+  'Liens de partage actifs': 'Active share links',
+  'liens de partage désactivés': 'share links disabled',
+  'Instance': 'Instance',
+  'Version de Crafty': 'Crafty version',
+  'désactivée': 'off',
+  'Sauvegarde automatique de la base': 'Automatic database backup',
+  'toutes les {n} h': 'every {n} h',
+  'Application': 'App',
+  'Version': 'Version',
+  'Aucune application.': 'No apps.',
+  // Comptes
+  'actif': 'active',
+  'mot de passe': 'password',
+  "Seuls les 500 premiers comptes sont affichés ici ; les autres sont dans l'administration de Crafty.":
+    'Only the first 500 accounts are shown here; the others are in the Crafty administration.',
+  '{name} (vous)': '{name} (you)',
+  'Rendre administrateur': 'Make administrator',
+  "Retirer les droits d'administration": 'Remove administrator rights',
+  'Applications…': 'Apps…',
+  'Sinon, seulement les applications cochées. La sélection actuelle est dans la colonne Applications ; un administrateur a toujours accès à toutes.':
+    'Otherwise, only the checked apps. The current selection is in the Apps column; an administrator always has access to all of them.',
+  'Quota…': 'Quota…',
+  'Le compte ne pourra plus se connecter ; ses sessions sont fermées.': 'The account will no longer be able to sign in; its sessions are closed.',
+  'Le compte, ses fichiers et leurs versions seront effacés. Cette action est définitive.': 'The account, its files and their versions will be erased. This cannot be undone.',
+  'Aucun compte.': 'No accounts.',
+  'Compte créé. Il faudra changer ce mot de passe à la première connexion.': 'Account created. This password must be changed at first sign-in.',
+  'Mot de passe provisoire de {name}': 'Temporary password for {name}',
+  "Cette action n'est pas possible pour ce compte.": 'This action is not possible for this account.',
+  'Il devra le changer à sa première connexion.': 'It must be changed at the next sign-in.',
+  // Réglages, assistant, système, journal
+  'Applications des invités': 'Guest apps',
+  'Utilisées seulement si le mode invité est activé.': 'Used only when guest mode is on.',
+  'Sinon, seulement les comptes cochés ci-dessous.': 'Otherwise, only the accounts checked below.',
+  'Essai': 'Test',
+  'Connexion unique, secrets et sauvegardes.': 'Single sign-on, secrets and backups.',
+  "L'émetteur, l'identifiant et le secret client se changent dans Crafty (Administration → Système) : les modifier d'ici couperait l'accès du Board.":
+    'The issuer, client ID and client secret are changed in Crafty (Administration → System): changing them from here would cut off the Board’s access.',
+  'Aucun événement.': 'No events.',
+  'État : {state}': 'Status: {state}',
+};
+
 // Du plus précis au plus général : le premier motif qui correspond l'emporte. Le libellé du fournisseur « Compatible
 // OpenAI (…) » est traduit lui aussi ; les autres sont des noms propres. Le dernier motif (« fournisseur : message
 // d'erreur renvoyé par l'API », texte non traduisible) ne fait que remettre la ponctuation à l'anglaise.

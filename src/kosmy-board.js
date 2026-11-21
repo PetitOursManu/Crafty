@@ -42,18 +42,29 @@ export function safeTarget(target, base) {
   } catch { return DEFAULT_TARGET; }
 }
 
-// ID token : signature RS256 avec la clé de jwks_uri désignée par kid, puis iss, aud (= identifiant client), exp, nonce.
-export function verifyIdToken(token, { keys, issuer, clientId, nonce, now = Date.now() }) {
+// Jeton du Board : en-tête et revendications lus, signature RS256 vérifiée avec la clé de jwks_uri désignée par kid.
+function verifySigned(token, keys) {
   const parts = String(token || '').split('.');
   if (parts.length !== 3) throw new Error('malformed');
   let header, claims;
   try { header = b64urlJson(parts[0]); claims = b64urlJson(parts[1]); } catch { throw new Error('malformed'); }
+  if (!header || typeof header !== 'object' || !claims || typeof claims !== 'object') throw new Error('malformed');
   if (header.alg !== 'RS256') throw new Error('algorithm');
   const jwk = keys.find((k) => k.kty === 'RSA' && (!header.kid || k.kid === header.kid) && (!k.use || k.use === 'sig') && (!k.alg || k.alg === 'RS256'));
   if (!jwk) throw new Error('key');
   let key;
   try { key = createPublicKey({ key: { kty: jwk.kty, n: jwk.n, e: jwk.e }, format: 'jwk' }); } catch { throw new Error('key'); }
   if (!verifySig('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), key, Buffer.from(parts[2], 'base64url'))) throw new Error('signature');
+  return { header, claims };
+}
+// Type de jeton (en-tête typ), comparé sans casse et sans le préfixe « application/ » (RFC 7515 § 4.1.9).
+const typOf = (header) => String(header.typ ?? '').toLowerCase().replace(/^application\//, '');
+export const ADMIN_TYP = 'kb-admin+jwt';
+
+// ID token : signature, iss, aud (= identifiant client), exp, nonce. Un jeton d'admin du Board n'est jamais un ID token.
+export function verifyIdToken(token, { keys, issuer, clientId, nonce, now = Date.now() }) {
+  const { header, claims } = verifySigned(token, keys);
+  if (typOf(header) === ADMIN_TYP) throw new Error('type');
   if (claims.iss !== issuer) throw new Error('issuer');
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!aud.includes(clientId) || (aud.length > 1 && claims.azp !== clientId)) throw new Error('audience');
@@ -61,6 +72,27 @@ export function verifyIdToken(token, { keys, issuer, clientId, nonce, now = Date
   if (typeof claims.exp !== 'number' || claims.exp < sec - 30) throw new Error('expired');
   if (typeof claims.iat === 'number' && claims.iat > sec + 120) throw new Error('expired');
   if (!sameText(claims.nonce, nonce)) throw new Error('nonce');
+  if (typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 200) throw new Error('claims');
+  return claims;
+}
+
+// Jeton de l'admin dans le Board (docs/admin-api.md du Board) : signature RS256, typ kb-admin+jwt, iss, aud, exp (30 s de
+// tolérance), âge de 2 min au plus, htm = méthode, chemin de htu terminé par le chemin demandé. Le jti (usage unique) est
+// vérifié par l'appelant, qui garde les jti reçus.
+export function verifyAdminToken(token, { keys, issuer, clientId, method, path, now = Date.now() }) {
+  const { header, claims } = verifySigned(token, keys);
+  if (typOf(header) !== ADMIN_TYP) throw new Error('type');
+  if (claims.iss !== issuer) throw new Error('issuer');
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!aud.includes(clientId)) throw new Error('audience');
+  const sec = Math.floor(now / 1000);
+  if (typeof claims.exp !== 'number' || claims.exp < sec - 30) throw new Error('expired');
+  if (typeof claims.iat !== 'number' || claims.iat > sec + 30 || claims.iat < sec - 150) throw new Error('expired');
+  if (claims.htm !== method) throw new Error('htm');
+  let htuPath = null;
+  try { const u = new URL(claims.htu); if (['http:', 'https:'].includes(u.protocol)) htuPath = u.pathname; } catch {}
+  if (!htuPath || !htuPath.endsWith(path)) throw new Error('htu');
+  if (typeof claims.jti !== 'string' || !claims.jti || claims.jti.length > 200) throw new Error('jti');
   if (typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 200) throw new Error('claims');
   return claims;
 }
@@ -235,7 +267,7 @@ export function createKosmyBoard({ db, log, auth, cookieSecure = false, origin =
         try { kid = b64urlJson(tr.data.id_token.split('.')[0]).kid; } catch {}
         claims = verifyIdToken(tr.data.id_token, { keys: await signingKeys(d.jwks_uri, kid), issuer: c.issuer, clientId: c.clientId, nonce: flow.nonce });
       } catch (e) {
-        if (/^(malformed|algorithm|key|signature|issuer|audience|expired|nonce|claims)$/.test(e.message)) return fail('token');
+        if (/^(malformed|algorithm|key|signature|type|issuer|audience|expired|nonce|claims)$/.test(e.message)) return fail('token');
         console.error('Kosmy Board :', e.message);
         return fail('unreachable');
       }
@@ -266,32 +298,57 @@ export function createKosmyBoard({ db, log, auth, cookieSecure = false, origin =
       res.redirect(302, flow.target || DEFAULT_TARGET);
     });
 
-    // Administration : réglages à coller depuis le Board, adresses à donner au Board. Le secret n'est jamais renvoyé.
-    const adminJson = (req) => {
-      const c = config(), base = baseOf(req);
-      return { enabled: enabled(c), issuer: c.issuer, clientId: c.clientId, hasSecret: !!c.secret, createAccounts: c.createAccounts,
-        redirectUri: `${base}${CALLBACK_PATH}`, loginUri: `${base}${LOGIN_PATH}`, secretsEncrypted: sealer.encrypted, publicOrigin: !!origin };
-    };
     app.get('/api/admin/kosmy-board', requireAdmin, (req, res) => res.set('Cache-Control', 'no-store').json(adminJson(req)));
     app.put('/api/admin/kosmy-board', requireAdmin, json, (req, res) => {
-      const b = req.body || {}, c = config();
-      const issuer = b.issuer === undefined ? c.issuer : normalizeIssuer(b.issuer);
-      if (b.issuer !== undefined && String(b.issuer).trim() && !issuer) return res.status(400).json({ error: 'Émetteur invalide : adresse http(s) attendue.' });
-      const clientId = b.clientId === undefined ? c.clientId : String(b.clientId).trim();
-      if (clientId.length > 200) return res.status(400).json({ error: 'Identifiant client invalide.' });
-      let sealed = c.secret;
-      if (b.clearSecret === true) sealed = '';
-      else if (typeof b.clientSecret === 'string' && b.clientSecret.trim()) {
-        if (b.clientSecret.trim().length > 500) return res.status(400).json({ error: 'Secret client invalide.' });
-        sealed = sealer.seal(b.clientSecret.trim());
-      }
-      const createAccounts = b.createAccounts === undefined ? c.createAccounts : b.createAccounts === true;
-      setRow.run(JSON.stringify({ issuer, clientId, secret: sealed, createAccounts }));
-      if (issuer !== c.issuer) { discovery = null; jwks = null; flows.clear(); }
-      log.audit(req, 'admin.kosmy', null, { issuer, clientId, secret: sealed !== c.secret ? '(changé)' : undefined, createAccounts });
-      res.json(adminJson(req));
+      try { res.json(saveSettings(req, req.body || {})); }
+      catch (e) { if (!e.expose) throw e; res.status(e.status).json({ error: e.message }); }
     });
   }
 
-  return { routes, enabled: () => enabled() };
+  // Administration : réglages à coller depuis le Board, adresses à donner au Board. Le secret n'est jamais renvoyé.
+  const adminJson = (req) => {
+    const c = config(), base = baseOf(req);
+    return { enabled: enabled(c), issuer: c.issuer, clientId: c.clientId, hasSecret: !!c.secret, createAccounts: c.createAccounts,
+      redirectUri: `${base}${CALLBACK_PATH}`, loginUri: `${base}${LOGIN_PATH}`, secretsEncrypted: sealer.encrypted, publicOrigin: !!origin };
+  };
+  const err = (status, error) => Object.assign(new Error(error), { status, expose: true });
+  function saveSettings(req, b) {
+    const c = config();
+    const issuer = b.issuer === undefined ? c.issuer : normalizeIssuer(b.issuer);
+    if (b.issuer !== undefined && String(b.issuer).trim() && !issuer) throw err(400, 'Émetteur invalide : adresse http(s) attendue.');
+    const clientId = b.clientId === undefined ? c.clientId : String(b.clientId).trim();
+    if (clientId.length > 200) throw err(400, 'Identifiant client invalide.');
+    let sealed = c.secret;
+    if (b.clearSecret === true) sealed = '';
+    else if (typeof b.clientSecret === 'string' && b.clientSecret.trim()) {
+      if (b.clientSecret.trim().length > 500) throw err(400, 'Secret client invalide.');
+      sealed = sealer.seal(b.clientSecret.trim());
+    }
+    const createAccounts = b.createAccounts === undefined ? c.createAccounts : b.createAccounts === true;
+    setRow.run(JSON.stringify({ issuer, clientId, secret: sealed, createAccounts }));
+    if (issuer !== c.issuer) { discovery = null; jwks = null; flows.clear(); }
+    log.audit(req, 'admin.kosmy', null, { issuer, clientId, secret: sealed !== c.secret ? '(changé)' : undefined, createAccounts });
+    return adminJson(req);
+  }
+
+  // Admin dans le Board : jeton vérifié avec les réglages, la découverte et les clés de la connexion unique ; jti à usage
+  // unique, gardés en mémoire jusqu'à leur expiration. Renvoie { claims, user } (user : compte relié par sub, ou null).
+  // Erreurs : 'not-configured', 'unreachable' (découverte ou clés), ou le motif du refus du jeton.
+  const seenJti = new Map(); // jti → fin de validité (ms)
+  async function adminIdentity(token, { method, path }) {
+    const c = config();
+    if (!enabled(c)) throw new Error('not-configured');
+    let kid, keys;
+    try { kid = b64urlJson(String(token).split('.')[0])?.kid; } catch {}
+    try { keys = await signingKeys((await discover(c.issuer)).jwks_uri, kid); }
+    catch (e) { console.error('Kosmy Board :', e.message); throw new Error('unreachable'); }
+    const claims = verifyAdminToken(token, { keys, issuer: c.issuer, clientId: c.clientId, method, path });
+    const now = Date.now();
+    for (const [k, exp] of seenJti) if (exp < now) seenJti.delete(k);
+    if (seenJti.has(claims.jti)) throw new Error('replay');
+    seenJti.set(claims.jti, (claims.exp + 30) * 1000);
+    return { claims, user: q.bySub.get(claims.sub) || null };
+  }
+
+  return { routes, enabled: () => enabled(), adminJson, saveSettings, adminIdentity };
 }
