@@ -149,18 +149,21 @@ function editUser(u) {
   const role = h('select', { disabled: u.id === me.user.id }, h('option', { value: 'user' }, t('Utilisateur')), h('option', { value: 'admin' }, t('Administrateur')));
   role.value = u.role;
   const quota = quotaInput(u.quota);
+  const email = h('input', { type: 'email', value: u.email || '', maxlength: 200, autocomplete: 'off', spellcheck: false, autocapitalize: 'none' });
   const chooser = appsChooser('edit-apps', u.allApps, u.apps);
   const errEl = h('div', { class: 'error-text', role: 'alert' });
   const dlg = dialog({ title: t('Modifier {name}', { name: u.username }), wide: true,
     body: h('div', { class: 'form' },
       h('label', { class: 'field' }, t('Rôle'), role, h('span', { class: 'hint' }, t('Un administrateur a toujours accès à toutes les applications.'))),
       h('fieldset', { class: 'card' }, h('legend', { class: 'visually-hidden' }, t('Applications')), h('h3', {}, t('Applications')), chooser.el),
-      h('label', { class: 'field' }, t('Quota (Gio)'), quota, h('span', { class: 'hint' }, t('Vide = quota par défaut.'))), errEl),
+      h('label', { class: 'field' }, t('Quota (Gio)'), quota, h('span', { class: 'hint' }, t('Vide = quota par défaut.'))),
+      h('label', { class: 'field' }, t('Adresse e-mail'), email,
+        h('span', { class: 'hint' }, t('Facultative. Si Kosmy Board donne accès à Crafty à cette adresse, il reprend ce compte au lieu d\'en créer un autre.'))), errEl),
     actions: [h('button', { class: 'btn', value: 'cancel', formnovalidate: true }, t('Annuler')), h('button', { class: 'btn primary', value: 'ok' }, t('Enregistrer'))] });
   dlg.querySelector('form').addEventListener('submit', async (e) => {
     if (e.submitter?.value !== 'ok') return;
     e.preventDefault();
-    const body = { ...chooser.value(), quota: quotaValue(quota) };
+    const body = { ...chooser.value(), quota: quotaValue(quota), email: email.value.trim() || null };
     if (u.id !== me.user.id) body.role = role.value;
     try { await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body }); dlg.close('done'); toast({ title: t('Compte modifié.') }); await loadUsers(); }
     catch (err) { errEl.textContent = err.message; }

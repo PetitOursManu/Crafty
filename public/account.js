@@ -52,6 +52,7 @@ const KOSMY_MESSAGES = {
   token: () => t('Réponse de Kosmy Board refusée (jeton invalide) : la configuration est à vérifier.'),
   'no-account': () => t('Ce compte Kosmy Board n\'est relié à aucun compte Crafty. Connectez-vous avec votre mot de passe, puis « Relier à Kosmy Board » dans le menu du compte.'),
   disabled: () => t('Ce compte est désactivé.'),
+  access: () => t('Kosmy Board a transmis un accès illisible pour Crafty : demandez à l\'administrateur du Board de vérifier votre rôle.'),
   ratelimit: () => t('Trop de tentatives, réessayez dans une minute.'),
   'linked-elsewhere': () => t('Ce compte Kosmy Board est déjà relié à un autre compte Crafty.'),
   'already-linked': () => t('Votre compte est déjà relié à un compte Kosmy Board.'),

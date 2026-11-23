@@ -25,7 +25,7 @@ const VERSION = (() => { try { return JSON.parse(readFileSync(new URL('../packag
 // (src/i18n-en.js : messages d'erreur, et BOARD_ADMIN pour les textes propres à cette API). test/i18n.test.js vérifie
 // que chaque texte passé à t() dans ce fichier a sa traduction.
 const EN = { ...account, ...common, ...BOARD_ADMIN };
-function tr(lang, fr, vars) {
+export function tr(lang, fr, vars) {
   let s = lang === 'fr' ? fr : (EN[fr] ?? translate('en', fr));
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
   return s;
@@ -47,7 +47,7 @@ export const AUDIT_LABELS = { 'auth.login': 'Connexion', 'auth.logout': 'Déconn
   'auth.kosmy': 'Connexion par Kosmy Board', 'auth.kosmy.create': 'Compte créé par Kosmy Board', 'auth.kosmy.link': 'Compte relié à Kosmy Board',
   'auth.kosmy.unlink': 'Compte délié de Kosmy Board', 'admin.kosmy': 'Réglages Kosmy Board modifiés' };
 
-class BoardError extends Error {
+export class BoardError extends Error {
   constructor(status, code, message) { super(code); Object.assign(this, { status, code, userMessage: message }); }
 }
 
@@ -61,7 +61,7 @@ const str = (v) => (v === undefined || v === null ? '' : String(v)).trim();
 // Nombre saisi : '' ou absent → null ; sinon Number (NaN si illisible : refusé par les contrôles du service).
 const num = (v) => (v === undefined || v === null || str(v) === '' ? null : Number(String(v).replace(',', '.')));
 
-async function readJson(req) {
+export async function readJson(req) {
   const chunks = [];
   let size = 0;
   for await (const c of req) {
@@ -70,6 +70,25 @@ async function readJson(req) {
     chunks.push(c);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return undefined; }
+}
+
+// Jeton du Board → compte Crafty administrateur, ou refus (401 invalid_token, 403 not_linked / forbidden). Commun à l'admin
+// dans le Board et aux utilisateurs gérés par le Board (src/kosmy-users.js) : même jeton, même vérification.
+export async function authenticate(kosmy, req, t) {
+  const m = /^Bearer\s+([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i.exec(String(req.headers.authorization || ''));
+  if (!m) throw new BoardError(401, 'invalid_token');
+  let id;
+  try { id = await kosmy.adminIdentity(m[1], { method: req.method, path: req.path.replace(/\/+$/, '') }); }
+  catch (e) {
+    if (e.message === 'unreachable') throw new BoardError(503, 'unavailable', t('Kosmy Board ne répond pas : réessayez plus tard.'));
+    throw new BoardError(401, 'invalid_token');
+  }
+  const u = id.user;
+  if (!u) throw new BoardError(403, 'not_linked', t('Ce compte Kosmy Board n\'est relié à aucun compte Crafty. Connectez-vous à Crafty avec votre mot de passe, puis menu du compte → Relier à Kosmy Board.'));
+  if (u.disabled) throw new BoardError(403, 'forbidden', t('Votre compte Crafty est désactivé.'));
+  if (u.role !== 'admin') throw new BoardError(403, 'forbidden', t('Votre compte Crafty n\'a pas les droits d\'administration.'));
+  if (u.must_change) throw new BoardError(403, 'forbidden', t('Changez d\'abord le mot de passe provisoire de votre compte Crafty.'));
+  return u;
 }
 
 export function kosmyAdminRoutes(app, { kosmy, admin, ai, apps, db, sso }) {
@@ -463,30 +482,12 @@ export function kosmyAdminRoutes(app, { kosmy, admin, ai, apps, db, sso }) {
   };
   const build = async (v, id) => ({ id, ...(await SECTIONS[id].build(v)) });
 
-  // Jeton du Board → compte Crafty administrateur, ou refus (401 invalid_token, 403 not_linked / forbidden).
-  async function authenticate(req, t) {
-    const m = /^Bearer\s+([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i.exec(String(req.headers.authorization || ''));
-    if (!m) throw new BoardError(401, 'invalid_token');
-    let id;
-    try { id = await kosmy.adminIdentity(m[1], { method: req.method, path: req.path.replace(/\/+$/, '') }); }
-    catch (e) {
-      if (e.message === 'unreachable') throw new BoardError(503, 'unavailable', t('Kosmy Board ne répond pas : réessayez plus tard.'));
-      throw new BoardError(401, 'invalid_token');
-    }
-    const u = id.user;
-    if (!u) throw new BoardError(403, 'not_linked', t('Ce compte Kosmy Board n\'est relié à aucun compte Crafty. Connectez-vous à Crafty avec votre mot de passe, puis menu du compte → Relier à Kosmy Board.'));
-    if (u.disabled) throw new BoardError(403, 'forbidden', t('Votre compte Crafty est désactivé.'));
-    if (u.role !== 'admin') throw new BoardError(403, 'forbidden', t('Votre compte Crafty n\'a pas les droits d\'administration.'));
-    if (u.must_change) throw new BoardError(403, 'forbidden', t('Changez d\'abord le mot de passe provisoire de votre compte Crafty.'));
-    return u;
-  }
-
   async function handle(req, res) {
     res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
     const send = (status, body) => res.status(status).json(body);
     const t0 = (fr, vars) => tr(langOf(req), fr, vars);
     try {
-      const u = await authenticate(req, t0);
+      const u = await authenticate(kosmy, req, t0);
       // L'acteur des fonctions d'administration (journal, contrôles « soi-même ») : le compte relié, pas de session.
       req.user = { id: u.id, username: u.username, role: u.role };
       req.sessionHash = '';

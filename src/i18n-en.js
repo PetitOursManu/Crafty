@@ -41,6 +41,7 @@ export default {
   'Il doit rester au moins un administrateur actif.': 'At least one active administrator must remain.',
   'Vous ne pouvez pas désactiver votre propre compte.': 'You can’t disable your own account.',
   'Vous ne pouvez pas supprimer votre propre compte.': 'You can’t delete your own account.',
+  'Adresse e-mail invalide.': 'Invalid email address.',
 
   // Fichiers, dossiers, corbeille, miniatures (files.js)
   'Dossier introuvable.': 'Folder not found.',
@@ -99,7 +100,7 @@ export default {
   'Secret client invalide.': 'Invalid client secret.',
 };
 
-// Admin dans Kosmy Board (src/kosmy-admin.js) : textes propres à cette API. Les autres viennent des dictionnaires de
+// Admin dans Kosmy Board et utilisateurs gérés par le Board (src/kosmy-admin.js, src/kosmy-users.js) : textes propres à ces API. Les autres viennent des dictionnaires de
 // l'interface (public/i18n/en-common.js, en-account.js) et des messages ci-dessus.
 export const BOARD_ADMIN = {
   // Protocole : refus
@@ -156,6 +157,28 @@ export const BOARD_ADMIN = {
     'The issuer, client ID and client secret are changed in Crafty (Administration → System): changing them from here would cut off the Board’s access.',
   'Aucun événement.': 'No events.',
   'État : {state}': 'Status: {state}',
+  // Utilisateurs gérés par le Board (src/kosmy-users.js)
+  'Gère Crafty (comptes, réglages, assistant IA) et a accès à toutes les applications.':
+    'Manages Crafty (accounts, settings, AI assistant) and has access to all apps.',
+  'Utilise les applications autorisées et son espace de fichiers.': 'Uses the allowed apps and their own file space.',
+  'Vide : quota par défaut des réglages ({n} Gio). Les anciennes versions et la corbeille comptent.':
+    'Empty: default quota from the settings ({n} GiB). Older versions and the trash count.',
+  'Sinon, seulement les applications cochées ci-dessous. Un administrateur a toujours accès à toutes.':
+    'Otherwise, only the apps checked below. An administrator always has access to all of them.',
+  "Sans effet si l'assistant est désactivé ou ouvert à tous les comptes (Assistant IA → Accès). Un administrateur y a toujours droit.":
+    'No effect if the assistant is off or open to all accounts (AI assistant → Access). An administrator always has it.',
+  'Restrictions illisibles.': 'Unreadable restrictions.',
+  'Valeur refusée pour « {field} ».': 'Value refused for “{field}”.',
+  'Rôle inconnu.': 'Unknown role.',
+  "Cette adresse e-mail est celle d'un compte Crafty déjà relié à une autre personne du Board.":
+    'This email address belongs to a Crafty account already linked to another Board user.',
+  'Plusieurs comptes Crafty portent cette adresse e-mail : gardez-la sur un seul (Administration → Comptes → Modifier).':
+    'Several Crafty accounts have this email address: keep it on only one (Administration → Accounts → Edit).',
+  "Vous ne pouvez pas vous retirer vos propres droits d'administration.": 'You can’t remove your own administrator rights.',
+  'Vous ne pouvez pas retirer votre propre accès.': 'You can’t remove your own access.',
+  'Compte créé.': 'Account created.',
+  'Compte existant relié.': 'Existing account linked.',
+  'Compte mis à jour.': 'Account updated.',
 };
 
 // Du plus précis au plus général : le premier motif qui correspond l'emporte. Le libellé du fournisseur « Compatible

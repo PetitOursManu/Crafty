@@ -20,6 +20,7 @@ import { createTwoFactor } from './twofactor.js';
 import { createSso } from './sso.js';
 import { createKosmyBoard } from './kosmy-board.js';
 import { kosmyAdminRoutes } from './kosmy-admin.js';
+import { createBoardUsers, kosmyUsersRoutes } from './kosmy-users.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGES = { '/': 'index.html', '/index.html': 'index.html', '/host.html': 'host.html', '/admin.html': 'admin.html' };
@@ -60,9 +61,11 @@ export function createApp({
   const ai = createAi({ db, log, ...(aiOptions || {}) });
   const twofa = createTwoFactor({ db, log, auth, ...(twoFactorOptions || {}) });
   const sso = createSso({ db, log, auth, settings: db.settings, cookieSecure, ...(ssoOptions || {}) });
-  const kosmy = createKosmyBoard({ db, log, auth, cookieSecure, ...(kosmyOptions || {}) });
   const admin = createAdmin({ db, auth, files, appData, log, apps, twofa, sso,
     backupDir: dataDir === ':memory:' ? null : (process.env.BACKUP_DIR || join(dataDir, 'backups')) });
+  // Utilisateurs gérés par Kosmy Board : mêmes fonctions que la page d'administration (src/kosmy-users.js).
+  const boardUsers = createBoardUsers({ db, log, admin, ai, apps });
+  const kosmy = createKosmyBoard({ db, log, auth, cookieSecure, boardUsers, ...(kosmyOptions || {}) });
   files.cleanTmp();
   const st = createStatic({ apps, vendorDir, csp, precompressedDir });
   // Interface (public/) : scripts et feuilles de style cités avec ?v=<version> (src/assets.js).
@@ -87,9 +90,11 @@ export function createApp({
   app.locals.files = files;
   app.locals.dataDir = dataDir;
   app.use(st.headers);
-  // Admin dans Kosmy Board : appelée par le serveur du Board avec son propre jeton (src/kosmy-admin.js), avant les sessions,
-  // le contrôle d'origine et la traduction des erreurs (réponses JSON propres au protocole).
+  // Admin dans Kosmy Board et utilisateurs gérés par le Board : appelés par le serveur du Board avec son propre jeton
+  // (src/kosmy-admin.js, src/kosmy-users.js), avant les sessions, le contrôle d'origine et la traduction des erreurs
+  // (réponses JSON propres au protocole).
   kosmyAdminRoutes(app, { kosmy, admin, ai, apps, db, sso });
+  kosmyUsersRoutes(app, { kosmy, boardUsers });
   app.use(auth.loadSession);
   app.use(i18nMiddleware); // messages d'erreur en anglais selon Accept-Language (src/i18n.js)
   app.use('/api', auth.originCheck);

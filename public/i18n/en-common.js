@@ -103,6 +103,9 @@ export default {
   'Modifier {name}': 'Edit {name}',
   'Un administrateur a toujours accès à toutes les applications.': 'An administrator always has access to all apps.',
   'Vide = quota par défaut.': 'Empty = default quota.',
+  'Adresse e-mail': 'Email address',
+  'Facultative. Si Kosmy Board donne accès à Crafty à cette adresse, il reprend ce compte au lieu d\'en créer un autre.':
+    'Optional. If Kosmy Board gives Crafty access to this address, it takes over this account instead of creating another one.',
   'Compte modifié.': 'Account updated.',
   'Nouveau mot de passe pour {name} ?': 'New password for {name}?',
   "Un mot de passe provisoire remplace l'actuel ; ses sessions ouvertes sont fermées.": 'A temporary password replaces the current one; their open sessions are signed out.',
