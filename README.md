@@ -83,6 +83,27 @@ seule requête signé par sa clé OpenID Connect.
   connexion avec Kosmy Board elle-même (émetteur, identifiant, secret, désactivation).
 - Textes en français ou en anglais selon la langue de la personne dans le Board (`Accept-Language`).
 
+## Utilisateurs gérés par Kosmy Board
+
+Un administrateur du Board peut donner (ou retirer) l'accès à Crafty à une personne, avec son rôle et ses restrictions : le Board
+crée, met à jour ou désactive alors son compte Crafty ([protocole `kosmy.board-users.v1`](https://github.com/PetitOursManu/Kosmy-Board/blob/main/docs/users-api.md)).
+Le serveur du Board appelle `GET /api/kosmy-board/users`, `PUT` et `DELETE /api/kosmy-board/users/{sub}` avec le même jeton et les
+mêmes prérequis que l'admin dans le Board (le compte Board de celui qui agit relié à un compte Crafty administrateur actif).
+
+- **Rôles** : Administrateur (droits d'administration de Crafty) et Utilisateur.
+- **Restrictions**, appliquées par Crafty : quota d'espace (en Gio, vide = quota par défaut ; tous les rôles), applications
+  autorisées (toutes, ou une case par application) et accès à l'assistant IA (sans effet si l'assistant est désactivé ou ouvert à
+  tous les comptes) ; ces deux dernières pour les utilisateurs seulement (un administrateur a tout).
+- **Création** : compte sans mot de passe (connexion par le Board seulement), identifiant tiré du nom, fixé ensuite. Un compte
+  existant non relié est **repris** s'il porte l'adresse e-mail donnée par le Board : l'adresse d'un compte se saisit dans
+  Administration → Comptes → Modifier. Adresse déjà reliée à une autre personne du Board, ou portée par plusieurs comptes : refus (409).
+- **Retrait de l'accès** : le compte est **désactivé** (ses fichiers restent) : connexion par mot de passe, par le Board ou par Dashy
+  refusée, sessions fermées, liens de partage coupés, admin dans le Board refusé. Un nouvel accès donné dans le Board le réactive.
+- **À la connexion par le Board**, l'accès transmis dans l'ID token (`kosmy_board_access`) est appliqué de la même façon, et le compte
+  créé s'il n'existe pas encore (même sans la création automatique) ; jamais de reprise par l'e-mail à ce moment-là, et un compte
+  désactivé ne se connecte pas.
+- Garde-fous : on ne se retire ni ses propres droits d'administration ni son propre accès, et il reste toujours un administrateur actif.
+
 ## Installer sur Coolify
 
 L'image est prête et essayée en local (santé, arrêt propre, redémarrage sans perte, sauvegarde et restauration). Les

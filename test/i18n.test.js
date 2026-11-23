@@ -82,9 +82,14 @@ test('serveur : chaque message d\'erreur a sa traduction (exacte ou motif)', () 
   assert.deepEqual(missing, [], 'messages du serveur sans traduction');
 });
 
-test('admin dans Kosmy Board : chaque texte a sa traduction (interface, serveur ou BOARD_ADMIN), avec les mêmes variables', async () => {
+test('admin et utilisateurs dans Kosmy Board : chaque texte a sa traduction (interface, serveur ou BOARD_ADMIN), avec les mêmes variables', async () => {
   const UI = { ...(await import('../public/i18n/en-account.js')).default, ...(await import('../public/i18n/en-common.js')).default };
-  const { keys, bad } = tKeys(readFileSync(join(ROOT, 'src', 'kosmy-admin.js'), 'utf8'));
+  const keys = [], bad = [];
+  for (const f of ['kosmy-admin.js', 'kosmy-users.js']) {
+    const r = tKeys(readFileSync(join(ROOT, 'src', f), 'utf8'));
+    keys.push(...r.keys);
+    bad.push(...r.bad);
+  }
   const all = [...keys, ...Object.values(SECTION_TITLES), ...Object.values(EFFORT_LABELS), ...Object.values(AUDIT_LABELS)];
   const en = (k) => BOARD_ADMIN[k] ?? UI[k] ?? SERVER_EN[k] ?? (PATTERNS.some(([re]) => re.test(k)) ? k : undefined);
   const missing = all.filter((k) => en(k) === undefined);

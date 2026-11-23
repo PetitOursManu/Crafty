@@ -147,6 +147,9 @@ export function openDb(file) {
   // Compte relié à Kosmy Board (OpenID Connect) : identifiant `sub` du Board, jamais l'e-mail.
   if (!cols('users').includes('kosmy_sub')) db.exec('ALTER TABLE users ADD COLUMN kosmy_sub TEXT');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_kosmy ON users(kosmy_sub) WHERE kosmy_sub IS NOT NULL');
+  // Adresse e-mail (facultative, en minuscules) : donnée par Kosmy Board pour un compte qu'il gère, ou saisie par l'admin ;
+  // sert seulement à relier un compte existant quand le Board donne l'accès à cette adresse (PUT, jamais à la connexion).
+  if (!cols('users').includes('email')) db.exec('ALTER TABLE users ADD COLUMN email TEXT');
   // Migration : colonne auto (sauvegarde automatique) ajoutée après la première version du schéma.
   if (!db.prepare('PRAGMA table_info(versions)').all().some((c) => c.name === 'auto')) db.exec('ALTER TABLE versions ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
 

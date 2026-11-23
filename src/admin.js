@@ -7,12 +7,15 @@ import { listBackups } from './backup.js';
 
 // Refus lisible : statut HTTP et message (en français, traduit à la sortie par src/i18n.js).
 const err = (status, error) => Object.assign(new Error(error), { status, expose: true });
+// Adresse e-mail d'un compte : vérification de forme seulement (jamais utilisée pour se connecter).
+export const EMAIL_RE = /^[^\s@<>"]{1,100}@[^\s@<>"]{1,100}$/;
+export const cleanEmail = (v) => { const s = String(v ?? '').trim().toLowerCase(); return s && s.length <= 200 && EMAIL_RE.test(s) ? s : null; };
 
 // actor : la requête de l'admin qui agit ({ user: { id, username }, ip, sessionHash }), pour les contrôles « soi-même » et le journal.
 export function createAdmin({ db, auth, files, appData, log, apps, twofa, sso, backupDir }) {
   const q = {
     users: db.prepare(`SELECT u.id, u.username, u.role, u.disabled, u.must_change, u.all_apps, u.quota, u.created_at, u.last_login_at,
-        u.locked_until, u.totp_enabled, u.dashy_sub, u.kosmy_sub, u.pass_hash, (SELECT IFNULL(SUM(size), 0) FROM versions v WHERE v.user_id = u.id) used,
+        u.locked_until, u.totp_enabled, u.dashy_sub, u.kosmy_sub, u.email, u.pass_hash, (SELECT IFNULL(SUM(size), 0) FROM versions v WHERE v.user_id = u.id) used,
         (SELECT COUNT(*) FROM files f WHERE f.user_id = u.id) files
       FROM users u ORDER BY u.username COLLATE NOCASE`),
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -27,7 +30,7 @@ export function createAdmin({ db, auth, files, appData, log, apps, twofa, sso, b
   const userJson = (u) => ({ id: u.id, username: u.username, role: u.role, disabled: !!u.disabled, mustChange: !!u.must_change,
     allApps: !!u.all_apps, apps: q.userApps.all(u.id).map((r) => r.slug), quota: u.quota, used: u.used, files: u.files,
     createdAt: u.created_at, lastLoginAt: u.last_login_at, locked: u.locked_until > Date.now(),
-    twoFactor: !!u.totp_enabled, dashy: !!u.dashy_sub, kosmy: !!u.kosmy_sub, hasPassword: String(u.pass_hash).startsWith('scrypt$') });
+    twoFactor: !!u.totp_enabled, dashy: !!u.dashy_sub, kosmy: !!u.kosmy_sub, email: u.email ?? null, hasPassword: String(u.pass_hash).startsWith('scrypt$') });
   const setApps = (id, allApps, list) => {
     q.clearApps.run(id);
     if (!allApps) for (const s of list) q.addApp.run(id, s);
@@ -60,6 +63,7 @@ export function createAdmin({ db, auth, files, appData, log, apps, twofa, sso, b
     if (b.role !== undefined && !['admin', 'user'].includes(b.role)) throw err(400, 'Rôle invalide.');
     if (b.allApps === false && !validApps(b.apps ?? [])) throw err(400, 'Liste d\'applications invalide.');
     if (b.quota !== undefined && b.quota !== null && !(Number.isInteger(b.quota) && b.quota >= 0)) throw err(400, 'Quota invalide.');
+    if (b.email !== undefined && b.email !== null && b.email !== '' && !cleanEmail(b.email)) throw err(400, 'Adresse e-mail invalide.');
     if (b.password !== undefined) {
       const e = checkCredentials(u.username, b.password);
       if (e) throw err(400, e);
@@ -68,6 +72,7 @@ export function createAdmin({ db, auth, files, appData, log, apps, twofa, sso, b
       if (b.role !== undefined) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(b.role, u.id);
       if (b.disabled !== undefined) db.prepare('UPDATE users SET disabled = ? WHERE id = ?').run(b.disabled ? 1 : 0, u.id);
       if (b.quota !== undefined) db.prepare('UPDATE users SET quota = ? WHERE id = ?').run(b.quota, u.id);
+      if (b.email !== undefined) db.prepare('UPDATE users SET email = ? WHERE id = ?').run(cleanEmail(b.email), u.id);
       if (b.unlock) db.prepare('UPDATE users SET failed_count = 0, locked_until = 0 WHERE id = ?').run(u.id);
       if (b.reset2fa) twofa.reset(u.id); // téléphone perdu, plus de code de secours
       if (b.unlinkDashy) db.prepare('UPDATE users SET dashy_sub = NULL WHERE id = ?').run(u.id);

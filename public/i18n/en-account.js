@@ -174,4 +174,6 @@ export default {
   'Compte relié à Kosmy Board': 'Account linked to Kosmy Board',
   'Compte délié de Kosmy Board': 'Account unlinked from Kosmy Board',
   'Réglages Kosmy Board modifiés': 'Kosmy Board settings changed',
+  "Kosmy Board a transmis un accès illisible pour Crafty : demandez à l'administrateur du Board de vérifier votre rôle.":
+    'Kosmy Board sent unreadable access details for Crafty: ask the Board administrator to check your role.',
 };

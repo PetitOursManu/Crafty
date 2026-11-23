@@ -4,7 +4,9 @@
 // cours est gardé côté serveur (usage unique) et lié au navigateur par un cookie httpOnly (pas de login CSRF).
 // Code échangé en client_secret_basic ; ID token vérifié ici sans dépendance : RS256 (clés de jwks_uri), iss, aud, exp, nonce.
 // Comptes reliés par `sub` seulement, jamais par l'e-mail (le Board ne le vérifie pas) ; création automatique en option,
-// désactivée par défaut, toujours en simple utilisateur. Réglages en base (clé kosmy_board), secret chiffré par CRAFTY_SECRET.
+// désactivée par défaut, toujours en simple utilisateur. Exception : l'ID token porte kosmy_board_access (accès donné par un
+// administrateur du Board, docs/users-api.md) → rôle et restrictions appliqués comme un PUT de src/kosmy-users.js, compte créé
+// au besoin. Réglages en base (clé kosmy_board), secret chiffré par CRAFTY_SECRET.
 // Exception assumée à « jamais d'état modifié en GET » : le retour du Board est une redirection (GET), comme pour Dashy.
 import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify as verifySig } from 'node:crypto';
 import { rateLimiter, USERNAME_RE, verifyPassword } from './auth.js';
@@ -97,14 +99,25 @@ export function verifyAdminToken(token, { keys, issuer, clientId, method, path, 
   return claims;
 }
 
+// Identifiant Crafty tiré du nom (ou de l'adresse) donné par le Board, rendu unique (taken : identifiant déjà pris ?).
+export function usernameFor(claims, taken) {
+  let base = String(claims.name || String(claims.email || claims.preferred_username || '').split('@')[0] || '').normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.').replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 28);
+  if (base.length < 3) base = `kosmy-${base}`.slice(0, 28);
+  let name = base, n = 2;
+  while (taken(name)) name = `${base}${n++}`;
+  return USERNAME_RE.test(name) ? name : `kosmy-${randomBytes(4).toString('hex')}`;
+}
+
 function parseCookies(header = '') {
   const out = {};
   for (const part of header.split(';')) { const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim()); }
   return out;
 }
 
+// boardUsers : utilisateurs gérés par le Board (src/kosmy-users.js), pour appliquer kosmy_board_access à la connexion.
 export function createKosmyBoard({ db, log, auth, cookieSecure = false, origin = process.env.PUBLIC_ORIGIN || '',
-  secret = process.env.CRAFTY_SECRET || '', fetchImpl = globalThis.fetch }) {
+  secret = process.env.CRAFTY_SECRET || '', fetchImpl = globalThis.fetch, boardUsers = null }) {
   origin = String(origin).replace(/\/+$/, '');
   const sealer = makeSealer(secret, 'crafty-kosmy-board');
   const getRow = db.prepare("SELECT value FROM settings WHERE key = 'kosmy_board'");
@@ -176,16 +189,6 @@ export function createKosmyBoard({ db, log, auth, cookieSecure = false, origin =
     u.search = new URLSearchParams({ response_type: 'code', client_id: c.clientId, redirect_uri: `${baseOf(req)}${CALLBACK_PATH}`,
       scope: 'openid profile email', state, nonce, code_challenge: codeChallenge(verifier), code_challenge_method: 'S256' }).toString();
     return u.href;
-  }
-
-  // Identifiant Crafty tiré du nom (ou de l'adresse) donné par le Board, rendu unique.
-  function usernameFor(claims) {
-    let base = String(claims.name || String(claims.email || claims.preferred_username || '').split('@')[0] || '').normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.').replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 28);
-    if (base.length < 3) base = `kosmy-${base}`.slice(0, 28);
-    let name = base, n = 2;
-    while (q.byName.get(name)) name = `${base}${n++}`;
-    return USERNAME_RE.test(name) ? name : `kosmy-${randomBytes(4).toString('hex')}`;
   }
 
   function routes(app, { json, requireUser, requireAdmin }) {
@@ -283,9 +286,24 @@ export function createKosmyBoard({ db, log, auth, cookieSecure = false, origin =
       }
 
       let u = q.bySub.get(sub), created = false;
-      if (!u) {
+      // Un compte désactivé (accès retiré dans le Board, ou par un admin de Crafty) ne se connecte pas, même avec un accès.
+      if (u?.disabled) return fail('disabled', u.username);
+      const access = claims.kosmy_board_access;
+      if (access !== undefined && access !== null && boardUsers) {
+        // Accès géré par le Board (docs/users-api.md du Board) : appliqué comme un PUT, compte créé s'il n'existe pas encore,
+        // jamais de liaison par l'e-mail ici.
+        try {
+          const r = await boardUsers.provision({ ip: req.ip, via: 'kosmy-board' }, sub,
+            { name: claims.name, email: claims.email, role: access?.role, values: access?.values }, { atLogin: true });
+          u = q.byId.get(r.id);
+          created = r.status === 'created';
+        } catch (e) {
+          if (!e.status) throw e;
+          return fail('access', u?.username ?? email);
+        }
+      } else if (!u) {
         if (!c.createAccounts) return fail('no-account', email);
-        const id = Number(q.insert.run(usernameFor(claims), Date.now(), sub).lastInsertRowid); // jamais administrateur
+        const id = Number(q.insert.run(usernameFor(claims, (n) => !!q.byName.get(n)), Date.now(), sub).lastInsertRowid); // jamais administrateur
         u = q.byId.get(id);
         created = true;
       }
@@ -294,7 +312,7 @@ export function createKosmyBoard({ db, log, auth, cookieSecure = false, origin =
       auth.openSession(req, res, { userId: u.id });
       log.auth('AUTH_OK', { ip: req.ip, user: u.username, reason: 'kosmy-board' });
       req.user = { id: u.id, username: u.username };
-      log.audit(req, created ? 'auth.kosmy.create' : 'auth.kosmy', null, { email });
+      log.audit(req, created ? 'auth.kosmy.create' : 'auth.kosmy', null, { email, ...(access && boardUsers ? { role: u.role } : {}) });
       res.redirect(302, flow.target || DEFAULT_TARGET);
     });
 

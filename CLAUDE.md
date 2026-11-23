@@ -22,7 +22,7 @@ commandes, inutile de tout expliquer, mais dis-moi clairement ce qui est vérifi
   sessions, verrouillage), `files.js` (dossiers, fichiers, versions, quotas), `admin.js`, `static.js` (MIME, compression, CSP),
   `db.js` (schéma SQLite), `log.js` (journal fail2ban + audit, rotation), `static-rules.js` (MIME, ETag, extensions compressibles),
   `backup.js` (instantanés de la base), `secrets.js` (chiffrement par `CRAFTY_SECRET`), `totp.js` + `twofactor.js` (double authentification),
-  `sso.js` (Dashy), `kosmy-board.js` (connexion avec Kosmy Board, OpenID Connect), `kosmy-admin.js` (admin dans Kosmy Board). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
+  `sso.js` (Dashy), `kosmy-board.js` (connexion avec Kosmy Board, OpenID Connect), `kosmy-admin.js` (admin dans Kosmy Board), `kosmy-users.js` (utilisateurs gérés par Kosmy Board). Données dans `DATA_DIR` (défaut `./data`, ignoré par git).
 - Logo : source `assets/crafty-logo-source.webp`, déclinaisons dans `public/brand/` (favicon, icônes, manifeste web).
 - Interface (`public/`) : `intercept.js` (interceptions dans l'iframe), `login.*`, `index.html` + `explorer.*` (accueil = applications + explorateur de fichiers),
   `host.*` (page hôte de production ; journal et outils seulement pour un admin avec `?debug`), `admin.*`, `ui.*` (composants
@@ -209,6 +209,14 @@ charge pas l'application et propose celles qui le lisent.
   fonctions que la page d'administration (`createAdmin` dans `admin.js`, `ai.js`, `kosmy-board.js`), journal noté `via: kosmy-board`.
   Mot de passe provisoire tiré par le serveur et montré une fois (`reveal`). Depuis le Board : pas d'action sur son propre rôle, état,
   mot de passe ou lien Kosmy, ni sur l'émetteur, l'identifiant ou le secret client. Textes : dictionnaires de `public/i18n/` + `BOARD_ADMIN`.
+- Utilisateurs gérés par Kosmy Board (23/11/2026, `src/kosmy-users.js`, protocole `kosmy.board-users.v1`, docs/users-api.md du Board) :
+  `GET /api/kosmy-board/users` (rôles admin/user, restrictions quota, toutes les applications, une case par application, assistant IA ;
+  comptes reliés), `PUT`/`DELETE /api/kosmy-board/users/{sub}`. Même jeton et même `authenticate` que l'admin dans le Board. Les
+  changements passent par `createAdmin.updateUser` et `ai.updateConfig` (même journal, `via: kosmy-board`). Compte créé sans mot de
+  passe (`'!kosmy'`), identifiant fixé à la création ; liaison d'un compte non relié par la colonne `users.email` (PUT seulement) ;
+  DELETE = `disabled` (déjà appliqué partout : mot de passe, Board, Dashy, sessions, liens de partage, admin dans le Board). À la
+  connexion, `kosmy_board_access` est appliqué comme un PUT (création même sans `createAccounts`, jamais de liaison par l'e-mail,
+  jamais de réactivation ; le dernier administrateur actif garde son rôle).
 - Production : aucun outil de débogage visible ; journal des messages et « simuler un échec » seulement pour un admin avec `?debug`.
 - Le premier compte devient admin puis l'inscription publique se ferme ; l'admin crée les autres comptes
   (changement de mot de passe forcé) et active les applications compte par compte.
